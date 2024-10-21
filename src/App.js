@@ -26,7 +26,7 @@ function App() {
   const handleFileSelect = (selectedVideo) => {
     setSelectedBinClip(selectedVideo);
   };
-
+// eslint-disable-next-line no-unused-vars
   const handleAddToTimeline = (clip) => {
     setTimelineClips(prevClips => [...prevClips, clip]);
   };

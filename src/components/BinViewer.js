@@ -42,6 +42,7 @@ const BinViewer = ({ selectedClip }) => {
   };
 
   // Handle Mouse Up Events
+  // eslint-disable-next-line
   const handleMouseUp = () => {
     console.log('Mouse Up');
     if (isDraggingStart) {
@@ -85,6 +86,7 @@ const BinViewer = ({ selectedClip }) => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleDocumentMouseUp);
     };
+    // eslint-disable-next-line
   }, [isDraggingStart, isDraggingEnd]);
 
   // Ensure video metadata is loaded before setting endTime

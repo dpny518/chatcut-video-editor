@@ -5,6 +5,7 @@ import '../styles/TimelineViewer.css';
 const TimelineViewer = ({ selectedClip }) => {
   const videoRef = useRef(null);
   const [currentTime, setCurrentTime] = useState(0);
+  // eslint-disable-next-line no-unused-vars
   const [duration, setDuration] = useState(0);
 
   useEffect(() => {
