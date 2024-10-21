@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactPlayer from 'react-player';
 import { Box, Typography, Button, LinearProgress } from '@mui/material';
 
@@ -9,6 +9,16 @@ const TimelineViewer = ({ clips }) => {
   const playerRef = useRef(null);
   const [currentUrl, setCurrentUrl] = useState(null);
 
+  // Use useCallback to ensure the function reference remains stable
+  const updateCurrentUrl = useCallback((index) => {
+    if (clips[index]) {
+      const url = URL.createObjectURL(clips[index].file);
+      console.log('Generated video URL: ', url); // Debugging log
+      setCurrentUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [clips]);
+
   useEffect(() => {
     if (clips.length > 0) {
       setCurrentClipIndex(0);
@@ -16,15 +26,7 @@ const TimelineViewer = ({ clips }) => {
       setPlaying(false);
       updateCurrentUrl(0);
     }
-  }, [clips]);
-
-  const updateCurrentUrl = (index) => {
-    if (clips[index]) {
-      const url = URL.createObjectURL(clips[index].file);
-      setCurrentUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-  };
+  }, [clips, updateCurrentUrl]); // Added updateCurrentUrl to the dependency array
 
   const handleProgress = ({ played }) => {
     const currentClip = clips[currentClipIndex];
@@ -33,6 +35,7 @@ const TimelineViewer = ({ clips }) => {
       const currentTime = currentClip.startTime + played * clipDuration;
       setProgress(currentTime);
 
+      // If the current time reaches the end of the clip, move to the next one
       if (currentTime >= currentClip.endTime) {
         handleNextClip();
       }
@@ -41,7 +44,7 @@ const TimelineViewer = ({ clips }) => {
 
   const handleNextClip = () => {
     if (currentClipIndex < clips.length - 1) {
-      setCurrentClipIndex(prevIndex => {
+      setCurrentClipIndex((prevIndex) => {
         updateCurrentUrl(prevIndex + 1);
         return prevIndex + 1;
       });
@@ -54,6 +57,15 @@ const TimelineViewer = ({ clips }) => {
 
   const handlePlayPause = () => {
     setPlaying(!playing);
+  };
+
+  const handleClipReady = () => {
+    const currentClip = clips[currentClipIndex];
+    if (playerRef.current && currentClip) {
+      // Seek to the clip's start time once it's ready
+      console.log('Seeking to start time: ', currentClip.startTime);
+      playerRef.current.seekTo(currentClip.startTime, 'seconds');
+    }
   };
 
   const formatTime = (time) => {
@@ -70,7 +82,6 @@ const TimelineViewer = ({ clips }) => {
     );
   }
 
-  const currentClip = clips[currentClipIndex];
   const totalDuration = clips.reduce((total, clip) => total + (clip.endTime - clip.startTime), 0);
 
   return (
@@ -84,6 +95,7 @@ const TimelineViewer = ({ clips }) => {
             height="100%"
             playing={playing}
             onProgress={handleProgress}
+            onReady={handleClipReady}  // Ensure the player seeks to the correct start time
             progressInterval={100}
             config={{
               file: {
