@@ -1,0 +1,38 @@
+.App {
+  display: flex;
+  height: 100vh;
+}
+
+.editor-container {
+  display: flex;
+  flex: 1;
+}
+
+.media-library-container {
+  width: 200px;
+  border-right: 1px solid #ccc;
+  overflow-y: auto;
+}
+
+.viewers-container {
+  display: flex;
+  flex: 1;
+}
+
+.bin-viewer,
+.timeline-viewer {
+  flex: 1;
+  border-right: 1px solid #ccc;
+  overflow: hidden;
+}
+
+.bottom-section {
+  position: fixed;
+  bottom: 0;
+  left: 200px;
+  right: 0;
+  height: 150px;
+  background-color: #f0f0f0;
+  border-top: 1px solid #ccc;
+  overflow-y: auto;
+}

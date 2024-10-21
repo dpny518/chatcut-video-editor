@@ -1,0 +1,14 @@
+.timeline {
+  height: 40%;
+  background-color: #d0d0d0;
+  border-top: 1px solid #ccc;
+  padding: 10px;
+  overflow-x: auto;
+}
+
+.track {
+  height: 50px;
+  background-color: #c0c0c0;
+  margin-bottom: 10px;
+  display: flex;
+}

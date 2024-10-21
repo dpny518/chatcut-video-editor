@@ -1,0 +1,38 @@
+import React, { useRef } from 'react';
+import '../styles/MediaBin.css';
+
+const MediaBin = ({ media, onDragStart, onFileUpload }) => {
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = (event) => {
+    const files = Array.from(event.target.files);
+    onFileUpload(files);
+  };
+
+  return (
+    <div className="media-bin">
+      <h3>Media Bin</h3>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="video/*,audio/*,image/*"
+        multiple
+        style={{ display: 'none' }}
+      />
+      <button onClick={() => fileInputRef.current.click()}>Upload Files</button>
+      {media.map((item, index) => (
+        <div
+          key={index}
+          draggable
+          onDragStart={(e) => onDragStart(e, item)}
+          className="media-item"
+        >
+          {item.name}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default MediaBin;

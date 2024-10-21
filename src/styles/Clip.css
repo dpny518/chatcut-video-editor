@@ -1,0 +1,7 @@
+.clip {
+  background-color: #a0a0a0;
+  margin-right: 5px;
+  padding: 5px;
+  min-width: 100px;
+  cursor: pointer;
+}
