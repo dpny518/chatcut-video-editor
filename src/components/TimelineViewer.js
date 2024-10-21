@@ -1,48 +1,118 @@
-import React, { useRef, useState, useEffect } from 'react';
-import '../styles/Viewer.css';
-import '../styles/TimelineViewer.css';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactPlayer from 'react-player';
+import { Box, Typography, Button, LinearProgress } from '@mui/material';
 
-const TimelineViewer = ({ selectedClip }) => {
-  const videoRef = useRef(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  // eslint-disable-next-line no-unused-vars
-  const [duration, setDuration] = useState(0);
+const TimelineViewer = ({ clips }) => {
+  const [playing, setPlaying] = useState(false);
+  const [currentClipIndex, setCurrentClipIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const playerRef = useRef(null);
+  const [currentUrl, setCurrentUrl] = useState(null);
 
   useEffect(() => {
-    if (selectedClip && videoRef.current) {
-      videoRef.current.src = URL.createObjectURL(selectedClip.file);
-      videoRef.current.currentTime = selectedClip.startTime;
+    if (clips.length > 0) {
+      setCurrentClipIndex(0);
+      setProgress(0);
+      setPlaying(false);
+      updateCurrentUrl(0);
     }
-  }, [selectedClip]);
+  }, [clips]);
 
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-      setDuration(videoRef.current.duration);
-      
-      // Loop the video within the selected range
-      if (selectedClip && videoRef.current.currentTime >= selectedClip.endTime) {
-        videoRef.current.currentTime = selectedClip.startTime;
+  const updateCurrentUrl = (index) => {
+    if (clips[index]) {
+      const url = URL.createObjectURL(clips[index].file);
+      setCurrentUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleProgress = ({ played }) => {
+    const currentClip = clips[currentClipIndex];
+    if (currentClip) {
+      const clipDuration = currentClip.endTime - currentClip.startTime;
+      const currentTime = currentClip.startTime + played * clipDuration;
+      setProgress(currentTime);
+
+      if (currentTime >= currentClip.endTime) {
+        handleNextClip();
       }
     }
   };
 
+  const handleNextClip = () => {
+    if (currentClipIndex < clips.length - 1) {
+      setCurrentClipIndex(prevIndex => {
+        updateCurrentUrl(prevIndex + 1);
+        return prevIndex + 1;
+      });
+    } else {
+      setPlaying(false);
+      setCurrentClipIndex(0);
+      updateCurrentUrl(0);
+    }
+  };
+
+  const handlePlayPause = () => {
+    setPlaying(!playing);
+  };
+
+  const formatTime = (time) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
+  if (clips.length === 0) {
+    return (
+      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography>No clips in timeline</Typography>
+      </Box>
+    );
+  }
+
+  const currentClip = clips[currentClipIndex];
+  const totalDuration = clips.reduce((total, clip) => total + (clip.endTime - clip.startTime), 0);
+
   return (
-    <div className="viewer timeline-viewer">
-      <h3>Timeline Viewer</h3>
-      {selectedClip && (
-        <div className="viewer-content">
-          <video
-            ref={videoRef}
-            onTimeUpdate={handleTimeUpdate}
-            controls
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flexGrow: 1, mb: 2, bgcolor: 'black', position: 'relative' }}>
+        {currentUrl && (
+          <ReactPlayer
+            ref={playerRef}
+            url={currentUrl}
+            width="100%"
+            height="100%"
+            playing={playing}
+            onProgress={handleProgress}
+            progressInterval={100}
+            config={{
+              file: {
+                attributes: {
+                  crossOrigin: "anonymous"
+                }
+              }
+            }}
+            onEnded={handleNextClip}
           />
-          <div className="time-display">
-            {(currentTime / 60).toFixed(1)}m
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </Box>
+      <LinearProgress 
+        variant="determinate" 
+        value={(progress / totalDuration) * 100} 
+        sx={{ mb: 2 }}
+      />
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography>
+          Clip: {currentClipIndex + 1} / {clips.length}
+        </Typography>
+        <Typography>
+          Time: {formatTime(progress)} / {formatTime(totalDuration)}
+        </Typography>
+        <Button onClick={handlePlayPause} variant="contained">
+          {playing ? 'Pause' : 'Play'}
+        </Button>
+      </Box>
+    </Box>
   );
 };
 

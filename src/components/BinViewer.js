@@ -1,98 +1,65 @@
-import React, { useState, useRef, useEffect } from 'react';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import ReactPlayer from 'react-player';
+import { Box, Typography, Button, Slider } from '@mui/material';
 
-const BinViewer = ({ selectedClip }) => {
-  const [startTime, setStartTime] = useState(0);
-  const [endTime, setEndTime] = useState(0);
-  const [isDraggingStart, setIsDraggingStart] = useState(false);
-  const [isDraggingEnd, setIsDraggingEnd] = useState(false);
-  const videoRef = useRef(null);
+const BinViewer = ({ selectedClip, onAddToTimeline }) => {
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [range, setRange] = useState([0, 0]);
+  const playerRef = useRef(null);
+  const [videoUrl, setVideoUrl] = useState(null);
 
-  // Handle Mouse Down Events
-  const handleMouseDownStart = (e) => {
-    e.preventDefault();
-    console.log('Start handle clicked');
-    setIsDraggingStart(true);
-  };
-
-  const handleMouseDownEnd = (e) => {
-    e.preventDefault();
-    console.log('End handle clicked');
-    setIsDraggingEnd(true);
-  };
-
-  // Handle Mouse Move Events
-  const handleMouseMove = (e) => {
-    if (isDraggingStart) {
-      console.log('Dragging Start');
-      const newTime = calculateTimeFromMousePosition(e);
-      if (newTime < endTime) {
-        console.log('New Start Time:', newTime);
-        setStartTime(newTime);
-      }
-    } else if (isDraggingEnd) {
-      console.log('Dragging End');
-      const newTime = calculateTimeFromMousePosition(e);
-      if (newTime > startTime) {
-        console.log('New End Time:', newTime);
-        setEndTime(newTime);
-      }
-    }
-  };
-
-  // Handle Mouse Up Events
-  // eslint-disable-next-line
-  const handleMouseUp = () => {
-    console.log('Mouse Up');
-    if (isDraggingStart) {
-      setIsDraggingStart(false);
-      console.log('Stopped dragging start');
-    }
-    if (isDraggingEnd) {
-      setIsDraggingEnd(false);
-      console.log('Stopped dragging end');
-    }
-  };
-
-  // Calculate time from mouse position
-  const calculateTimeFromMousePosition = (e) => {
-    const rect = videoRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const percent = Math.max(0, Math.min(clickX / rect.width, 1)); // Keep percent between 0 and 1
-    const newTime = percent * videoRef.current.duration;
-  
-    console.log('Mouse Position:', e.clientX, 'Percent:', percent, 'New Time:', newTime);
-  
-    return newTime;
-  };
-
-  // Ensure mouse move and up are handled at document level
   useEffect(() => {
-    const handleDocumentMouseUp = () => {
-      setIsDraggingStart(false);
-      setIsDraggingEnd(false);
-    };
-
-    if (isDraggingStart || isDraggingEnd) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleDocumentMouseUp);
-    } else {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleDocumentMouseUp);
+    if (selectedClip && selectedClip.file) {
+      setVideoUrl(URL.createObjectURL(selectedClip.file));
+      setPlaying(false);
+      setCurrentTime(0);
+      setRange([0, 0]);
     }
-
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleDocumentMouseUp);
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
     };
-    // eslint-disable-next-line
-  }, [isDraggingStart, isDraggingEnd]);
+  }, [selectedClip]);
 
-  // Ensure video metadata is loaded before setting endTime
-  const handleLoadedMetadata = () => {
-    console.log('Video Duration:', videoRef.current.duration);
-    setEndTime(videoRef.current.duration); // Set end time when metadata loads
+  const handlePlayPause = () => {
+    setPlaying(!playing);
+  };
+
+  const handleDuration = (duration) => {
+    setDuration(duration);
+    setRange([0, duration]);
+  };
+
+  const handleProgress = useCallback(state => {
+    setCurrentTime(state.playedSeconds);
+    if (state.playedSeconds >= range[1]) {
+      setPlaying(false);
+      playerRef.current.seekTo(range[0]);
+    }
+  }, [range]);
+
+  const handleRangeChange = (event, newValue) => {
+    setRange(newValue);
+    playerRef.current.seekTo(newValue[0]);
+  };
+
+  const handleAddToTimeline = () => {
+    if (onAddToTimeline) {
+      onAddToTimeline({
+        file: selectedClip.file,
+        startTime: range[0],
+        endTime: range[1]
+      });
+    }
+  };
+
+  const formatTime = (time) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
   if (!selectedClip) {
@@ -109,49 +76,53 @@ const BinViewer = ({ selectedClip }) => {
         {selectedClip.file.name}
       </Typography>
       <Box sx={{ position: 'relative', flexGrow: 1, mb: 2 }}>
-        <video
-          ref={videoRef}
-          src={URL.createObjectURL(selectedClip.file)}
-          controls
-          onLoadedMetadata={handleLoadedMetadata}
-          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        {videoUrl && (
+          <ReactPlayer
+            ref={playerRef}
+            url={videoUrl}
+            width="100%"
+            height="100%"
+            playing={playing}
+            onDuration={handleDuration}
+            onProgress={handleProgress}
+            progressInterval={100}
+          />
+        )}
+      </Box>
+      <Box sx={{ mb: 2, position: 'relative' }}>
+        <Slider
+          value={range}
+          onChange={handleRangeChange}
+          valueLabelDisplay="auto"
+          valueLabelFormat={formatTime}
+          min={0}
+          max={duration}
+          step={0.1}
         />
-        
-        {/* Start Handle */}
-        <div
-          style={{
+        <Box
+          sx={{
             position: 'absolute',
-            left: `${(startTime / videoRef.current?.duration) * 100}%`,
-            top: '0',
-            width: '10px',
-            height: '100%',
-            background: 'yellow',
-            cursor: 'ew-resize',
-            zIndex: 10,
-            border: '2px solid red',  // Add this for visual debugging
+            left: `${(currentTime / duration) * 100}%`,
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: 'red',
           }}
-          onMouseDown={handleMouseDownStart}
-        />
-        
-        {/* End Handle */}
-        <div
-          style={{
-            position: 'absolute',
-            left: `${(endTime / videoRef.current?.duration) * 100}%`,
-            top: '0',
-            width: '10px',
-            height: '100%',
-            background: 'yellow',
-            cursor: 'ew-resize',
-            zIndex: 10,
-            border: '2px solid blue',  // Add this for visual debugging
-          }}
-          onMouseDown={handleMouseDownEnd}
         />
       </Box>
-      <Typography>
-        Selected Range: {JSON.stringify({ start: startTime.toFixed(2), end: endTime.toFixed(2) })}
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography>
+          Selected Range: {formatTime(range[0])} - {formatTime(range[1])}
+        </Typography>
+        <Button onClick={handlePlayPause} variant="contained">
+          {playing ? 'Pause' : 'Play'}
+        </Button>
+      </Box>
+      <Button onClick={handleAddToTimeline} variant="contained" color="primary">
+        Add to Timeline
+      </Button>
     </Box>
   );
 };
