@@ -1,29 +1,96 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
-import AddIcon from '@mui/icons-material/Add';
 
-const BinViewer = ({ selectedClip, onAddToTimeline }) => {
+const BinViewer = ({ selectedClip }) => {
   const [startTime, setStartTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
+  const [isDraggingStart, setIsDraggingStart] = useState(false);
+  const [isDraggingEnd, setIsDraggingEnd] = useState(false);
   const videoRef = useRef(null);
 
-  const handleAddToTimeline = () => {
-    onAddToTimeline({
-      ...selectedClip,
-      startTime,
-      endTime
-    });
+  // Handle Mouse Down Events
+  const handleMouseDownStart = (e) => {
+    e.preventDefault();
+    console.log('Start handle clicked');
+    setIsDraggingStart(true);
   };
 
-  // Implement drag handlers for selection
-  const handleDragStart = (e) => {
-    // Set start time based on drag position
+  const handleMouseDownEnd = (e) => {
+    e.preventDefault();
+    console.log('End handle clicked');
+    setIsDraggingEnd(true);
   };
 
-  const handleDragEnd = (e) => {
-    // Set end time based on drag position
+  // Handle Mouse Move Events
+  const handleMouseMove = (e) => {
+    if (isDraggingStart) {
+      console.log('Dragging Start');
+      const newTime = calculateTimeFromMousePosition(e);
+      if (newTime < endTime) {
+        console.log('New Start Time:', newTime);
+        setStartTime(newTime);
+      }
+    } else if (isDraggingEnd) {
+      console.log('Dragging End');
+      const newTime = calculateTimeFromMousePosition(e);
+      if (newTime > startTime) {
+        console.log('New End Time:', newTime);
+        setEndTime(newTime);
+      }
+    }
+  };
+
+  // Handle Mouse Up Events
+  const handleMouseUp = () => {
+    console.log('Mouse Up');
+    if (isDraggingStart) {
+      setIsDraggingStart(false);
+      console.log('Stopped dragging start');
+    }
+    if (isDraggingEnd) {
+      setIsDraggingEnd(false);
+      console.log('Stopped dragging end');
+    }
+  };
+
+  // Calculate time from mouse position
+  const calculateTimeFromMousePosition = (e) => {
+    const rect = videoRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(clickX / rect.width, 1)); // Keep percent between 0 and 1
+    const newTime = percent * videoRef.current.duration;
+  
+    console.log('Mouse Position:', e.clientX, 'Percent:', percent, 'New Time:', newTime);
+  
+    return newTime;
+  };
+
+  // Ensure mouse move and up are handled at document level
+  useEffect(() => {
+    const handleDocumentMouseUp = () => {
+      setIsDraggingStart(false);
+      setIsDraggingEnd(false);
+    };
+
+    if (isDraggingStart || isDraggingEnd) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleDocumentMouseUp);
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleDocumentMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleDocumentMouseUp);
+    };
+  }, [isDraggingStart, isDraggingEnd]);
+
+  // Ensure video metadata is loaded before setting endTime
+  const handleLoadedMetadata = () => {
+    console.log('Video Duration:', videoRef.current.duration);
+    setEndTime(videoRef.current.duration); // Set end time when metadata loads
   };
 
   if (!selectedClip) {
@@ -39,23 +106,50 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
       <Typography variant="h6" gutterBottom>
         {selectedClip.file.name}
       </Typography>
-      <Box sx={{ flexGrow: 1, mb: 2, position: 'relative' }}>
+      <Box sx={{ position: 'relative', flexGrow: 1, mb: 2 }}>
         <video
           ref={videoRef}
           src={URL.createObjectURL(selectedClip.file)}
           controls
+          onLoadedMetadata={handleLoadedMetadata}
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
         />
-        {/* Add draggable selection overlay here */}
+        
+        {/* Start Handle */}
+        <div
+          style={{
+            position: 'absolute',
+            left: `${(startTime / videoRef.current?.duration) * 100}%`,
+            top: '0',
+            width: '10px',
+            height: '100%',
+            background: 'yellow',
+            cursor: 'ew-resize',
+            zIndex: 10,
+            border: '2px solid red',  // Add this for visual debugging
+          }}
+          onMouseDown={handleMouseDownStart}
+        />
+        
+        {/* End Handle */}
+        <div
+          style={{
+            position: 'absolute',
+            left: `${(endTime / videoRef.current?.duration) * 100}%`,
+            top: '0',
+            width: '10px',
+            height: '100%',
+            background: 'yellow',
+            cursor: 'ew-resize',
+            zIndex: 10,
+            border: '2px solid blue',  // Add this for visual debugging
+          }}
+          onMouseDown={handleMouseDownEnd}
+        />
       </Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography>
-          Selection: {startTime.toFixed(2)}s - {endTime.toFixed(2)}s
-        </Typography>
-        <IconButton onClick={handleAddToTimeline} color="primary">
-          <AddIcon />
-        </IconButton>
-      </Box>
+      <Typography>
+        Selected Range: {JSON.stringify({ start: startTime.toFixed(2), end: endTime.toFixed(2) })}
+      </Typography>
     </Box>
   );
 };
