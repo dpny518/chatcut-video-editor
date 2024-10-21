@@ -9,7 +9,8 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
   const [range, setRange] = useState([0, 0]);
   const playerRef = useRef(null);
   const [videoUrl, setVideoUrl] = useState(null);
-// eslint-disable-next-line react-hooks/exhaustive-deps
+
+
   useEffect(() => {
     if (selectedClip && selectedClip.file) {
       setVideoUrl(URL.createObjectURL(selectedClip.file));
@@ -21,7 +22,8 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
       if (videoUrl) {
         URL.revokeObjectURL(videoUrl);
       }
-    }; // eslint-disable-next-line
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClip]);
 
   const handlePlayPause = () => {

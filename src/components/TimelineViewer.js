@@ -9,25 +9,11 @@ const TimelineViewer = ({ clips }) => {
   const playerRef = useRef(null);
   const [currentUrl, setCurrentUrl] = useState(null);
 
-  // Log all clips data for debugging
-  useEffect(() => {
-    if (clips.length > 0) {
-      console.log("All clips in the timeline:", clips.map((clip, index) => ({
-        clipIndex: index,
-        id: clip.id,
-        name: clip.name,
-        startTime: clip.startTime,
-        endTime: clip.endTime,
-        duration: clip.endTime - clip.startTime,
-        fileUrl: URL.createObjectURL(clip.file),
-      })));
-    }
-  }, [clips]);
-
+  // Use useCallback to ensure the function reference remains stable
   const updateCurrentUrl = useCallback((index) => {
     if (clips[index]) {
       const url = URL.createObjectURL(clips[index].file);
-      console.log('Generated video URL: ', url); // Debugging log for current clip URL
+      console.log('Generated video URL: ', url); // Debugging log
       setCurrentUrl(url);
       return () => URL.revokeObjectURL(url);
     }
@@ -36,11 +22,11 @@ const TimelineViewer = ({ clips }) => {
   useEffect(() => {
     if (clips.length > 0) {
       setCurrentClipIndex(0);
-      setProgress(clips[0].startTime); // Start at the start time of the first clip
+      setProgress(0);
       setPlaying(false);
       updateCurrentUrl(0);
     }
-  }, [clips, updateCurrentUrl]); // Ensuring updateCurrentUrl is in the dependency array
+  }, [clips, updateCurrentUrl]); // Added updateCurrentUrl to the dependency array
 
   const handleProgress = ({ played }) => {
     const currentClip = clips[currentClipIndex];
@@ -59,15 +45,12 @@ const TimelineViewer = ({ clips }) => {
   const handleNextClip = () => {
     if (currentClipIndex < clips.length - 1) {
       setCurrentClipIndex((prevIndex) => {
-        const nextIndex = prevIndex + 1;
-        updateCurrentUrl(nextIndex);
-        setProgress(clips[nextIndex].startTime); // Reset progress to the start time of the next clip
-        return nextIndex;
+        updateCurrentUrl(prevIndex + 1);
+        return prevIndex + 1;
       });
     } else {
       setPlaying(false);
       setCurrentClipIndex(0);
-      setProgress(clips[0].startTime); // Reset progress to the start time of the first clip
       updateCurrentUrl(0);
     }
   };
@@ -79,11 +62,9 @@ const TimelineViewer = ({ clips }) => {
   const handleClipReady = () => {
     const currentClip = clips[currentClipIndex];
     if (playerRef.current && currentClip) {
-      // Delay seeking to ensure the player is fully ready
-      setTimeout(() => {
-        console.log('Seeking to start time (delayed): ', currentClip.startTime);
-        playerRef.current.seekTo(currentClip.startTime, 'seconds');
-      }, 100); // Adding a 100ms delay
+      // Seek to the clip's start time once it's ready
+      console.log('Seeking to start time: ', currentClip.startTime);
+      playerRef.current.seekTo(currentClip.startTime, 'seconds');
     }
   };
 
@@ -115,7 +96,7 @@ const TimelineViewer = ({ clips }) => {
             playing={playing}
             onProgress={handleProgress}
             onReady={handleClipReady}  // Ensure the player seeks to the correct start time
-            progressInterval={500}     // Progress interval at 500ms
+            progressInterval={100}
             config={{
               file: {
                 attributes: {
