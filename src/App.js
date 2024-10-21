@@ -60,9 +60,9 @@ function App() {
                 selectedClip={selectedBinClip}
               />
             </Box>
-            <Box sx={{ flexGrow: 1, p: 3, display: 'flex', flexDirection: 'column' }}>
-              <Grid container spacing={2} sx={{ flexGrow: 1, mb: 2 }}>
-                <Grid item xs={6}>
+            <Box sx={{ flexGrow: 1, p: 3, display: 'flex', flexDirection: 'row' }}>
+              <Grid container spacing={2} sx={{ flexGrow: 1 }}>
+                <Grid item xs={12} sm={6}>
                   <Paper sx={{ height: '100%', p: 2 }}>
                     <BinViewer
                       selectedClip={selectedBinClip}
@@ -70,7 +70,7 @@ function App() {
                     />
                   </Paper>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={6}>
                   <Paper sx={{ height: '100%', p: 2 }}>
                     <TimelineViewer clips={timelineClips} />
                   </Paper>
@@ -78,10 +78,11 @@ function App() {
               </Grid>
             </Box>
           </Box>
-          <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', flexGrow: 0 }}>
             <Timeline 
               clips={timelineClips}
               onClipsChange={handleTimelineClipsChange}
+              sx={{ width: '100%' }} // Ensure the Timeline takes the full width
             />
             <Button variant="contained" color="primary" onClick={handleExportVideo} sx={{ mt: 2 }}>
               Export Video
