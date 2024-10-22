@@ -1,67 +1,102 @@
 // src/components/Timeline/TimelineClip.js
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
-import { formatTime } from '../../utils/formatters';
 
 const TimelineClip = ({ 
   clip, 
   action, 
+  row, 
   isSelected, 
   onSelect 
 }) => {
-  if (!clip) return null;
+  const videoRef = useRef(null);
 
-  const duration = action.end - action.start;
+  // Set the correct frame when video metadata is loaded
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleLoad = () => {
+      // Set currentTime to clip's start time
+      video.currentTime = clip.startTime;
+    };
+
+    video.addEventListener('loadedmetadata', handleLoad);
+    return () => video.removeEventListener('loadedmetadata', handleLoad);
+  }, [clip.startTime]);
 
   return (
     <Box
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect?.(action.id);
-      }}
+      onClick={() => onSelect?.(action.id)}
       sx={{
-        height: '100%',
+        position: 'relative',
         width: '100%',
-        backgroundColor: isSelected ? 'primary.main' : '#3c3c3c',
-        borderRadius: '4px',
+        height: '100%',
+        cursor: 'pointer',
+        bgcolor: isSelected ? 'primary.main' : 'grey.800',
+        borderRadius: 1,
+        border: theme => `2px solid ${isSelected ? theme.palette.primary.main : theme.palette.grey[700]}`,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 8px',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-        '&:hover': {
-          backgroundColor: isSelected ? 'primary.dark' : '#4c4c4c',
-        },
         overflow: 'hidden',
-        // Optional: add a subtle border
-        border: isSelected ? '1px solid rgba(255,255,255,0.2)' : 'none',
-        // Optional: add a subtle shadow
-        boxShadow: isSelected ? '0 0 8px rgba(0,0,0,0.3)' : 'none'
+        '&:hover': {
+          bgcolor: 'grey.700',
+        }
       }}
     >
-      <Typography
-        variant="caption"
+      {/* Thumbnail container */}
+      <Box
         sx={{
-          color: 'white',
+          width: 80,
+          height: '100%',
+          flexShrink: 0,
+          position: 'relative',
+          bgcolor: 'black',
+          overflow: 'hidden'
+        }}
+      >
+        <video
+          ref={videoRef}
+          src={clip.file ? URL.createObjectURL(clip.file) : ''}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
+          }}
+          muted
+          playsInline
+        />
+      </Box>
+
+      {/* Clip info */}
+      <Box
+        sx={{
           flex: 1,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          mr: 1
+          px: 1,
+          overflow: 'hidden'
         }}
       >
-        {clip.name || 'Untitled'}
-      </Typography>
-      <Typography
-        variant="caption"
-        sx={{
-          color: 'rgba(255, 255, 255, 0.7)',
-          flexShrink: 0
-        }}
-      >
-        {formatTime(duration)}
-      </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            color: 'white',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
+        >
+          {clip.name}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            color: 'grey.400',
+            fontSize: '0.7rem'
+          }}
+        >
+          {(action.end - action.start).toFixed(1)}s
+        </Typography>
+      </Box>
     </Box>
   );
 };
