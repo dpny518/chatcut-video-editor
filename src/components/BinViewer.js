@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import ReactPlayer from 'react-player';
-import { Box, Typography, Button, Slider, Alert, CircularProgress } from '@mui/material';
+import { Box, Typography, Slider, Alert, CircularProgress } from '@mui/material';
+// eslint-disable-next-line no-unused-vars
+import { Button } from '@mui/material';
 import { debounce } from 'lodash';
 
 // Constants
@@ -57,6 +59,7 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
   }, [selectedClip, cleanupVideoUrl]);
 
   // Debounced seek function to improve performance
+  // eslint-disable-next-line
   const debouncedSeek = useCallback(
     debounce((time) => {
       if (playerRef.current) {

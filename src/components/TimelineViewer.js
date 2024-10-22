@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ReactPlayer from 'react-player';
-import { Box, Typography, Button, LinearProgress, IconButton, Tooltip } from '@mui/material';
+import { Box, Typography, LinearProgress, IconButton, Tooltip } from '@mui/material';
+// eslint-disable-next-line no-unused-vars
+import { Button } from '@mui/material';
 import { PlayCircle, PauseCircle, SkipNext, SkipPrevious, Replay } from '@mui/icons-material';
 
 // Constants
@@ -114,10 +116,11 @@ const TimelineViewer = ({ clips = [], onPlaybackComplete }) => {
     }
 
     // Handle transition timing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     transitionTimeoutRef.current = setTimeout(() => {
       setIsTransitioning(false);
     }, TRANSITION_DURATION);
-  }, [currentClipIndex, clips.length, nextUrl, onPlaybackComplete]);
+  }, [currentClipIndex, clips, nextUrl, onPlaybackComplete]);
 
   // Progress handling
   const handleProgress = useCallback(({ played, playedSeconds }) => {
