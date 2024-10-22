@@ -1,20 +1,28 @@
 import React, { useState } from 'react';
 import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-import Button from '@mui/material/Button';
-import MediaSidebar from './components/MediaSidebar';
-import BinViewer from './components/BinViewer';
-import TimelineViewer from './components/TimelineViewer';
-import Timeline from './components/Timeline';
+import { Box } from '@mui/material';
+
+// Layout components
+import MainLayout from './components/Layout/MainLayout';
+import EditorLayout from './components/Layout/EditorLayout';
+
+// Viewer components
+import BinViewerSection from './components/Viewers/BinViewerSection';
+import TimelineViewerSection from './components/Viewers/TimelineViewerSection';
+
+// Timeline components
+import TimelineSection from './components/Timeline/TimelineSection';
+import TimelineDebug from './components/Timeline/TimelineDebug';
+
+// Controls
+import ExportControls from './components/Controls/ExportControls';
+
 
 const theme = createTheme({
   palette: {
     mode: 'dark',
-    primary: {
-      main: '#0ea5e9',
-    },
+    primary: { main: '#0ea5e9' },
     background: {
       default: '#121212',
       paper: '#1e1e1e',
@@ -62,89 +70,100 @@ function App() {
     console.log('Exporting video with clips:', timelineClips);
   };
 
+  const handleDownloadState = () => {
+    const state = {
+      mediaFiles,
+      selectedBinClip,
+      timelineClips
+    };
+    
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'editor-state.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDebugClips = () => {
+    const debugClips = [
+      {
+        id: 'debug-clip-1',
+        name: 'Debug Clip 1',
+        startTime: 0,
+        endTime: 10,
+        duration: 10,
+        file: new File([''], 'test1.mp4', { type: 'video/mp4' })
+      },
+      {
+        id: 'debug-clip-2',
+        name: 'Debug Clip 2',
+        startTime: 12, // Gap of 2 seconds
+        endTime: 18,
+        duration: 6,
+        file: new File([''], 'test2.mp4', { type: 'video/mp4' })
+      }
+    ];
+    setTimelineClips(debugClips);
+  };
+
   return (
     <StyledEngineProvider injectFirst>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Box sx={{ display: 'flex', height: '100vh' }}>
-          <MediaSidebar 
-            files={mediaFiles}
-            onFileUpload={handleFileUpload}
-            onFileSelect={handleFileSelect}
-            selectedFile={selectedBinClip}
-          />
-          
-          <Box sx={{ 
-            flexGrow: 1, 
-            display: 'flex', 
-            flexDirection: 'column',
-            height: '100%',
-            bgcolor: 'background.default'
-          }}>
+        <MainLayout
+          mediaFiles={mediaFiles}
+          selectedBinClip={selectedBinClip}
+          onFileUpload={handleFileUpload}
+          onFileSelect={handleFileSelect}
+        >
+          <EditorLayout>
             {/* Main Content Area */}
-            <Box sx={{ 
-              display: 'flex',
-              flexGrow: 1,
-              gap: 2,
-              p: 2,
-              pb: 0
-            }}>
-              <Paper sx={{ flex: 1, p: 2, bgcolor: 'background.paper' }}>
-                <BinViewer
-                  selectedClip={selectedBinClip}
-                  onAddToTimeline={handleAddToTimeline}
-                />
-              </Paper>
-              <Paper sx={{ flex: 1, p: 2, bgcolor: 'background.paper' }}>
-                <TimelineViewer clips={timelineClips} />
-              </Paper>
+            <Box sx={{ display: 'flex', flexGrow: 1, gap: 2, p: 2, pb: 0 }}>
+              <BinViewerSection
+                selectedClip={selectedBinClip}
+                onAddToTimeline={handleAddToTimeline}
+              />
+              <TimelineViewerSection clips={timelineClips} />
             </Box>
 
-                {/* Timeline Area */}
+            {/* Timeline and Controls Area */}
             <Box sx={{ 
-              mt: 2,
-              px: 2,
-              pb: 2,
-              bgcolor: 'background.default',
-              borderTop: 1,
-              borderColor: 'divider'
+              mt: 2, 
+              px: 2, 
+              pb: 2, 
+              bgcolor: 'background.default', 
+              borderTop: 1, 
+              borderColor: 'divider',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2
             }}>
-              <Box sx={{ 
-                width: '100%',
-                height: '150px',
-                bgcolor: '#1a1a1a',
-                mb: 2,
-                '.timeline-editor': {
-                  width: '100% !important'
-                }
-              }}>
-                <Timeline 
-                  clips={timelineClips}
-                  onClipsChange={handleTimelineClipsChange}
-                />
-              </Box>
-              <Button 
-                variant="contained"
-                onClick={handleExportVideo}
-                sx={{
-                  bgcolor: '#0ea5e9',
-                  color: 'white',
-                  '&:hover': {
-                    bgcolor: '#0284c7'
-                  },
-                  textTransform: 'uppercase',
-                  fontWeight: 'medium',
-                  px: 3
-                }}
-              >
-                Export Video
-              </Button>
+              <TimelineSection
+                clips={timelineClips}
+                onClipsChange={handleTimelineClipsChange}
+              />
+              
+              <ExportControls
+                onExport={handleExportVideo}
+                onDownloadState={handleDownloadState}
+                onDebugClips={handleDebugClips}
+              />
+
+              <TimelineDebug
+                timelineClips={timelineClips}
+                selectedBinClip={selectedBinClip}
+              />
             </Box>
-          </Box>
-        </Box>
+          </EditorLayout>
+        </MainLayout>
       </ThemeProvider>
     </StyledEngineProvider>
   );
 }
 
 export default App;
+

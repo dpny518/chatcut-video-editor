@@ -1,70 +1,126 @@
-# Getting Started with Create React App
+```jsx
+/*** VIDEO EDITOR PROJECT STATE ***/
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+/* App Purpose */
+React-based video editor web app. Upload videos, select segments, arrange on timeline, manage gaps/transitions. Dark theme MUI interface.
 
-## Available Scripts
+/* Core Dependencies */
+- @mui/material (UI)
+- @xzdarcy/react-timeline-editor (Timeline)
+- react-player (Video)
 
-In the project directory, you can run:
+/* File Structure */
+src/
+├── components/
+│   ├── BinViewer.js // Video preview + segment selection
+│   │   props: { selectedClip: Clip, onAddToTimeline: (clip) => void }
+│   │
+│   ├── Controls/
+│   │   └── ExportControls.js // Export + debug tools
+│   │       props: { onExport, onDownloadState, onDebugClips }
+│   │
+│   ├── Layout/
+│   │   ├── MainLayout.js // App wrapper
+│   │   │   props: { mediaFiles[], selectedClip, onFileUpload, onFileSelect }
+│   │   └── EditorLayout.js // Content layout
+│   │
+│   ├── MediaSidebar/
+│   │   └── index.js // File management
+│   │       props: { files[], onFileUpload, onFileSelect, selectedFile }
+│   │
+│   ├── Timeline/
+│   │   ├── index.js // Main timeline
+│   │   │   props: { clips[], onClipsChange, selectedClipId, onClipSelect }
+│   │   ├── TimelineControls.js // Zoom/grid controls
+│   │   ├── TimelineClip.js // Clip renderer
+│   │   └── TimelineDebug.js // State visualization
+│   │
+│   └── Viewers/
+       ├── BinViewerSection.js // Preview container
+       └── TimelineViewerSection.js // Timeline preview
 
-### `npm start`
+/* Data Types */
+type Clip = {
+  id: string,
+  file: File,
+  name: string,
+  startTime: number,
+  endTime: number,
+  duration: number,
+  type?: string,
+  size?: number
+}
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+type TimelineClip = Clip & {
+  sourceStartTime: number,
+  sourceEndTime: number
+}
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+/* State Management (App.js) */
+const [mediaFiles, setMediaFiles] = useState([])
+const [selectedBinClip, setSelectedBinClip] = useState(null)
+const [timelineClips, setTimelineClips] = useState([])
 
-### `npm test`
+/* Core Features */
+1. Media Management
+   - File upload/select
+   - Preview in BinViewer
+   - Segment selection
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+2. Timeline Editing
+   - Add clips sequentially
+   - Support gaps between clips
+   - Drag & drop reordering
+   - Zoom controls
+   - Grid snapping
 
-### `npm run build`
+3. Preview/Export
+   - Live preview
+   - Timeline playback
+   - Export functionality (UI ready)
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+4. Debug Features
+   - State download
+   - Debug clips loading
+   - State visualization
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+/* Next Development */
+1. Audio track separation
+2. Video export processing
+3. Enhanced snapping
+4. Transition effects
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+/* Working Example */
+```javascript
+// Adding clip to timeline
+const handleAddToTimeline = (clip) => {
+  const newClip = {
+    id: `clip${timelineClips.length + 1}`,
+    file: clip.file,
+    name: clip.file.name,
+    startTime: clip.startTime || 0,
+    endTime: clip.endTime || 0,
+    duration: (clip.endTime || 0) - (clip.startTime || 0)
+  };
+  setTimelineClips(prev => [...prev, newClip]);
+};
+```
 
-### `npm run eject`
+/* Theme */
+```javascript
+const theme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: { main: '#0ea5e9' },
+    background: {
+      default: '#121212',
+      paper: '#1e1e1e',
+    },
+  }
+});
+```
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+[DEVELOPMENT STATUS: Core functionality working, component structure refactored, debug tools implemented. Need video export and audio handling.]
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+[COPY THIS TO NEW LLM TO CONTINUE DEVELOPMENT]
