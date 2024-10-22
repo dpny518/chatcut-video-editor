@@ -15,8 +15,6 @@ import TimelineViewerSection from './components/Viewers/TimelineViewerSection';
 import TimelineSection from './components/Timeline/TimelineSection';
 import TimelineDebug from './components/Timeline/TimelineDebug';
 
-// Controls
-import ExportControls from './components/Controls/ExportControls';
 
 
 const theme = createTheme({
@@ -66,49 +64,7 @@ function App() {
     setTimelineClips(newClips);
   };
 
-  const handleExportVideo = () => {
-    console.log('Exporting video with clips:', timelineClips);
-  };
-
-  const handleDownloadState = () => {
-    const state = {
-      mediaFiles,
-      selectedBinClip,
-      timelineClips
-    };
-    
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'editor-state.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleDebugClips = () => {
-    const debugClips = [
-      {
-        id: 'debug-clip-1',
-        name: 'Debug Clip 1',
-        startTime: 0,
-        endTime: 10,
-        duration: 10,
-        file: new File([''], 'test1.mp4', { type: 'video/mp4' })
-      },
-      {
-        id: 'debug-clip-2',
-        name: 'Debug Clip 2',
-        startTime: 12, // Gap of 2 seconds
-        endTime: 18,
-        duration: 6,
-        file: new File([''], 'test2.mp4', { type: 'video/mp4' })
-      }
-    ];
-    setTimelineClips(debugClips);
-  };
+ 
 
   return (
     <StyledEngineProvider injectFirst>
@@ -146,13 +102,6 @@ function App() {
                 clips={timelineClips}
                 onClipsChange={handleTimelineClipsChange}
               />
-              
-              <ExportControls
-                onExport={handleExportVideo}
-                onDownloadState={handleDownloadState}
-                onDebugClips={handleDebugClips}
-              />
-
               <TimelineDebug
                 timelineClips={timelineClips}
                 selectedBinClip={selectedBinClip}
