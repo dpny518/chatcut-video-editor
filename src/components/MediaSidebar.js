@@ -16,6 +16,7 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 const MediaSidebar = ({ files, onFileUpload, onFileSelect, selectedFile }) => {
+  // eslint-disable-next-line no-unused-vars
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
 
