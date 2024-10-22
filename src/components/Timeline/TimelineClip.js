@@ -5,25 +5,49 @@ import { Box, Typography } from '@mui/material';
 const TimelineClip = ({ 
   clip, 
   action, 
-  row, 
   isSelected, 
   onSelect 
 }) => {
   const videoRef = useRef(null);
+  const videoUrlRef = useRef(null);
 
-  // Set the correct frame when video metadata is loaded
+  useEffect(() => {
+    if (videoRef.current && clip.file) {
+      // Clean up previous URL
+      if (videoUrlRef.current) {
+        URL.revokeObjectURL(videoUrlRef.current);
+      }
+      // Create new URL
+      videoUrlRef.current = URL.createObjectURL(clip.file);
+      videoRef.current.src = videoUrlRef.current;
+    }
+
+    return () => {
+      if (videoUrlRef.current) {
+        URL.revokeObjectURL(videoUrlRef.current);
+      }
+    };
+  }, [clip.file]);
+
+  // Update video frame when original start time changes
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     const handleLoad = () => {
-      // Set currentTime to clip's start time
-      video.currentTime = clip.startTime;
+      // Use the original video timing, not the timeline position
+      video.currentTime = clip.originalStart || clip.startTime;
     };
 
     video.addEventListener('loadedmetadata', handleLoad);
+    
+    // Also update currentTime immediately if video is already loaded
+    if (video.readyState >= 2) {
+      video.currentTime = clip.originalStart || clip.startTime;
+    }
+
     return () => video.removeEventListener('loadedmetadata', handleLoad);
-  }, [clip.startTime]);
+  }, [clip.originalStart, clip.startTime]);
 
   return (
     <Box
@@ -57,7 +81,6 @@ const TimelineClip = ({
       >
         <video
           ref={videoRef}
-          src={clip.file ? URL.createObjectURL(clip.file) : ''}
           style={{
             width: '100%',
             height: '100%',

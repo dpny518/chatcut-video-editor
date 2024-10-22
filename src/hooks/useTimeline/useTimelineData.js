@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from 'react';
 export const useTimelineData = (clips = [], onClipsChange) => {
   const [error, setError] = useState(null);
 
-  // Define effects for different states
   const effects = useMemo(() => ({
     default: {
       id: 'default',
@@ -29,81 +28,58 @@ export const useTimelineData = (clips = [], onClipsChange) => {
     }
   }), []);
 
-  // Convert clips to timeline format
   const editorData = useMemo(() => {
-    const rows = [];
-    const rowMap = new Map();
     let currentPosition = 0;
-
-    clips.forEach((clip, index) => {
-      const rowIndex = clip.rowIndex ?? index;
-      
-      if (!rowMap.has(rowIndex)) {
-        rowMap.set(rowIndex, {
-          id: `row-${rowIndex}`,
-          actions: []
-        });
-        rows[rowIndex] = rowMap.get(rowIndex);
-      }
-
-      // Calculate clip duration
+    const rows = clips.map((clip, index) => {
+      // For new clips, place them sequentially
+      const isNewClip = !clip.hasBeenPositioned;
+      const start = isNewClip ? currentPosition : clip.startTime;
       const duration = clip.endTime - clip.startTime;
 
-      rowMap.get(rowIndex).actions.push({
-        id: clip.id,
-        start: currentPosition,
-        end: currentPosition + duration,
-        effectId: 'default',
-        flexible: true,
-        movable: true,
-        data: {
-          ...clip,
-          originalStart: clip.startTime, // Store original timing
-          originalEnd: clip.endTime
-        }
-      });
+      if (isNewClip) {
+        currentPosition += duration + 0.1; // Add small gap for new clips
+      }
 
-      // Move position for next clip
-      currentPosition += duration + 0.1; // Add small gap between clips
+      return {
+        id: String(index), // Each clip gets its own row
+        actions: [{
+          id: clip.id,
+          start: start,
+          end: start + duration,
+          effectId: 'default',
+          flexible: true,
+          movable: true,
+          data: {
+            ...clip,
+            hasBeenPositioned: true,
+            originalStart: clip.startTime,
+            originalEnd: clip.endTime
+          }
+        }]
+      };
     });
 
-    // Fill gaps and add empty row
-    const maxRow = Math.max(...Array.from(rowMap.keys()), 0);
-    for (let i = 0; i <= maxRow + 1; i++) {
-      if (!rows[i]) {
-        rows[i] = {
-          id: `row-${i}`,
-          actions: []
-        };
-      }
-    }
+    // Add an empty row at the end
+    rows.push({
+      id: String(clips.length),
+      actions: []
+    });
 
     return rows;
   }, [clips]);
 
-  // Handle timeline changes
   const handleChange = useCallback((newEditorData) => {
     try {
-      const updatedClips = [];
-      
-      newEditorData.forEach((row, rowIndex) => {
-        row.actions.forEach(action => {
-          // Calculate the duration of the clip in its new position
-          const newDuration = action.end - action.start;
-          // Use the original timing info to maintain proper timing relationships
-          const originalDuration = action.data.originalEnd - action.data.originalStart;
-          // Scale the original timing to match the new duration
-          const scaleFactor = newDuration / originalDuration;
-
-          updatedClips.push({
-            ...action.data,
-            id: action.id,
-            startTime: action.data.originalStart * scaleFactor,
-            endTime: action.data.originalEnd * scaleFactor,
-            rowIndex
-          });
-        });
-      });
+      const updatedClips = newEditorData.flatMap((row, index) => 
+        row.actions.map(action => ({
+          ...action.data,
+          id: action.id,
+          startTime: action.start,
+          endTime: action.end,
+          rowIndex: index,
+          hasBeenPositioned: true
+        }))
+      );
 
       onClipsChange(updatedClips);
       setError(null);
