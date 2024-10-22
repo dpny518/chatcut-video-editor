@@ -1,4 +1,3 @@
-// src/components/Timeline/TimelineControls.js
 import React from 'react';
 import { 
   Stack, 
@@ -9,9 +8,21 @@ import {
 } from '@mui/material';
 import { 
   Download, 
-  BugReport 
+  BugReport, 
+  ZoomIn, 
+  ZoomOut, 
+  RestartAlt 
 } from '@mui/icons-material';
-const TimelineControls = ({ onExport, onDownloadState, onDebugClips }) => {
+
+const TimelineControls = ({
+  onExport, 
+  onDownloadState, 
+  onDebugClips, 
+  scale, 
+  onZoomIn, 
+  onZoomOut, 
+  onZoomReset
+}) => {
   return (
     <Stack direction="row" spacing={2} alignItems="center">
       <Button 
@@ -30,6 +41,50 @@ const TimelineControls = ({ onExport, onDownloadState, onDebugClips }) => {
       >
         Export Video
       </Button>
+
+      <Box sx={{ display: 'flex', gap: 1, mx: 2 }}>
+        <Tooltip title="Zoom In">
+          <IconButton 
+            onClick={onZoomIn}
+            size="small"
+            sx={{ 
+              bgcolor: 'rgba(255,255,255,0.1)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+            }}
+          >
+            <ZoomIn fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Zoom Out">
+          <IconButton 
+            onClick={onZoomOut}
+            size="small"
+            sx={{ 
+              bgcolor: 'rgba(255,255,255,0.1)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+            }}
+          >
+            <ZoomOut fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Reset Zoom">
+          <IconButton 
+            onClick={onZoomReset}
+            size="small"
+            sx={{ 
+              bgcolor: 'rgba(255,255,255,0.1)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+            }}
+          >
+            <RestartAlt fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={`Current Scale: ${scale}`}>
+          <Box sx={{ fontSize: 12, color: 'text.secondary' }}>
+            {scale}%
+          </Box>
+        </Tooltip>
+      </Box>
 
       <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
         <Tooltip title="Download Current State">
