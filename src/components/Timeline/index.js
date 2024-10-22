@@ -1,7 +1,7 @@
 // src/components/Timeline/index.js
 import React, { useCallback } from 'react';
 import { Timeline as ReactTimelineEditor } from '@xzdarcy/react-timeline-editor';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Menu, MenuItem } from '@mui/material';
 import TimelineControls from './TimelineControls';
 import TimelineClip from './TimelineClip';
 import { useTimelineZoom } from '../../hooks/useTimeline/useTimelineZoom';
@@ -20,6 +20,10 @@ const Timeline = ({
   const { scale, handleZoomIn, handleZoomOut } = useTimelineZoom();
   const { editorData, effects, error, handleChange } = useTimelineData(clips, onClipsChange);
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = React.useState(null);
+  const [selectedActionId, setSelectedActionId] = React.useState(null);
+
   // Handle clip dragging between rows
   const handleActionDrag = useCallback(({ action, newRowIndex }) => {
     return {
@@ -31,6 +35,37 @@ const Timeline = ({
       }
     };
   }, []);
+
+  // Handle context menu
+  const handleContextMenu = useCallback((e, action) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+    setSelectedActionId(action.id);
+    onClipSelect?.(action.id);
+  }, [onClipSelect]);
+
+  // Handle delete
+  const handleDelete = useCallback(() => {
+    if (selectedActionId) {
+      const newClips = clips.filter(clip => clip.id !== selectedActionId);
+      onClipsChange(newClips);
+      setContextMenu(null);
+      setSelectedActionId(null);
+    }
+  }, [clips, selectedActionId, onClipsChange]);
+
+  // Handle keyboard delete
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipId) {
+        const newClips = clips.filter(clip => clip.id !== selectedClipId);
+        onClipsChange(newClips);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [clips, selectedClipId, onClipsChange]);
 
   return (
     <Box sx={{ 
@@ -65,13 +100,15 @@ const Timeline = ({
           effects={effects}
           onChange={handleChange}
           getActionRender={(action, row) => (
-            <TimelineClip
-              clip={action.data}
-              action={action}
-              row={row}
-              isSelected={action.id === selectedClipId}
-              onSelect={onClipSelect}
-            />
+            <Box onContextMenu={(e) => handleContextMenu(e, action)}>
+              <TimelineClip
+                clip={action.data}
+                action={action}
+                row={row}
+                isSelected={action.id === selectedClipId}
+                onSelect={onClipSelect}
+              />
+            </Box>
           )}
           getScaleRender={formatTime}
           style={{ 
@@ -119,6 +156,28 @@ const Timeline = ({
             }
           }}
         />
+
+        {/* Context Menu */}
+        <Menu
+          open={Boolean(contextMenu)}
+          onClose={() => setContextMenu(null)}
+          anchorReference="anchorPosition"
+          anchorPosition={
+            contextMenu
+              ? { top: contextMenu.y, left: contextMenu.x }
+              : undefined
+          }
+        >
+          <MenuItem 
+            onClick={handleDelete}
+            sx={{ 
+              color: 'error.main',
+              '&:hover': { bgcolor: 'error.dark', color: 'white' }
+            }}
+          >
+            Delete Clip
+          </MenuItem>
+        </Menu>
       </Box>
     </Box>
   );
