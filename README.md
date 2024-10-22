@@ -121,6 +121,74 @@ const theme = createTheme({
 ```
 ```
 
-[DEVELOPMENT STATUS: Core functionality working, component structure refactored, debug tools implemented. Need video export and audio handling.]
+Based on the provided files, here's a summary of your code:
 
-[COPY THIS TO NEW LLM TO CONTINUE DEVELOPMENT]
+1. App.js:
+   - Main component that sets up the overall structure of the application.
+   - Manages states: mediaFiles, selectedBinClip, timelineClips.
+   - Handles file upload, file selection, and adding clips to the timeline.
+
+2. components/Layout/MainLayout.js:
+   - Provides the main layout structure, including the MediaSidebar.
+   - Receives props: mediaFiles, selectedBinClip, onFileUpload, onFileSelect.
+
+3. components/Layout/EditorLayout.js:
+   - Provides the layout for the editor area.
+
+4. components/MediaSidebar.js (not provided, but referenced):
+   - Likely handles displaying and selecting media files.
+
+5. components/Viewers/BinViewerSection.js:
+   - Wrapper for BinViewer component.
+   - Receives props: selectedClip, onAddToTimeline.
+
+6. components/BinViewer.js:
+   - Displays and controls the selected clip from the media bin.
+   - Manages states: playing, duration, currentTime, range, loading, error, videoUrl.
+   - Handles video playback, range selection, and adding clips to the timeline.
+
+7. components/Viewers/TimelineViewerSection.js:
+   - Wrapper for TimelineViewer component.
+   - Receives props: clips.
+
+8. components/TimelineViewer.js (not provided, but referenced):
+   - Likely handles displaying the timeline view of clips.
+
+9. components/Timeline/TimelineSection.js:
+   - Wrapper for the Timeline component.
+   - Receives props: clips, onClipsChange.
+
+10. components/Timeline/index.js:
+    - Main Timeline component.
+    - Uses custom hooks: useTimelineZoom, useTimelineData.
+    - Manages states: contextMenu, selectedActionId.
+    - Handles clip selection, context menu, and clip deletion.
+
+11. components/Timeline/TimelineClip.js:
+    - Represents individual clips in the timeline.
+    - Manages video playback for thumbnails.
+
+12. hooks/useTimeline/useTimelineData.js:
+    - Custom hook for managing timeline data.
+    - Converts clips to timeline actions and effects.
+
+13. hooks/useTimeline/useTimelineZoom.js (not provided, but referenced):
+    - Likely manages zoom functionality for the timeline.
+
+14. utils/timelineUtils.js:
+    - Utility functions for creating timeline data and effects.
+
+15. types/clip.ts:
+    - TypeScript definitions for Clip, TimelineAction, and TimelineRow.
+
+16. components/Timeline/TimelineDebug.js:
+    - Debugging component to display timeline and selected clip data.
+
+The main flow of state:
+1. App.js manages the overall state (mediaFiles, selectedBinClip, timelineClips).
+2. This state is passed down to child components (MainLayout, BinViewerSection, TimelineViewerSection, TimelineSection).
+3. BinViewer handles the state for the currently selected clip from the media bin.
+4. Timeline component (index.js) uses useTimelineData hook to convert clips to timeline actions and effects.
+5. TimelineClip components receive individual clip data and handle their own video playback for thumbnails.
+
+The application allows users to upload media files, select them in the bin viewer, add them to the timeline, and manipulate them on the timeline. The timeline supports zooming, clip selection, and deletion.
