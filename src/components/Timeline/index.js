@@ -7,7 +7,8 @@ import TimelineClip from './TimelineClip';
 import { useTimelineZoom } from '../../hooks/useTimeline/useTimelineZoom';
 import { useTimelineData } from '../../hooks/useTimeline/useTimelineData';
 import { formatTime } from '../../utils/formatters';
-
+import { scrollbarStyles } from './styles/scrollbarStyles';
+import { timelineEditorStyles, customTimelineStyles } from './styles/timelineStyles';
 const ROW_HEIGHT = 64;
 const MIN_ROWS = 10;
 
@@ -19,7 +20,7 @@ const Timeline = ({
 }) => {
   const { scale, handleZoomIn, handleZoomOut } = useTimelineZoom();
   const { editorData, effects, error, handleChange } = useTimelineData(clips, onClipsChange);
-
+ 
   // Context menu state
   const [contextMenu, setContextMenu] = React.useState(null);
   const [selectedActionId, setSelectedActionId] = React.useState(null);
@@ -72,14 +73,18 @@ const Timeline = ({
       display: 'flex',
       flexDirection: 'column',
       height: `${ROW_HEIGHT * MIN_ROWS}px`,
-      position: 'relative'
+      position: 'relative',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: '4px 4px 0 0',
+      mb: 2,
+      overflow: 'hidden',
     }}>
       <TimelineControls
         scale={scale}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
       />
-
+  
       {error && (
         <Typography 
           color="error" 
@@ -89,11 +94,16 @@ const Timeline = ({
           {error}
         </Typography>
       )}
-
+  
       <Box sx={{ 
         flex: 1,
         minHeight: `${ROW_HEIGHT * MIN_ROWS}px`,
-        overflow: 'auto'
+        overflow: 'scroll',
+        position: 'relative',
+        borderBottom: '3px solid rgba(255,255,255,0.15)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+        marginBottom: '2px',
+        ...scrollbarStyles
       }}>
         <ReactTimelineEditor
           editorData={editorData}
@@ -111,15 +121,8 @@ const Timeline = ({
             </Box>
           )}
           getScaleRender={formatTime}
-          style={{ 
-            height: '100%',
-            '--timeline-background-color': '#1a1a1a',
-            '--timeline-row-height': `${ROW_HEIGHT}px`,
-            '--timeline-row-padding': '4px',
-            '--timeline-header-height': '32px',
-            '--timeline-header-background': '#2a2a2a',
-            '--timeline-grid-color': 'rgba(255,255,255,0.1)',
-          }}
+          style={timelineEditorStyles}
+          customStyle={customTimelineStyles}
           rowHeight={ROW_HEIGHT}
           scaleWidth={160 * scale}
           scale={1}
@@ -137,42 +140,26 @@ const Timeline = ({
           showDragIndicator={true}
           dragRowHeight={ROW_HEIGHT}
           disableDrag={false}
-          customStyle={{
-            rowStyle: {
-              backgroundColor: 'rgba(255,255,255,0.02)',
-              borderBottom: '1px solid rgba(255,255,255,0.1)',
-              '&:hover': {
-                backgroundColor: 'rgba(255,255,255,0.05)'
-              }
-            },
-            actionStyle: {
-              margin: '2px 0',
-              backgroundColor: '#2d3748',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              '&:hover': {
-                backgroundColor: '#3a4657'
-              }
-            }
-          }}
         />
-
-        {/* Context Menu */}
+  
         <Menu
           open={Boolean(contextMenu)}
           onClose={() => setContextMenu(null)}
           anchorReference="anchorPosition"
           anchorPosition={
-            contextMenu
-              ? { top: contextMenu.y, left: contextMenu.x }
+            contextMenu 
+              ? { top: contextMenu.y, left: contextMenu.x } 
               : undefined
           }
         >
           <MenuItem 
             onClick={handleDelete}
             sx={{ 
-              color: 'error.main',
-              '&:hover': { bgcolor: 'error.dark', color: 'white' }
+              color: 'error.main', 
+              '&:hover': { 
+                bgcolor: 'error.dark', 
+                color: 'white' 
+              }
             }}
           >
             Delete Clip
@@ -181,6 +168,5 @@ const Timeline = ({
       </Box>
     </Box>
   );
-};
-
+}
 export default Timeline;

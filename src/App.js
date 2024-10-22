@@ -88,25 +88,28 @@ function App() {
 
             {/* Timeline and Controls Area */}
             <Box sx={{ 
-              mt: 2, 
-              px: 2, 
-              pb: 2, 
-              bgcolor: 'background.default', 
-              borderTop: 1, 
-              borderColor: 'divider',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2
-            }}>
-              <TimelineSection
-                clips={timelineClips}
-                onClipsChange={handleTimelineClipsChange}
-              />
-              <TimelineDebug
-                timelineClips={timelineClips}
-                selectedBinClip={selectedBinClip}
-              />
-            </Box>
+                mt: 2, 
+                px: 2, 
+                pb: 2, 
+                bgcolor: 'background.default', 
+                borderTop: 1, 
+                borderColor: 'divider',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                '& > *:last-child': {
+                  marginBottom: '20px', // Ensure space at the bottom
+                }
+              }}>
+                <TimelineSection
+                  clips={timelineClips}
+                  onClipsChange={handleTimelineClipsChange}
+                />
+                <TimelineDebug
+                  timelineClips={timelineClips}
+                  selectedBinClip={selectedBinClip}
+                />
+              </Box>
           </EditorLayout>
         </MainLayout>
       </ThemeProvider>
