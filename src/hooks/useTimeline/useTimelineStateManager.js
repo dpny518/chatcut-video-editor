@@ -27,7 +27,7 @@ class TimelineClipState {
     
     // Timeline position (changes with moves/trims)
     this.timelineStart = clip.metadata.timeline.start;
-    this.timelineEnd = clip.metadata.timeline.end; // Use the provided end time instead of calculating
+    this.timelineEnd = clip.metadata.timeline.end;
     this.timelineDuration = this.timelineEnd - this.timelineStart;
 
     // Playback segment within source media (changes with trims)
@@ -54,15 +54,10 @@ class TimelineClipState {
   }
 
   moveClip(newPosition) {
-    // Calculate movement delta
     const moveDelta = newPosition - this.timelineStart;
     
-    // Move timeline position, keeping duration constant
     this.timelineStart = newPosition;
     this.timelineEnd = newPosition + this.timelineDuration;
-    
-    // Playback timing stays the same since we're just moving
-    // No changes to playbackStart/playbackEnd needed
     
     this.modifications[this.modifications.length - 1].current = {
       timelineStart: this.timelineStart,
@@ -76,33 +71,60 @@ class TimelineClipState {
   }
 
   trimClip(newStart, newEnd) {
-    // Detect which end is being trimmed by looking at which value actually changed
-    const startChanged = Math.abs(newStart - this.timelineStart) > 0.001;
-    const endChanged = Math.abs(newEnd - this.timelineEnd) > 0.001;
+    // Store original values
+    const originalTimelineStart = this.timelineStart;
+    const originalTimelineEnd = this.timelineEnd;
+    const originalTimelineDuration = this.timelineDuration;
+    const originalPlaybackDuration = this.playbackEnd - this.playbackStart;
+    
+    // Detect which end is being trimmed
+    const startChanged = Math.abs(newStart - originalTimelineStart) > 0.001;
+    const endChanged = Math.abs(newEnd - originalTimelineEnd) > 0.001;
     
     if (startChanged && !endChanged) {
-      // Left trim - start changed, end stayed same
-      const trimRatio = (newStart - this.timelineStart) / this.timelineDuration;
-      const playbackDuration = this.playbackEnd - this.playbackStart;
-      this.playbackStart = Math.max(this.sourceStart, this.playbackStart + (trimRatio * playbackDuration));
+      // Left trim
+      const trimDelta = newStart - originalTimelineStart;
+      const trimRatio = trimDelta / originalTimelineDuration;
+      
+      // Update timeline position
       this.timelineStart = newStart;
+      
+      // Update playback timing proportionally
+      const playbackDeltaTime = trimRatio * originalPlaybackDuration;
+      this.playbackStart = Math.max(
+        this.sourceStart,
+        this.playbackStart + playbackDeltaTime
+      );
+      
     } else if (!startChanged && endChanged) {
-      // Right trim - end changed, start stayed same
-      const trimRatio = (newEnd - this.timelineEnd) / this.timelineDuration;
-      const playbackDuration = this.playbackEnd - this.playbackStart;
-      this.playbackEnd = Math.min(this.sourceEnd, this.playbackEnd + (trimRatio * playbackDuration));
+      // Right trim
+      const trimDelta = newEnd - originalTimelineEnd;
+      const trimRatio = trimDelta / originalTimelineDuration;
+      
+      // Update timeline position
       this.timelineEnd = newEnd;
+      
+      // Update playback timing proportionally
+      const playbackDeltaTime = trimRatio * originalPlaybackDuration;
+      this.playbackEnd = Math.min(
+        this.sourceEnd,
+        this.playbackEnd + playbackDeltaTime
+      );
     }
     
-    // Update duration
+    // Update duration after trim
     this.timelineDuration = this.timelineEnd - this.timelineStart;
     
+    // Record the modification
     this.modifications[this.modifications.length - 1].current = {
       timelineStart: this.timelineStart,
       timelineEnd: this.timelineEnd,
       playbackStart: this.playbackStart,
       playbackEnd: this.playbackEnd,
-      isLeftTrim: startChanged
+      isLeftTrim: startChanged,
+      trimDelta: startChanged ? 
+        (newStart - originalTimelineStart) : 
+        (newEnd - originalTimelineEnd)
     };
     
     return this;
@@ -129,6 +151,11 @@ class TimelineClipState {
   }
 
   getTimingInfo() {
+    // Calculate relative position of playback within source
+    const playbackOffset = this.playbackStart - this.sourceStart;
+    const currentInPoint = this.timelineStart;
+    const currentOutPoint = this.timelineEnd;
+    
     return {
       timelineStart: this.timelineStart,
       timelineEnd: this.timelineEnd,
@@ -136,8 +163,33 @@ class TimelineClipState {
       playbackEnd: this.playbackEnd,
       sourceStart: this.sourceStart,
       sourceEnd: this.sourceEnd,
-      duration: this.timelineEnd - this.timelineStart
+      duration: this.timelineEnd - this.timelineStart,
+      // Add these fields for proper time mapping
+      currentIn: currentInPoint,
+      currentOut: currentOutPoint,
+      originalIn: this.sourceStart,
+      originalOut: this.sourceEnd,
+      // Add relative timing information
+      relativeStart: this.playbackStart - this.sourceStart,
+      relativeDuration: this.playbackEnd - this.playbackStart
     };
+  }
+
+  // Helper method to map timeline time to source time
+  mapTimelineToSource(timelinePosition) {
+    // Calculate how far into the timeline segment we are
+    const timelineProgress = (timelinePosition - this.timelineStart) / this.timelineDuration;
+    // Map that same progress to the playback segment
+    const playbackDuration = this.playbackEnd - this.playbackStart;
+    return this.playbackStart + (timelineProgress * playbackDuration);
+  }
+
+  // Helper method to map source time to timeline time
+  mapSourceToTimeline(sourcePosition) {
+    // Calculate how far into the playback segment we are
+    const playbackProgress = (sourcePosition - this.playbackStart) / (this.playbackEnd - this.playbackStart);
+    // Map that same progress to the timeline segment
+    return this.timelineStart + (playbackProgress * this.timelineDuration);
   }
 }
 

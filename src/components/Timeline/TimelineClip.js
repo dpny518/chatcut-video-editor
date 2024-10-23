@@ -90,7 +90,6 @@ const TimelineClip = ({
       originalDuration: formatTime(originalDuration)
     };
   }, [clip, action, manager.clips]);
-  
 
   // Update state manager when clip position changes
   useEffect(() => {
@@ -119,7 +118,17 @@ const TimelineClip = ({
     setError(null);
 
     try {
-      const cacheKey = `${clip.file.name}-${clip.startTime}-${clip.endTime}-${containerRef.current.offsetWidth}`;
+      // Get clip state for accurate timing
+      const timingInfo = calculateCurrentTimes();
+      if (!timingInfo) return;
+
+      // Parse times removing formatting
+      const currentStart = parseFloat(timingInfo.currentStart.split(':').pop());
+      const currentEnd = parseFloat(timingInfo.currentEnd.split(':').pop());
+      const originalStart = parseFloat(timingInfo.originalStart.split(':').pop());
+      
+      // Update cache key to include current timing
+      const cacheKey = `${clip.file.name}-${currentStart}-${currentEnd}-${containerRef.current.offsetWidth}`;
       
       if (thumbnailCache.has(cacheKey)) {
         setThumbnails(thumbnailCache.get(cacheKey));
@@ -142,12 +151,18 @@ const TimelineClip = ({
       });
 
       const thumbnailCount = getThumbnailCount();
-      const duration = clip.endTime - clip.startTime;
-      const interval = duration / (thumbnailCount - 1);
+      const duration = currentEnd - currentStart;
       
       for (let i = 0; i < thumbnailCount; i++) {
-        const time = clip.startTime + (i * interval);
-        video.currentTime = time;
+        // Calculate position within the current segment
+        const progress = i / (thumbnailCount - 1);
+        const timeOffset = progress * duration;
+        
+        // Map to source video time
+        const sourceTime = currentStart + timeOffset;
+        
+        // Set video to the source time position
+        video.currentTime = sourceTime;
         
         await new Promise((resolve) => {
           video.addEventListener('seeked', resolve, { once: true });
@@ -172,7 +187,7 @@ const TimelineClip = ({
     } finally {
       setLoading(false);
     }
-  }, [clip.file, clip.startTime, clip.endTime, getThumbnailCount]);
+  }, [clip.file, calculateCurrentTimes, getThumbnailCount]);
 
   // Handle video source and thumbnail generation
   useEffect(() => {
@@ -205,6 +220,11 @@ const TimelineClip = ({
 
     return () => observer.disconnect();
   }, [generateThumbnails]);
+
+  // Add effect to regenerate thumbnails on clip changes
+  useEffect(() => {
+    generateThumbnails();
+  }, [clip.startTime, clip.endTime, action.start, action.end, generateThumbnails]);
 
   // Cache cleanup
   useEffect(() => {

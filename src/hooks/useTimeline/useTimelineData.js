@@ -1,4 +1,3 @@
-// hooks/useTimeline/useTimelineData.js
 import { useCallback, useMemo, useState } from 'react';
 
 export const useTimelineData = (clips = [], onClipsChange) => {
@@ -32,18 +31,29 @@ export const useTimelineData = (clips = [], onClipsChange) => {
     try {
       let currentPosition = 0;
       const rows = clips.map((clip, index) => {
-        // Safely access clip properties with defaults
+        // Get source timing
         const sourceStart = clip.source?.startTime ?? 0;
         const sourceEnd = clip.source?.endTime ?? (sourceStart + (clip.duration || 0));
         const sourceDuration = sourceEnd - sourceStart;
 
+        // Get or calculate timeline timing
         const timelineStart = clip.metadata?.timeline?.start ?? currentPosition;
         const timelineEnd = clip.metadata?.timeline?.end ?? (timelineStart + sourceDuration);
+        const timelineDuration = timelineEnd - timelineStart;
+        
+        // Calculate playback timing
+        const playbackStart = clip.metadata?.playback?.start ?? sourceStart;
+        const playbackEnd = clip.metadata?.playback?.end ?? sourceEnd;
+        const playbackDuration = playbackEnd - playbackStart;
         
         // For new clips, place them sequentially
         if (!clip.hasBeenPositioned) {
           currentPosition = timelineEnd + 0.1; // Add small gap
         }
+
+        // Calculate relative timing
+        const relativeStart = playbackStart - sourceStart;
+        const relativeDuration = playbackEnd - playbackStart;
 
         return {
           id: String(index),
@@ -67,7 +77,17 @@ export const useTimelineData = (clips = [], onClipsChange) => {
                 originalDuration: sourceDuration,
                 timeline: {
                   start: timelineStart,
-                  end: timelineEnd
+                  end: timelineEnd,
+                  duration: timelineDuration
+                },
+                playback: {
+                  start: playbackStart,
+                  end: playbackEnd,
+                  duration: playbackDuration
+                },
+                relative: {
+                  start: relativeStart,
+                  duration: relativeDuration
                 }
               }
             }
@@ -99,27 +119,63 @@ export const useTimelineData = (clips = [], onClipsChange) => {
           const originalClip = clips.find(c => c.id === action.id);
           if (!originalClip) return null;
 
+          // Get source timing
+          const sourceStart = originalClip.source?.startTime ?? 0;
+          const sourceEnd = originalClip.source?.endTime ?? sourceStart + (action.end - action.start);
+          const sourceDuration = sourceEnd - sourceStart;
+
+          // Calculate timeline timing
+          const timelineStart = action.start;
+          const timelineEnd = action.end;
+          const timelineDuration = timelineEnd - timelineStart;
+
+          // Calculate playback timing based on timeline position and duration
+          const timelineOffset = timelineStart - (originalClip.metadata?.timeline?.start || 0);
+          const timelineRatio = timelineDuration / (originalClip.metadata?.timeline?.duration || sourceDuration);
+          
+          const originalPlaybackStart = originalClip.metadata?.playback?.start ?? sourceStart;
+          const originalPlaybackDuration = originalClip.metadata?.playback?.duration ?? sourceDuration;
+          
+          // Map timeline changes to playback timing
+          const playbackStart = originalPlaybackStart + (timelineOffset * (originalPlaybackDuration / sourceDuration));
+          const playbackDuration = originalPlaybackDuration * timelineRatio;
+          const playbackEnd = playbackStart + playbackDuration;
+
+          // Calculate relative timing
+          const relativeStart = playbackStart - sourceStart;
+          const relativeDuration = playbackEnd - playbackStart;
+
           return {
             ...action.data,
             id: action.id,
             source: {
               ...originalClip.source,
-              startTime: originalClip.source?.startTime ?? 0,
-              endTime: originalClip.source?.endTime ?? action.end - action.start,
-              duration: originalClip.source?.duration ?? action.end - action.start
+              startTime: sourceStart,
+              endTime: sourceEnd,
+              duration: sourceDuration
             },
             metadata: {
               ...originalClip.metadata,
               timeline: {
-                start: action.start,
-                end: action.end
+                start: timelineStart,
+                end: timelineEnd,
+                duration: timelineDuration
+              },
+              playback: {
+                start: playbackStart,
+                end: playbackEnd,
+                duration: playbackDuration
+              },
+              relative: {
+                start: relativeStart,
+                duration: relativeDuration
               }
             },
             rowIndex: index,
             hasBeenPositioned: true
           };
         })
-      ).filter(Boolean); // Remove any null entries
+      ).filter(Boolean);
 
       onClipsChange(updatedClips);
       setError(null);
