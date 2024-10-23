@@ -4,6 +4,7 @@ import { Timeline as ReactTimelineEditor } from '@xzdarcy/react-timeline-editor'
 import { Box, Typography, Menu, MenuItem } from '@mui/material';
 import TimelineControls from './TimelineControls';
 import TimelineClip from './TimelineClip';
+import { useTimelineExport } from './TimelineExport';
 import { useTimelineZoom } from '../../hooks/useTimeline/useTimelineZoom';
 import { useTimelineData } from '../../hooks/useTimeline/useTimelineData';
 import { formatTime } from '../../utils/formatters';
@@ -36,6 +37,18 @@ const Timeline = ({
       }
     };
   }, []);
+ // Add timeline state export functionality
+ const timelineState = {
+  clips,
+  totalDuration: editorData.duration,
+  settings: {
+    scale,
+    effects
+  }
+};
+
+const { exportTimelineData } = useTimelineExport(timelineState);
+
 
   // Handle context menu
   const handleContextMenu = useCallback((e, action) => {
@@ -82,10 +95,12 @@ const Timeline = ({
       backgroundColor: '#1a1a1a',
       boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
     }}>
-      <TimelineControls
+    <TimelineControls
         scale={scale}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
+        onDownloadState={exportTimelineData}
+        onDebugClips={() => console.log('Debug clips:', clips)}
       />
   
       {error && (

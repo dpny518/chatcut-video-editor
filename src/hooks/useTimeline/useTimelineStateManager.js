@@ -92,14 +92,12 @@ class TimelineClipState {
           const timelineDelta = newStart - draft.timelineStartTime;
           const sourceDelta = timelineDelta * (originalDuration / draft.timelineDuration);
           draft.currentStartTime = draft.sourceStartTime + sourceDelta;
-          // End time stays the same
-          draft.currentEndTime = draft.currentEndTime;
+          // End time remains unchanged, no need to reassign
         } else {
           // When trimming from right, keep the start point and adjust end
           const timelineDelta = newEnd - draft.timelineEndTime;
           const sourceDelta = timelineDelta * (originalDuration / draft.timelineDuration);
-          // Start time stays the same
-          draft.currentStartTime = draft.currentStartTime;
+          // Start time remains unchanged, no need to reassign
           draft.currentEndTime = draft.sourceEndTime + sourceDelta;
         }
         
