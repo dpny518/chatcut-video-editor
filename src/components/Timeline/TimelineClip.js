@@ -1,16 +1,26 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, Skeleton, Tooltip, Typography } from '@mui/material';
 import { AlertCircle } from 'lucide-react';
+import { useTimelineStateManager, CLIP_STATES } from '../../hooks/useTimeline/useTimelineStateManager';
 
 const thumbnailCache = new Map();
-const THUMBNAIL_WIDTH = 80; // Target width for each thumbnail
+const THUMBNAIL_WIDTH = 80;
 
 const TimelineClip = ({ 
   clip, 
   action, 
   isSelected, 
-  onSelect 
+  onSelect
 }) => {
+  const {
+    manager,
+    updateClip,
+    startClipModification,
+    moveClip,
+    trimClip,
+    completeModification
+  } = useTimelineStateManager();
+
   const [thumbnails, setThumbnails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,18 +44,28 @@ const TimelineClip = ({
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
 
-  // Calculate current clip times based on timeline position and modifications
+  // Get timing info from state manager
   const calculateCurrentTimes = useCallback(() => {
+    const clipState = manager.clips.get(clip.id);
+    if (clipState) {
+      const timingInfo = clipState.getTimingInfo();
+      return {
+        timelinePosition: formatTime(timingInfo.timelinePosition),
+        originalStart: formatTime(timingInfo.originalIn),
+        originalEnd: formatTime(timingInfo.originalOut),
+        currentStart: formatTime(timingInfo.currentIn),
+        currentEnd: formatTime(timingInfo.currentOut),
+        duration: formatTime(timingInfo.duration)
+      };
+    }
+
+    // Fallback to direct calculation if no state available
     const originalStart = clip.startTime || 0;
     const originalEnd = clip.endTime || 0;
     const timelineStart = action.start || 0;
     const timelineDuration = action.end - action.start;
     const originalDuration = originalEnd - originalStart;
-    
-    // Calculate time scaling factor if clip has been stretched/compressed
     const timeScale = originalDuration / timelineDuration;
-    
-    // Calculate current start time in original video
     const currentStart = originalStart + ((action.start - timelineStart) * timeScale);
     const currentEnd = currentStart + (timelineDuration * timeScale);
     
@@ -57,7 +77,34 @@ const TimelineClip = ({
       currentEnd: formatTime(currentEnd),
       duration: formatTime(timelineDuration)
     };
-  }, [clip, action]);
+  }, [clip, action, manager.clips]);
+
+  // Initialize clip in state manager if needed
+  useEffect(() => {
+    if (!manager.clips.has(clip.id)) {
+      updateClip(clip);
+    }
+  }, [clip, manager.clips, updateClip]);
+
+  // Update state manager when clip position changes
+  useEffect(() => {
+    const clipState = manager.clips.get(clip.id);
+    if (clipState && action.start !== clipState.timelineStartTime) {
+      startClipModification(clip.id, CLIP_STATES.MOVING);
+      moveClip(clip.id, action.start);
+      completeModification(clip.id);
+    }
+  }, [action.start, clip.id, manager.clips, startClipModification, moveClip, completeModification]);
+
+  // Update state manager when clip duration changes
+  useEffect(() => {
+    const clipState = manager.clips.get(clip.id);
+    if (clipState && (action.end - action.start) !== clipState.timelineDuration) {
+      startClipModification(clip.id, CLIP_STATES.TRIMMING);
+      trimClip(clip.id, action.start, action.end);
+      completeModification(clip.id);
+    }
+  }, [action.start, action.end, clip.id, manager.clips, startClipModification, trimClip, completeModification]);
 
   const generateThumbnails = useCallback(async () => {
     if (!videoRef.current || !clip.file || !containerRef.current) return;
