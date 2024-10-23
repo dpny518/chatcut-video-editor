@@ -78,6 +78,9 @@ const Timeline = ({
       borderRadius: '4px 4px 0 0',
       mb: 2,
       overflow: 'hidden',
+      // Enhanced container styles
+      backgroundColor: '#1a1a1a',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
     }}>
       <TimelineControls
         scale={scale}
@@ -100,10 +103,31 @@ const Timeline = ({
         minHeight: `${ROW_HEIGHT * MIN_ROWS}px`,
         overflow: 'scroll',
         position: 'relative',
-        borderBottom: '3px solid rgba(255,255,255,0.15)',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-        marginBottom: '2px',
-        ...scrollbarStyles
+        // Enhanced bottom border and shadow
+        borderBottom: '3px solid rgba(255,255,255,0.25)',
+        boxShadow: 'inset 0 -4px 6px -4px rgba(0,0,0,0.3)',
+        // Spacing for scrollbars
+        padding: '0 0 16px 0',
+        marginBottom: '16px',
+        // Combine with existing scrollbar styles
+        ...scrollbarStyles,
+        // Additional scrollbar enhancements
+        '&::-webkit-scrollbar-track': {
+          ...scrollbarStyles['&::-webkit-scrollbar-track'],
+          margin: '4px',
+          boxShadow: 'inset 0 0 6px rgba(0,0,0,0.3)',
+        },
+        '&::-webkit-scrollbar-thumb': {
+          ...scrollbarStyles['&::-webkit-scrollbar-thumb'],
+          border: '4px solid #1a1a1a',
+          minHeight: '40px',
+        },
+        // Enhanced corner treatment
+        '&::-webkit-scrollbar-corner': {
+          ...scrollbarStyles['&::-webkit-scrollbar-corner'],
+          backgroundColor: '#1a1a1a',
+          borderTop: '1px solid rgba(255,255,255,0.15)',
+        }
       }}>
         <ReactTimelineEditor
           editorData={editorData}
@@ -121,8 +145,20 @@ const Timeline = ({
             </Box>
           )}
           getScaleRender={formatTime}
-          style={timelineEditorStyles}
-          customStyle={customTimelineStyles}
+          style={{
+            ...timelineEditorStyles,
+            // Ensure proper spacing for scrollbar buttons
+            paddingBottom: '20px',
+          }}
+          customStyle={{
+            ...customTimelineStyles,
+            // Enhanced container style
+            containerStyle: {
+              ...customTimelineStyles.containerStyle,
+              borderBottom: '3px solid rgba(255,255,255,0.25)',
+              boxShadow: 'inset 0 -4px 6px -4px rgba(0,0,0,0.3)',
+            }
+          }}
           rowHeight={ROW_HEIGHT}
           scaleWidth={160 * scale}
           scale={1}
@@ -169,4 +205,5 @@ const Timeline = ({
     </Box>
   );
 }
+
 export default Timeline;
