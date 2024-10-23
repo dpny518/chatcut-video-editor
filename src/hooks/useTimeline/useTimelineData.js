@@ -29,64 +29,110 @@ export const useTimelineData = (clips = [], onClipsChange) => {
   }), []);
 
   const editorData = useMemo(() => {
-    let currentPosition = 0;
-    const rows = clips.map((clip, index) => {
-      // For new clips, place them sequentially
-      const isNewClip = !clip.hasBeenPositioned;
-      const start = isNewClip ? currentPosition : clip.startTime;
-      const duration = clip.endTime - clip.startTime;
+    try {
+      let currentPosition = 0;
+      const rows = clips.map((clip, index) => {
+        // Safely access clip properties with defaults
+        const sourceStart = clip.source?.startTime ?? 0;
+        const sourceEnd = clip.source?.endTime ?? (sourceStart + (clip.duration || 0));
+        const sourceDuration = sourceEnd - sourceStart;
 
-      if (isNewClip) {
-        currentPosition += duration + 0.1; // Add small gap for new clips
-      }
+        const timelineStart = clip.metadata?.timeline?.start ?? currentPosition;
+        const timelineEnd = clip.metadata?.timeline?.end ?? (timelineStart + sourceDuration);
+        
+        // For new clips, place them sequentially
+        if (!clip.hasBeenPositioned) {
+          currentPosition = timelineEnd + 0.1; // Add small gap
+        }
 
-      return {
-        id: String(index), // Each clip gets its own row
-        actions: [{
-          id: clip.id,
-          start: start,
-          end: start + duration,
-          effectId: 'default',
-          flexible: true,
-          movable: true,
-          data: {
-            ...clip,
-            hasBeenPositioned: true,
-            originalStart: clip.startTime,
-            originalEnd: clip.endTime
-          }
-        }]
-      };
-    });
+        return {
+          id: String(index),
+          actions: [{
+            id: clip.id,
+            start: timelineStart,
+            end: timelineEnd,
+            effectId: 'default',
+            flexible: true,
+            movable: true,
+            data: {
+              ...clip,
+              hasBeenPositioned: true,
+              source: {
+                startTime: sourceStart,
+                endTime: sourceEnd,
+                duration: sourceDuration,
+                name: clip.source?.name || 'Untitled'
+              },
+              metadata: {
+                originalDuration: sourceDuration,
+                timeline: {
+                  start: timelineStart,
+                  end: timelineEnd
+                }
+              }
+            }
+          }]
+        };
+      });
 
-    // Add an empty row at the end
-    rows.push({
-      id: String(clips.length),
-      actions: []
-    });
+      // Add empty row at the end
+      rows.push({
+        id: String(clips.length),
+        actions: []
+      });
 
-    return rows;
+      return rows;
+    } catch (err) {
+      console.error('Error processing timeline data:', err);
+      setError('Error processing timeline data: ' + err.message);
+      return [{
+        id: '0',
+        actions: []
+      }];
+    }
   }, [clips]);
 
   const handleChange = useCallback((newEditorData) => {
     try {
       const updatedClips = newEditorData.flatMap((row, index) => 
-        row.actions.map(action => ({
-          ...action.data,
-          id: action.id,
-          startTime: action.start,
-          endTime: action.end,
-          rowIndex: index,
-          hasBeenPositioned: true
-        }))
-      );
+        row.actions.map(action => {
+          const originalClip = clips.find(c => c.id === action.id);
+          if (!originalClip) return null;
+
+          return {
+            ...action.data,
+            id: action.id,
+            source: {
+              ...originalClip.source,
+              startTime: originalClip.source?.startTime ?? 0,
+              endTime: originalClip.source?.endTime ?? action.end - action.start,
+              duration: originalClip.source?.duration ?? action.end - action.start
+            },
+            metadata: {
+              ...originalClip.metadata,
+              timeline: {
+                start: action.start,
+                end: action.end
+              }
+            },
+            rowIndex: index,
+            hasBeenPositioned: true
+          };
+        })
+      ).filter(Boolean); // Remove any null entries
 
       onClipsChange(updatedClips);
       setError(null);
     } catch (err) {
+      console.error('Error updating timeline:', err);
       setError('Error updating timeline: ' + err.message);
     }
-  }, [onClipsChange]);
+  }, [clips, onClipsChange]);
 
-  return { editorData, effects, error, handleChange };
+  return { 
+    editorData, 
+    effects, 
+    error, 
+    handleChange 
+  };
 };

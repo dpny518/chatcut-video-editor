@@ -1,8 +1,6 @@
-// src/hooks/useTimeline/useTimelineStateManager.js
 import { useState, useCallback } from 'react';
-import { produce, enableMapSet, immerable } from 'immer';
+import { produce, enableMapSet } from 'immer';
 
-// Enable Immer support for Map and Set
 enableMapSet();
 
 export const CLIP_STATES = {
@@ -13,37 +11,29 @@ export const CLIP_STATES = {
 };
 
 class TimelineClipState {
-  // Make this class immerable
-  [immerable] = true;
-
   constructor(clip) {
     this.id = clip.id;
-    this.file = clip.file;
-    this.name = clip.file.name;
     
-    // Convert file to a plain object to make it immerable
     this.fileInfo = {
       name: clip.file.name,
       size: clip.file.size,
       type: clip.file.type,
     };
     
-    // Original source timing
-    this.sourceStartTime = clip.startTime || 0;
-    this.sourceEndTime = clip.endTime || 0;
-    this.sourceDuration = this.sourceEndTime - this.sourceStartTime;
+    // Source media timing (original media timing - never changes)
+    this.sourceStart = clip.source.startTime;
+    this.sourceEnd = clip.source.endTime;
+    this.sourceDuration = this.sourceEnd - this.sourceStart;
     
-    // Timeline positioning
-    this.timelineStartTime = 0;
-    this.timelineDuration = this.sourceDuration;
-    this.timelineEndTime = this.timelineStartTime + this.timelineDuration;
+    // Timeline position (changes with moves/trims)
+    this.timelineStart = clip.metadata.timeline.start;
+    this.timelineEnd = clip.metadata.timeline.end; // Use the provided end time instead of calculating
+    this.timelineDuration = this.timelineEnd - this.timelineStart;
+
+    // Playback segment within source media (changes with trims)
+    this.playbackStart = this.sourceStart;
+    this.playbackEnd = this.sourceEnd;
     
-    // Current working state
-    this.currentStartTime = this.sourceStartTime;
-    this.currentEndTime = this.sourceEndTime;
-    this.currentDuration = this.sourceDuration;
-    
-    // Track modifications
     this.modifications = [];
     this.state = CLIP_STATES.INITIAL;
   }
@@ -54,71 +44,80 @@ class TimelineClipState {
       type,
       timestamp: Date.now(),
       before: {
-        startTime: this.currentStartTime,
-        endTime: this.currentEndTime,
-        timelinePosition: this.timelineStartTime
+        timelineStart: this.timelineStart,
+        timelineEnd: this.timelineEnd,
+        playbackStart: this.playbackStart,
+        playbackEnd: this.playbackEnd
       }
     });
     return this;
   }
 
-  moveClip(newTimelinePosition) {
-    const delta = newTimelinePosition - this.timelineStartTime;
-    this.timelineStartTime = newTimelinePosition;
-    this.timelineEndTime = newTimelinePosition + this.timelineDuration;
+  moveClip(newPosition) {
+    // Calculate movement delta
+    const moveDelta = newPosition - this.timelineStart;
+    
+    // Move timeline position, keeping duration constant
+    this.timelineStart = newPosition;
+    this.timelineEnd = newPosition + this.timelineDuration;
+    
+    // Playback timing stays the same since we're just moving
+    // No changes to playbackStart/playbackEnd needed
     
     this.modifications[this.modifications.length - 1].current = {
-      startTime: this.currentStartTime,
-      endTime: this.currentEndTime,
-      timelinePosition: newTimelinePosition,
-      delta
+      timelineStart: this.timelineStart,
+      timelineEnd: this.timelineEnd,
+      playbackStart: this.playbackStart,
+      playbackEnd: this.playbackEnd,
+      moveDelta
     };
+    
     return this;
   }
 
-  trimClip(clipId, newStart, newEnd) {
-    const clipState = this.clips.get(clipId);
-    if (clipState && this.currentOperation?.clipId === clipId) {
-      const updatedState = produce(clipState, draft => {
-        const originalDuration = draft.sourceEndTime - draft.sourceStartTime;
-        const newDuration = newEnd - newStart;
-        const timeScale = originalDuration / newDuration;
-
-        // Check if we're trimming from the left or right
-        const isLeftTrim = newStart !== draft.timelineStartTime;
-        
-        if (isLeftTrim) {
-          // When trimming from left, keep the end point fixed and adjust start
-          const timelineDelta = newStart - draft.timelineStartTime;
-          const sourceDelta = timelineDelta * (originalDuration / draft.timelineDuration);
-          draft.currentStartTime = draft.sourceStartTime + sourceDelta;
-          // End time remains unchanged, no need to reassign
-        } else {
-          // When trimming from right, keep the start point and adjust end
-          const timelineDelta = newEnd - draft.timelineEndTime;
-          const sourceDelta = timelineDelta * (originalDuration / draft.timelineDuration);
-          // Start time remains unchanged, no need to reassign
-          draft.currentEndTime = draft.sourceEndTime + sourceDelta;
-        }
-        
-        // Update timeline positions
-        draft.timelineStartTime = newStart;
-        draft.timelineEndTime = newEnd;
-        draft.timelineDuration = newDuration;
-
-        draft.modifications[draft.modifications.length - 1].current = {
-          startTime: draft.currentStartTime,
-          endTime: draft.currentEndTime,
-          timelinePosition: newStart,
-          duration: newDuration,
-          timeScale,
-          isLeftTrim
-        };
-      });
-      this.clips.set(clipId, updatedState);
-      return updatedState;
+  trimClip(newStart, newEnd) {
+    // Check if we're trimming the left or right side by comparing with current values
+    const isLeftTrim = Math.abs(newStart - this.timelineStart) > 0.01; // Small threshold for floating point comparison
+    
+    if (isLeftTrim) {
+      // Left trim - move start point
+      const trimRatio = (newStart - this.timelineStart) / (this.timelineEnd - this.timelineStart);
+      const playbackDuration = this.playbackEnd - this.playbackStart;
+      
+      // Update start points
+      this.playbackStart += trimRatio * playbackDuration;
+      this.timelineStart = newStart;
+      
+      // Keep end points unchanged
+      // this.playbackEnd stays same
+      // this.timelineEnd stays same
+    } else {
+      // Right trim - move end point
+      const trimRatio = (newEnd - this.timelineEnd) / (this.timelineEnd - this.timelineStart);
+      const playbackDuration = this.playbackEnd - this.playbackStart;
+      
+      // Keep start points unchanged
+      // this.playbackStart stays same
+      // this.timelineStart stays same
+      
+      // Update end points
+      this.playbackEnd += trimRatio * playbackDuration;
+      this.timelineEnd = newEnd;
     }
-    return null;
+    
+    // Update duration
+    this.timelineDuration = this.timelineEnd - this.timelineStart;
+    
+    // Record the modification
+    this.modifications[this.modifications.length - 1].current = {
+      timelineStart: this.timelineStart,
+      timelineEnd: this.timelineEnd,
+      playbackStart: this.playbackStart,
+      playbackEnd: this.playbackEnd,
+      isLeftTrim
+    };
+    
+    return this;
   }
 
   completeModification() {
@@ -131,12 +130,11 @@ class TimelineClipState {
   undo() {
     const lastMod = this.modifications.pop();
     if (lastMod) {
-      this.currentStartTime = lastMod.before.startTime;
-      this.currentEndTime = lastMod.before.endTime;
-      this.timelineStartTime = lastMod.before.timelinePosition;
-      this.timelineEndTime = lastMod.before.timelinePosition + 
-        (lastMod.before.endTime - lastMod.before.startTime);
-      this.timelineDuration = this.timelineEndTime - this.timelineStartTime;
+      this.timelineStart = lastMod.before.timelineStart;
+      this.timelineEnd = lastMod.before.timelineEnd;
+      this.playbackStart = lastMod.before.playbackStart;
+      this.playbackEnd = lastMod.before.playbackEnd;
+      this.timelineDuration = this.timelineEnd - this.timelineStart;
     }
     this.state = CLIP_STATES.COMPLETED;
     return this;
@@ -144,12 +142,13 @@ class TimelineClipState {
 
   getTimingInfo() {
     return {
-      timelinePosition: this.timelineStartTime,
-      currentIn: this.currentStartTime,
-      currentOut: this.currentEndTime,
-      originalIn: this.sourceStartTime,
-      originalOut: this.sourceEndTime,
-      duration: this.timelineDuration
+      timelineStart: this.timelineStart,
+      timelineEnd: this.timelineEnd,
+      playbackStart: this.playbackStart,
+      playbackEnd: this.playbackEnd,
+      sourceStart: this.sourceStart,
+      sourceEnd: this.sourceEnd,
+      duration: this.timelineEnd - this.timelineStart
     };
   }
 }
@@ -162,7 +161,6 @@ class TimelineStateManager {
   }
 
   updateClip(clip) {
-    // Create a plain object version of the clip state
     const clipState = this.clips.get(clip.id) || new TimelineClipState(clip);
     this.clips.set(clip.id, clipState);
     return clipState;
@@ -172,16 +170,7 @@ class TimelineStateManager {
     const clipState = this.clips.get(clipId);
     if (clipState) {
       const updatedState = produce(clipState, draft => {
-        draft.state = modificationType;
-        draft.modifications.push({
-          type: modificationType,
-          timestamp: Date.now(),
-          before: {
-            startTime: draft.currentStartTime,
-            endTime: draft.currentEndTime,
-            timelinePosition: draft.timelineStartTime
-          }
-        });
+        draft.startModification(modificationType);
       });
       this.clips.set(clipId, updatedState);
       this.currentOperation = { clipId, type: modificationType };
@@ -194,16 +183,7 @@ class TimelineStateManager {
     const clipState = this.clips.get(clipId);
     if (clipState && this.currentOperation?.clipId === clipId) {
       const updatedState = produce(clipState, draft => {
-        const delta = newPosition - draft.timelineStartTime;
-        draft.timelineStartTime = newPosition;
-        draft.timelineEndTime = newPosition + draft.timelineDuration;
-        
-        draft.modifications[draft.modifications.length - 1].current = {
-          startTime: draft.currentStartTime,
-          endTime: draft.currentEndTime,
-          timelinePosition: newPosition,
-          delta
-        };
+        draft.moveClip(newPosition);
       });
       this.clips.set(clipId, updatedState);
       return updatedState;
@@ -215,25 +195,7 @@ class TimelineStateManager {
     const clipState = this.clips.get(clipId);
     if (clipState && this.currentOperation?.clipId === clipId) {
       const updatedState = produce(clipState, draft => {
-        const originalDuration = draft.sourceEndTime - draft.sourceStartTime;
-        const newDuration = newEnd - newStart;
-        const timeScale = originalDuration / newDuration;
-
-        const sourceOffset = (newStart - draft.timelineStartTime) * timeScale;
-        draft.currentStartTime = draft.sourceStartTime + sourceOffset;
-        draft.currentEndTime = draft.currentStartTime + (newDuration * timeScale);
-        
-        draft.timelineStartTime = newStart;
-        draft.timelineEndTime = newEnd;
-        draft.timelineDuration = newDuration;
-
-        draft.modifications[draft.modifications.length - 1].current = {
-          startTime: draft.currentStartTime,
-          endTime: draft.currentEndTime,
-          timelinePosition: newStart,
-          duration: newDuration,
-          timeScale
-        };
+        draft.trimClip(newStart, newEnd);
       });
       this.clips.set(clipId, updatedState);
       return updatedState;
@@ -245,9 +207,7 @@ class TimelineStateManager {
     const clipState = this.clips.get(clipId);
     if (clipState && this.currentOperation?.clipId === clipId) {
       const updatedState = produce(clipState, draft => {
-        const lastMod = draft.modifications[draft.modifications.length - 1];
-        lastMod.completed = Date.now();
-        draft.state = CLIP_STATES.COMPLETED;
+        draft.completeModification();
       });
       this.clips.set(clipId, updatedState);
       this.history.push({ ...this.currentOperation, timestamp: Date.now() });
@@ -261,16 +221,7 @@ class TimelineStateManager {
     const clipState = this.clips.get(clipId);
     if (clipState) {
       const updatedState = produce(clipState, draft => {
-        const lastMod = draft.modifications.pop();
-        if (lastMod) {
-          draft.currentStartTime = lastMod.before.startTime;
-          draft.currentEndTime = lastMod.before.endTime;
-          draft.timelineStartTime = lastMod.before.timelinePosition;
-          draft.timelineEndTime = lastMod.before.timelinePosition + 
-            (lastMod.before.endTime - lastMod.before.startTime);
-          draft.timelineDuration = draft.timelineEndTime - draft.timelineStartTime;
-        }
-        draft.state = CLIP_STATES.COMPLETED;
+        draft.undo();
       });
       this.clips.set(clipId, updatedState);
       return updatedState;
@@ -278,7 +229,6 @@ class TimelineStateManager {
     return null;
   }
 
-  // Get all clips' current state
   getAllClipsState() {
     return Array.from(this.clips.values()).map(clip => ({
       id: clip.id,
