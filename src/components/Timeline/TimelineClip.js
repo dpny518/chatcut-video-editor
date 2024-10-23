@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Box, Skeleton } from '@mui/material';
+import { Box, Skeleton, Tooltip, Typography } from '@mui/material';
 import { AlertCircle } from 'lucide-react';
 
 const thumbnailCache = new Map();
@@ -14,6 +14,7 @@ const TimelineClip = ({
   const [thumbnails, setThumbnails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [hoverInfo, setHoverInfo] = useState(null);
   const videoRef = useRef(null);
   const videoUrlRef = useRef(null);
   const containerRef = useRef(null);
@@ -24,6 +25,39 @@ const TimelineClip = ({
     const width = containerRef.current.offsetWidth;
     return Math.max(3, Math.ceil(width / THUMBNAIL_WIDTH));
   }, []);
+
+  // Format time helper
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 100);
+    return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate current clip times based on timeline position and modifications
+  const calculateCurrentTimes = useCallback(() => {
+    const originalStart = clip.startTime || 0;
+    const originalEnd = clip.endTime || 0;
+    const timelineStart = action.start || 0;
+    const timelineDuration = action.end - action.start;
+    const originalDuration = originalEnd - originalStart;
+    
+    // Calculate time scaling factor if clip has been stretched/compressed
+    const timeScale = originalDuration / timelineDuration;
+    
+    // Calculate current start time in original video
+    const currentStart = originalStart + ((action.start - timelineStart) * timeScale);
+    const currentEnd = currentStart + (timelineDuration * timeScale);
+    
+    return {
+      timelinePosition: formatTime(timelineStart),
+      originalStart: formatTime(originalStart),
+      originalEnd: formatTime(originalEnd),
+      currentStart: formatTime(currentStart),
+      currentEnd: formatTime(currentEnd),
+      duration: formatTime(timelineDuration)
+    };
+  }, [clip, action]);
 
   const generateThumbnails = useCallback(async () => {
     if (!videoRef.current || !clip.file || !containerRef.current) return;
@@ -127,89 +161,127 @@ const TimelineClip = ({
     }
   }, [thumbnails]);
 
+  // Update hover info whenever the clip position or duration changes
+  useEffect(() => {
+    setHoverInfo(calculateCurrentTimes());
+  }, [action.start, action.end, calculateCurrentTimes]);
+
+  const tooltipContent = () => (
+    <Box sx={{ p: 1 }}>
+      <Typography variant="caption" display="block">
+        Timeline Position: {hoverInfo?.timelinePosition}
+      </Typography>
+      <Typography variant="caption" display="block">
+        Current In/Out: {hoverInfo?.currentStart} - {hoverInfo?.currentEnd}
+      </Typography>
+      <Typography variant="caption" display="block">
+        Original In/Out: {hoverInfo?.originalStart} - {hoverInfo?.originalEnd}
+      </Typography>
+      <Typography variant="caption" display="block">
+        Duration: {hoverInfo?.duration}
+      </Typography>
+    </Box>
+  );
+
   return (
-    <Box
-      ref={containerRef}
-      onClick={() => onSelect?.(action.id)}
-      sx={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        cursor: 'pointer',
-        bgcolor: 'black',
-        borderRadius: 1,
-        border: theme => `2px solid ${isSelected ? theme.palette.primary.main : theme.palette.grey[700]}`,
-        overflow: 'hidden',
-        '&:hover': {
-          borderColor: theme => isSelected ? theme.palette.primary.main : theme.palette.grey[500],
-        }
+    <Tooltip
+      title={tooltipContent()}
+      followCursor
+      placement="top"
+      componentsProps={{
+        tooltip: {
+          sx: {
+            bgcolor: 'rgba(0, 0, 0, 0.85)',
+            '& .MuiTooltip-arrow': {
+              color: 'rgba(0, 0, 0, 0.85)',
+            },
+          },
+        },
       }}
     >
       <Box
+        ref={containerRef}
+        onClick={() => onSelect?.(action.id)}
         sx={{
-          display: 'flex',
+          position: 'relative',
           width: '100%',
           height: '100%',
-          overflow: 'hidden'
+          cursor: 'pointer',
+          bgcolor: 'black',
+          borderRadius: 1,
+          border: theme => `2px solid ${isSelected ? theme.palette.primary.main : theme.palette.grey[700]}`,
+          overflow: 'hidden',
+          '&:hover': {
+            borderColor: theme => isSelected ? theme.palette.primary.main : theme.palette.grey[500],
+          }
         }}
       >
-        {loading ? (
-          Array.from({ length: getThumbnailCount() }).map((_, index) => (
-            <Skeleton
-              key={index}
-              variant="rectangular"
-              sx={{
-                flex: 1,
-                height: '100%',
-                bgcolor: 'grey.900'
-              }}
-            />
-          ))
-        ) : error ? (
-          <Box
-            sx={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'grey.900',
-              color: 'error.main'
-            }}
-          >
-            <AlertCircle size={24} />
-          </Box>
-        ) : (
-          thumbnails.map((thumbnail, index) => (
-            <Box
-              key={index}
-              sx={{
-                flex: 1,
-                height: '100%',
-                position: 'relative',
-                borderRight: index < thumbnails.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none'
-              }}
-            >
-              <img
-                src={thumbnail}
-                alt={`Frame ${index + 1}`}
-                style={{
-                  width: '100%',
+        <Box
+          sx={{
+            display: 'flex',
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden'
+          }}
+        >
+          {loading ? (
+            Array.from({ length: getThumbnailCount() }).map((_, index) => (
+              <Skeleton
+                key={index}
+                variant="rectangular"
+                sx={{
+                  flex: 1,
                   height: '100%',
-                  objectFit: 'cover'
+                  bgcolor: 'grey.900'
                 }}
               />
+            ))
+          ) : error ? (
+            <Box
+              sx={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'grey.900',
+                color: 'error.main'
+              }}
+            >
+              <AlertCircle size={24} />
             </Box>
-          ))
-        )}
+          ) : (
+            thumbnails.map((thumbnail, index) => (
+              <Box
+                key={index}
+                sx={{
+                  flex: 1,
+                  height: '100%',
+                  position: 'relative',
+                  borderRight: index < thumbnails.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none'
+                }}
+              >
+                <img
+                  src={thumbnail}
+                  alt={`Frame ${index + 1}`}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
+                />
+              </Box>
+            ))
+          )}
+        </Box>
+        <video
+          ref={videoRef}
+          style={{ display: 'none' }}
+          muted
+          playsInline
+        />
       </Box>
-      <video
-        ref={videoRef}
-        style={{ display: 'none' }}
-        muted
-        playsInline
-      />
-    </Box>
+    </Tooltip>
   );
 };
 
