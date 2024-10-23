@@ -1,0 +1,66 @@
+VIDEOEDITOR_REACT_APP{
+stack:[React,MUI,Immer,ReactPlayer];
+purpose:"Web-based video editor with frame-accurate timeline manipulation";
+
+core_components:{
+  BinViewer:{
+    purpose:"Video preview and segment selection",
+    state:["playing","duration","currentTime","range"],
+    features:["segment_selection","preview","add_to_timeline"]
+  },
+  Timeline:{
+    purpose:"Main editing interface",
+    features:["drag_drop","trim","zoom","snap"],
+    state_management:"useTimelineStateManager"
+  },
+  TimelineClip:{
+    purpose:"Individual clip renderer",
+    features:["thumbnails","hover_info","time_tracking"],
+    state:["timing","modifications","thumbnails"]
+  }
+};
+
+state_management:{
+  TimelineClipState:{
+    properties:{
+      source_timing:["startTime","endTime","duration"],
+      timeline_timing:["timelineStart","timelineEnd"],
+      current_state:["currentStart","currentEnd"],
+      modifications:["history","type","timestamp"]
+    },
+    states:["INITIAL","MOVING","TRIMMING","COMPLETED"]
+  },
+  TimelineStateManager:{
+    purpose:"Global timeline state coordination",
+    features:["clip_tracking","modification_history","undo"],
+    implementation:"Immer-based immutable updates"
+  }
+};
+
+key_features:[
+  "frame_accurate_trimming",
+  "time_preservation",
+  "thumbnail_generation",
+  "modification_history",
+  "state_persistence"
+];
+
+data_flow:{
+  clip_creation:"BinViewer->Timeline",
+  state_updates:"TimelineStateManager->TimelineClip",
+  modifications:"TimelineClip->TimelineStateManager",
+  thumbnails:"TimelineClip(internal)"
+};
+
+time_handling:{
+  preservation:"Maintains original timing when trimming",
+  scaling:"Handles duration changes with proper time scaling",
+  display:"Shows timeline position, current in/out, original in/out"
+};
+
+implementation_notes:{
+  state:"Uses Immer for immutable updates",
+  caching:"Implements thumbnail caching",
+  performance:"Optimizes re-renders with useCallback",
+  effects:"Manages side effects with useEffect"
+}}

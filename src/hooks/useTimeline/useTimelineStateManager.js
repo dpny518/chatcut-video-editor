@@ -76,27 +76,51 @@ class TimelineClipState {
     return this;
   }
 
-  trimClip(newStart, newEnd) {
-    const originalDuration = this.sourceEndTime - this.sourceStartTime;
-    const newDuration = newEnd - newStart;
-    const timeScale = originalDuration / newDuration;
+  trimClip(clipId, newStart, newEnd) {
+    const clipState = this.clips.get(clipId);
+    if (clipState && this.currentOperation?.clipId === clipId) {
+      const updatedState = produce(clipState, draft => {
+        const originalDuration = draft.sourceEndTime - draft.sourceStartTime;
+        const newDuration = newEnd - newStart;
+        const timeScale = originalDuration / newDuration;
 
-    const sourceOffset = (newStart - this.timelineStartTime) * timeScale;
-    this.currentStartTime = this.sourceStartTime + sourceOffset;
-    this.currentEndTime = this.currentStartTime + (newDuration * timeScale);
-    
-    this.timelineStartTime = newStart;
-    this.timelineEndTime = newEnd;
-    this.timelineDuration = newDuration;
+        // Check if we're trimming from the left or right
+        const isLeftTrim = newStart !== draft.timelineStartTime;
+        
+        if (isLeftTrim) {
+          // When trimming from left, keep the end point fixed and adjust start
+          const timelineDelta = newStart - draft.timelineStartTime;
+          const sourceDelta = timelineDelta * (originalDuration / draft.timelineDuration);
+          draft.currentStartTime = draft.sourceStartTime + sourceDelta;
+          // End time stays the same
+          draft.currentEndTime = draft.currentEndTime;
+        } else {
+          // When trimming from right, keep the start point and adjust end
+          const timelineDelta = newEnd - draft.timelineEndTime;
+          const sourceDelta = timelineDelta * (originalDuration / draft.timelineDuration);
+          // Start time stays the same
+          draft.currentStartTime = draft.currentStartTime;
+          draft.currentEndTime = draft.sourceEndTime + sourceDelta;
+        }
+        
+        // Update timeline positions
+        draft.timelineStartTime = newStart;
+        draft.timelineEndTime = newEnd;
+        draft.timelineDuration = newDuration;
 
-    this.modifications[this.modifications.length - 1].current = {
-      startTime: this.currentStartTime,
-      endTime: this.currentEndTime,
-      timelinePosition: newStart,
-      duration: newDuration,
-      timeScale
-    };
-    return this;
+        draft.modifications[draft.modifications.length - 1].current = {
+          startTime: draft.currentStartTime,
+          endTime: draft.currentEndTime,
+          timelinePosition: newStart,
+          duration: newDuration,
+          timeScale,
+          isLeftTrim
+        };
+      });
+      this.clips.set(clipId, updatedState);
+      return updatedState;
+    }
+    return null;
   }
 
   completeModification() {
