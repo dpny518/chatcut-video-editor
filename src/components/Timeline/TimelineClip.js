@@ -14,7 +14,6 @@ const TimelineClip = ({
 }) => {
   const {
     manager,
-    updateClip,
     startClipModification,
     moveClip,
     trimClip,
@@ -55,19 +54,31 @@ const TimelineClip = ({
         originalEnd: formatTime(timingInfo.originalOut),
         currentStart: formatTime(timingInfo.currentIn),
         currentEnd: formatTime(timingInfo.currentOut),
-        duration: formatTime(timingInfo.duration)
+        duration: formatTime(timingInfo.duration),
+        originalDuration: formatTime(timingInfo.originalOut - timingInfo.originalIn)
       };
     }
-
+  
     // Fallback to direct calculation if no state available
     const originalStart = clip.startTime || 0;
     const originalEnd = clip.endTime || 0;
     const timelineStart = action.start || 0;
     const timelineDuration = action.end - action.start;
     const originalDuration = originalEnd - originalStart;
-    const timeScale = originalDuration / timelineDuration;
-    const currentStart = originalStart + ((action.start - timelineStart) * timeScale);
-    const currentEnd = currentStart + (timelineDuration * timeScale);
+    
+    // Determine if we're trimming from left side
+    const isLeftTrim = timelineStart !== clip.timelineStartTime;
+    
+    let currentStart, currentEnd;
+    if (isLeftTrim) {
+      // When trimming from left, keep end fixed
+      currentEnd = originalEnd;
+      currentStart = originalEnd - timelineDuration;
+    } else {
+      // When trimming from right, keep start fixed
+      currentStart = originalStart;
+      currentEnd = originalStart + timelineDuration;
+    }
     
     return {
       timelinePosition: formatTime(timelineStart),
@@ -75,16 +86,11 @@ const TimelineClip = ({
       originalEnd: formatTime(originalEnd),
       currentStart: formatTime(currentStart),
       currentEnd: formatTime(currentEnd),
-      duration: formatTime(timelineDuration)
+      duration: formatTime(timelineDuration),
+      originalDuration: formatTime(originalDuration)
     };
   }, [clip, action, manager.clips]);
-
-  // Initialize clip in state manager if needed
-  useEffect(() => {
-    if (!manager.clips.has(clip.id)) {
-      updateClip(clip);
-    }
-  }, [clip, manager.clips, updateClip]);
+  
 
   // Update state manager when clip position changes
   useEffect(() => {
@@ -215,7 +221,7 @@ const TimelineClip = ({
 
   const tooltipContent = () => (
     <Box sx={{ p: 1 }}>
-      <Typography variant="caption" display="block">
+      <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
         Timeline Position: {hoverInfo?.timelinePosition}
       </Typography>
       <Typography variant="caption" display="block">
@@ -224,8 +230,11 @@ const TimelineClip = ({
       <Typography variant="caption" display="block">
         Original In/Out: {hoverInfo?.originalStart} - {hoverInfo?.originalEnd}
       </Typography>
-      <Typography variant="caption" display="block">
-        Duration: {hoverInfo?.duration}
+      <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+        Current Duration: {hoverInfo?.duration}
+      </Typography>
+      <Typography variant="caption" display="block" sx={{ color: 'text.secondary' }}>
+        Original Duration: {hoverInfo?.originalDuration}
       </Typography>
     </Box>
   );
