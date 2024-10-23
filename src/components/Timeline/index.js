@@ -10,6 +10,8 @@ import { useTimelineData } from '../../hooks/useTimeline/useTimelineData';
 import { formatTime } from '../../utils/formatters';
 import { scrollbarStyles } from './styles/scrollbarStyles';
 import { timelineEditorStyles, customTimelineStyles } from './styles/timelineStyles';
+import { useTimelineStateManager } from '../../hooks/useTimeline/useTimelineStateManager';
+
 const ROW_HEIGHT = 64;
 const MIN_ROWS = 10;
 
@@ -21,13 +23,40 @@ const Timeline = ({
 }) => {
   const { scale, handleZoomIn, handleZoomOut } = useTimelineZoom();
   const { editorData, effects, error, handleChange } = useTimelineData(clips, onClipsChange);
- 
+ // Add this near the top with other hooks
+ const { 
+  startClipModification,
+  moveClip,
+  trimClip,
+  completeModification
+} = useTimelineStateManager();
+
+
   // Context menu state
   const [contextMenu, setContextMenu] = React.useState(null);
   const [selectedActionId, setSelectedActionId] = React.useState(null);
 
-  // Handle clip dragging between rows
+  // Enhanced clip modification handling
+   // Update the trim handlers
+   const handleTrimStart = useCallback(({ action }) => {
+    startClipModification(action.id, 'TRIMMING');
+    return action;
+  }, [startClipModification]);
+
+  const handleTrim = useCallback(({ action }) => {
+    trimClip(action.id, action.start, action.end);
+    return action;
+  }, [trimClip]);
+
+  const handleTrimEnd = useCallback(({ action }) => {
+    completeModification(action.id);
+    return action;
+  }, [completeModification]);
+
+  // Update handleActionDrag to use state manager
   const handleActionDrag = useCallback(({ action, newRowIndex }) => {
+    moveClip(action.id, action.start);
+    
     return {
       ...action,
       effectId: action.effectId || 'default',
@@ -36,19 +65,24 @@ const Timeline = ({
         rowIndex: newRowIndex
       }
     };
-  }, []);
- // Add timeline state export functionality
- const timelineState = {
-  clips,
-  totalDuration: editorData.duration,
-  settings: {
-    scale,
-    effects
-  }
-};
+  }, [moveClip]);
 
-const { exportTimelineData } = useTimelineExport(timelineState);
+  // Add debug controls
+  const handleDebug = useCallback(() => {
+    console.log('Current Clips:', clips);
+  }, [clips]);
 
+  // Add timeline state export functionality
+  const timelineState = {
+    clips,
+    totalDuration: editorData.duration,
+    settings: {
+      scale,
+      effects
+    }
+  };
+
+  const { exportTimelineData } = useTimelineExport(timelineState);
 
   // Handle context menu
   const handleContextMenu = useCallback((e, action) => {
@@ -91,16 +125,15 @@ const { exportTimelineData } = useTimelineExport(timelineState);
       borderRadius: '4px 4px 0 0',
       mb: 2,
       overflow: 'hidden',
-      // Enhanced container styles
       backgroundColor: '#1a1a1a',
       boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
     }}>
-    <TimelineControls
+      <TimelineControls
         scale={scale}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onDownloadState={exportTimelineData}
-        onDebugClips={() => console.log('Debug clips:', clips)}
+        onDebugClips={handleDebug}
       />
   
       {error && (
@@ -118,15 +151,11 @@ const { exportTimelineData } = useTimelineExport(timelineState);
         minHeight: `${ROW_HEIGHT * MIN_ROWS}px`,
         overflow: 'scroll',
         position: 'relative',
-        // Enhanced bottom border and shadow
         borderBottom: '3px solid rgba(255,255,255,0.25)',
         boxShadow: 'inset 0 -4px 6px -4px rgba(0,0,0,0.3)',
-        // Spacing for scrollbars
         padding: '0 0 16px 0',
         marginBottom: '16px',
-        // Combine with existing scrollbar styles
         ...scrollbarStyles,
-        // Additional scrollbar enhancements
         '&::-webkit-scrollbar-track': {
           ...scrollbarStyles['&::-webkit-scrollbar-track'],
           margin: '4px',
@@ -137,7 +166,6 @@ const { exportTimelineData } = useTimelineExport(timelineState);
           border: '4px solid #1a1a1a',
           minHeight: '40px',
         },
-        // Enhanced corner treatment
         '&::-webkit-scrollbar-corner': {
           ...scrollbarStyles['&::-webkit-scrollbar-corner'],
           backgroundColor: '#1a1a1a',
@@ -148,6 +176,13 @@ const { exportTimelineData } = useTimelineExport(timelineState);
           editorData={editorData}
           effects={effects}
           onChange={handleChange}
+          onActionResizeStart={handleTrimStart}
+          onActionResize={handleTrim}
+          onActionResizeEnd={handleTrimEnd}
+          allowResizeStart={true}
+          allowResizeEnd={true}
+          resizeMin={0.1}
+          showResizeIndicator={true}
           getActionRender={(action, row) => (
             <Box onContextMenu={(e) => handleContextMenu(e, action)}>
               <TimelineClip
@@ -162,12 +197,10 @@ const { exportTimelineData } = useTimelineExport(timelineState);
           getScaleRender={formatTime}
           style={{
             ...timelineEditorStyles,
-            // Ensure proper spacing for scrollbar buttons
             paddingBottom: '20px',
           }}
           customStyle={{
             ...customTimelineStyles,
-            // Enhanced container style
             containerStyle: {
               ...customTimelineStyles.containerStyle,
               borderBottom: '3px solid rgba(255,255,255,0.25)',
@@ -219,6 +252,6 @@ const { exportTimelineData } = useTimelineExport(timelineState);
       </Box>
     </Box>
   );
-}
+};
 
 export default Timeline;

@@ -76,45 +76,33 @@ class TimelineClipState {
   }
 
   trimClip(newStart, newEnd) {
-    // Check if we're trimming the left or right side by comparing with current values
-    const isLeftTrim = Math.abs(newStart - this.timelineStart) > 0.01; // Small threshold for floating point comparison
+    // Detect which end is being trimmed by looking at which value actually changed
+    const startChanged = Math.abs(newStart - this.timelineStart) > 0.001;
+    const endChanged = Math.abs(newEnd - this.timelineEnd) > 0.001;
     
-    if (isLeftTrim) {
-      // Left trim - move start point
-      const trimRatio = (newStart - this.timelineStart) / (this.timelineEnd - this.timelineStart);
+    if (startChanged && !endChanged) {
+      // Left trim - start changed, end stayed same
+      const trimRatio = (newStart - this.timelineStart) / this.timelineDuration;
       const playbackDuration = this.playbackEnd - this.playbackStart;
-      
-      // Update start points
-      this.playbackStart += trimRatio * playbackDuration;
+      this.playbackStart = Math.max(this.sourceStart, this.playbackStart + (trimRatio * playbackDuration));
       this.timelineStart = newStart;
-      
-      // Keep end points unchanged
-      // this.playbackEnd stays same
-      // this.timelineEnd stays same
-    } else {
-      // Right trim - move end point
-      const trimRatio = (newEnd - this.timelineEnd) / (this.timelineEnd - this.timelineStart);
+    } else if (!startChanged && endChanged) {
+      // Right trim - end changed, start stayed same
+      const trimRatio = (newEnd - this.timelineEnd) / this.timelineDuration;
       const playbackDuration = this.playbackEnd - this.playbackStart;
-      
-      // Keep start points unchanged
-      // this.playbackStart stays same
-      // this.timelineStart stays same
-      
-      // Update end points
-      this.playbackEnd += trimRatio * playbackDuration;
+      this.playbackEnd = Math.min(this.sourceEnd, this.playbackEnd + (trimRatio * playbackDuration));
       this.timelineEnd = newEnd;
     }
     
     // Update duration
     this.timelineDuration = this.timelineEnd - this.timelineStart;
     
-    // Record the modification
     this.modifications[this.modifications.length - 1].current = {
       timelineStart: this.timelineStart,
       timelineEnd: this.timelineEnd,
       playbackStart: this.playbackStart,
       playbackEnd: this.playbackEnd,
-      isLeftTrim
+      isLeftTrim: startChanged
     };
     
     return this;
