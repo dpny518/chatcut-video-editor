@@ -64,43 +64,65 @@ const Timeline = ({
     onClipsChange(updatedClips);
   }, [clips, onClipsChange]);
 
-  // Handle resize start
-  const handleResizeStart = useCallback(({ action, row, dir }) => {
-    console.log('Resize Start:', { action, dir });
-    onClipSelect?.(action.id);
-  }, [onClipSelect]);
-
-  // Handle resizing
-  const handleResizing = useCallback(({ action, row, start, end, dir }) => {
-    console.log('Resizing:', { action, start, end, dir });
-    // Return true to allow the resize
-    return true;
-  }, []);
-
-  // Handle resize end
-  const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
-    console.log('Resize End:', { action, start, end, dir });
-    
-    // Update the clips with new dimensions
-    const updatedClips = clips.map(clip => {
-      if (clip.id === action.id) {
-        return {
-          ...clip,
-          metadata: {
-            ...clip.metadata,
-            timeline: {
-              start,
-              end,
-              duration: end - start
+    // Handle resize start
+    const handleResizeStart = useCallback(({ action, row, dir }) => {
+      console.log('Resize Start:', { action, dir });
+      
+      // Update the action data with the resize direction
+      action.data = {
+        ...action.data,
+        resizeDir: dir
+      };
+      
+      onClipSelect?.(action.id);
+    }, [onClipSelect]);
+  
+    // Handle resizing
+    const handleResizing = useCallback(({ action, row, start, end, dir }) => {
+      console.log('Resizing:', { action, start, end, dir });
+      
+      // Update the action data with current resize info
+      action.data = {
+        ...action.data,
+        resizeDir: dir
+      };
+      
+      return true;
+    }, []);
+  
+    // Handle resize end
+    const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
+      console.log('Resize End:', { action, start, end, dir });
+      
+      // Update the clips with new dimensions and resize direction
+      const updatedClips = clips.map(clip => {
+        if (clip.id === action.id) {
+          return {
+            ...clip,
+            metadata: {
+              ...clip.metadata,
+              timeline: {
+                start,
+                end,
+                duration: end - start,
+                resizeDir: dir  // Include the resize direction
+              }
             }
-          }
-        };
-      }
-      return clip;
-    });
-
-    onClipsChange(updatedClips);
-  }, [clips, onClipsChange]);
+          };
+        }
+        return clip;
+      });
+  
+      onClipsChange(updatedClips);
+    }, [clips, onClipsChange]);
+  
+    // Add debug effect
+    useEffect(() => {
+      console.log('Timeline Clips State:', clips.map(clip => ({
+        id: clip.id,
+        metadata: clip.metadata
+      })));
+    }, [clips]);
 
   // Handle general changes
   const handleChange = useCallback((newEditorData) => {
