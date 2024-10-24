@@ -37,129 +37,57 @@ const TimelineClip = ({
   };
 
   const calculateCurrentTimes = useCallback(() => {
-    console.group('=== Timeline Clip Calculations ===');
-    
-    // Input values
-    console.log('Input Clip:', {
-        id: clip.id,
-        startTime: clip.startTime,
-        endTime: clip.endTime,
-        metadata: clip.metadata
-    });
-    
-    console.log('Input Action:', {
-        id: action.id,
-        start: action.start,
-        end: action.end
-    });
-
-    // Initial calculations
-    const originalStart = clip.startTime || 0;
-    const originalEnd = clip.endTime || 0;
-    const timelineStart = action.start || 0;
-    const timelineDuration = action.end - action.start;
-    const originalDuration = originalEnd - originalStart;
-
-    console.log('Initial values:', {
-        originalStart,
-        originalEnd,
-        timelineStart,
-        timelineDuration,
-        originalDuration,
-        hasMetadata: !!clip.metadata?.timeline,
-        isInitialized: isInitialized.current
-    });
-
-    // For first addition or when no metadata exists
     if (!isInitialized.current || !clip.metadata?.timeline) {
         isInitialized.current = true;
-        console.log('Using original clip times');
         
-        const result = {
-            timelinePosition: formatTime(timelineStart),
-            originalStart: formatTime(originalStart),
-            originalEnd: formatTime(originalEnd),
-            currentStart: formatTime(clip.startTime || 0),  // Use clip's intended start time
-            currentEnd: formatTime(clip.endTime || 0),      // Use clip's intended end time
-            duration: formatTime(originalDuration),
-            originalDuration: formatTime(originalDuration)
+        // Initial metadata
+        action.data = {
+            ...clip,
+            metadata: {
+                timeline: {
+                    start: action.start,
+                    end: action.end,
+                    duration: action.end - action.start
+                },
+                playback: {
+                    start: clip.startTime,
+                    end: clip.endTime,
+                    duration: clip.endTime - clip.startTime
+                }
+            }
         };
-        
-        console.log('First Addition/No Metadata Result:', result);
-        console.groupEnd();
-        return result;
+
+        return {
+            timelinePosition: formatTime(action.start),
+            originalStart: formatTime(clip.startTime),
+            originalEnd: formatTime(clip.endTime),
+            currentStart: formatTime(clip.startTime),
+            currentEnd: formatTime(clip.endTime),
+            duration: formatTime(clip.endTime - clip.startTime),
+            originalDuration: formatTime(clip.endTime - clip.startTime)
+        };
     }
 
-    // Get previous position data
-    const prevTimelineStart = clip.metadata.timeline.start;
-    const prevIn = clip.metadata.playback.start;
-    const prevOut = clip.metadata.playback.end;
+    // Calculate new times based on resize
+    let currentStart = clip.startTime;
+    let currentEnd = clip.endTime;
 
-    console.log('Previous Values:', {
-        prevTimelineStart,
-        prevIn,
-        prevOut
-    });
-
-    // Detect if we're trimming from left side
-    const isLeftTrim = timelineStart !== prevTimelineStart;
-    
-    console.log('Trim Detection:', { isLeftTrim, timelineStart, prevTimelineStart });
-
-    let finalStart, finalEnd;
-
-    if (isLeftTrim) {
-        // When trimming from left, adjust start based on the difference in timeline position
-        finalEnd = prevOut;
-        finalStart = clip.startTime + (timelineStart - prevTimelineStart);
-        console.log('Left Trim Calculation:', {
-            finalStart,
-            finalEnd,
-            timelineOffset: timelineStart - prevTimelineStart
-        });
-    } else {
-        // When trimming from right or moving, maintain the start time
-        finalStart = clip.startTime;
-        finalEnd = clip.startTime + timelineDuration;
-        console.log('Right Trim/Move Calculation:', {
-            finalStart,
-            finalEnd,
-            timelineDuration
-        });
+    if (clip.resizeDir === 'left') {
+        const timelineShift = action.start - clip.metadata.timeline.start;
+        currentStart = clip.startTime + timelineShift;
+        currentEnd = clip.endTime;
+    } else if (clip.resizeDir === 'right') {
+        currentStart = clip.startTime;
+        const newDuration = action.end - action.start;
+        currentEnd = clip.startTime + newDuration;
     }
 
-    const result = {
-        timelinePosition: formatTime(timelineStart),
-        originalStart: formatTime(originalStart),
-        originalEnd: formatTime(originalEnd),
-        currentStart: formatTime(finalStart),
-        currentEnd: formatTime(finalEnd),
-        duration: formatTime(timelineDuration),
-        originalDuration: formatTime(originalDuration)
-    };
-
-    console.log('Final Result:', result);
-    console.groupEnd();
-    return result;
-}, [clip, action]);
-
-// Update metadata effect
-useEffect(() => {
-    if (!action || action.start === undefined || action.end === undefined) {
-        return;
-    }
-
-    const timingInfo = calculateCurrentTimes();
-    const currentStart = parseFloat(timingInfo.currentStart.split(':').pop());
-    const currentEnd = parseFloat(timingInfo.currentEnd.split(':').pop());
-
-    // Only create metadata if it doesn't exist or if times have changed
-    if (!clip.metadata?.timeline || 
-        currentStart !== clip.metadata.playback.start || 
-        currentEnd !== clip.metadata.playback.end) {
-        
-        // Create new metadata
-        const newMetadata = {
+    // Update action.data with new times
+    action.data = {
+        ...clip,
+        startTime: currentStart,  // Update the actual clip times
+        endTime: currentEnd,
+        metadata: {
             timeline: {
                 start: action.start,
                 end: action.end,
@@ -170,52 +98,35 @@ useEffect(() => {
                 end: currentEnd,
                 duration: currentEnd - currentStart
             }
-        };
-
-        // Update action.data
-        action.data = {
-            ...clip,
-            metadata: newMetadata
-        };
-
-        console.log('Updated action data:', action.data);
-    }
-}, [action?.start, action?.end, calculateCurrentTimes, clip]);
-
-  // Update metadata through action.data instead of clip.metadata
-  useEffect(() => {
-    if (!action || action.start === undefined || action.end === undefined) {
-      return;
-    }
-
-    const timingInfo = calculateCurrentTimes();
-    const currentStart = parseFloat(timingInfo.currentStart.split(':').pop());
-    const currentEnd = parseFloat(timingInfo.currentEnd.split(':').pop());
-
-    // Create new metadata
-    const newMetadata = {
-      timeline: {
-        start: action.start,
-        end: action.end,
-        duration: action.end - action.start
-      },
-      playback: {
-        start: currentStart,
-        end: currentEnd,
-        duration: currentEnd - currentStart
-      }
+        }
     };
 
-    // Update action.data instead of clip.metadata
-    action.data = {
-      ...clip,
-      metadata: newMetadata
+    console.log('Resize Calculation:', {
+        direction: clip.resizeDir,
+        timeline: {
+            oldStart: clip.metadata.timeline.start,
+            newStart: action.start,
+            oldEnd: clip.metadata.timeline.end,
+            newEnd: action.end
+        },
+        times: {
+            oldStart: clip.startTime,
+            newStart: currentStart,
+            oldEnd: clip.endTime,
+            newEnd: currentEnd
+        }
+    });
+
+    return {
+        timelinePosition: formatTime(action.start),
+        originalStart: formatTime(clip.startTime),
+        originalEnd: formatTime(clip.endTime),
+        currentStart: formatTime(currentStart),
+        currentEnd: formatTime(currentEnd),
+        duration: formatTime(currentEnd - currentStart),
+        originalDuration: formatTime(clip.endTime - clip.startTime)
     };
-
-    console.log('Updated action data:', action.data);
-    
-  }, [action?.start, action?.end, calculateCurrentTimes, clip]);
-
+}, [clip, action]);
 
   const generateThumbnails = useCallback(async () => {
     if (!videoRef.current || !clip.file || !containerRef.current) return;

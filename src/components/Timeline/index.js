@@ -26,7 +26,8 @@ const Timeline = ({
     // Add context menu state
     const [contextMenu, setContextMenu] = useState(null);
     const [selectedActionId, setSelectedActionId] = useState(null);
-  // Handle move start
+ 
+    // Handle move start
   const handleMoveStart = useCallback(({ action, row }) => {
     console.log('Move Start:', { action, row });
     onClipSelect?.(action.id);
@@ -91,31 +92,33 @@ const Timeline = ({
     }, []);
   
     // Handle resize end
-    const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
-      console.log('Resize End:', { action, start, end, dir });
-      
-      // Update the clips with new dimensions and resize direction
-      const updatedClips = clips.map(clip => {
-        if (clip.id === action.id) {
+const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
+  console.log('Resize End:', { action, start, end, dir });
+  
+  const updatedClips = clips.map(clip => {
+      if (clip.id === action.id) {
+          const currentMetadata = action.data?.metadata || clip.metadata;
+          
           return {
-            ...clip,
-            metadata: {
-              ...clip.metadata,
-              timeline: {
-                start,
-                end,
-                duration: end - start,
-                resizeDir: dir  // Include the resize direction
-              }
-            }
+              ...clip,
+              metadata: {
+                  ...currentMetadata,
+                  timeline: {
+                      start,
+                      end,
+                      duration: end - start
+                  },
+                  playback: currentMetadata.playback
+              },
+              resizeDir: dir
           };
-        }
-        return clip;
-      });
-  
-      onClipsChange(updatedClips);
-    }, [clips, onClipsChange]);
-  
+      }
+      return clip;
+  });
+
+  onClipsChange(updatedClips);
+}, [clips, onClipsChange]);
+ 
     // Add debug effect
     useEffect(() => {
       console.log('Timeline Clips State:', clips.map(clip => ({
