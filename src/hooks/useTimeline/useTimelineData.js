@@ -118,7 +118,7 @@ export const useTimelineData = (clips = [], onClipsChange) => {
         row.actions.map(action => {
           const originalClip = clips.find(c => c.id === action.id);
           if (!originalClip) return null;
-
+          console.log("moving the file")
           // Get source timing
           const sourceStart = originalClip.source?.startTime ?? 0;
           const sourceEnd = originalClip.source?.endTime ?? sourceStart + (action.end - action.start);

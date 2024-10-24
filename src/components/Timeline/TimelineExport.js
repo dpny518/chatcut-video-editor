@@ -1,24 +1,37 @@
-// src/components/Timeline/TimelineExport.js
 import { useCallback } from 'react';
 
 const useTimelineExport = (timelineState) => {
   const exportTimelineData = useCallback(() => {
     try {
-      // Debug logs
-      console.log('Full Timeline State:', timelineState);
-      console.log('Clips:', timelineState.clips);
-      if (timelineState.clips.length > 0) {
-        console.log('First Clip Example:', timelineState.clips[0]);
-      }
-      console.log('Settings:', timelineState.settings);
-      console.log('Duration:', timelineState.totalDuration);
+      // Enhanced debug logs
+      console.log('=== TIMELINE EXPORT START ===');
+      console.log('Timeline State:', {
+        clips: timelineState.clips,
+        editorData: timelineState.editorData,
+        settings: timelineState.settings,
+        duration: timelineState.totalDuration
+      });
 
       const exportData = {
         version: "1.0",
         timestamp: new Date().toISOString(),
         timeline: {
           clips: timelineState.clips.map(clip => {
-            console.log('Processing clip:', clip); // Debug log for each clip
+            // Find corresponding editor action to get current timeline position
+            const editorAction = timelineState.editorData?.actions?.find(
+              action => action.id === clip.id
+            );
+
+            console.log('Processing Clip:', {
+              clipId: clip.id,
+              clipData: clip,
+              editorAction: editorAction,
+              currentPosition: {
+                start: editorAction?.start,
+                end: editorAction?.end
+              }
+            });
+
             return {
               id: clip.id,
               source: {
@@ -35,9 +48,22 @@ const useTimelineExport = (timelineState) => {
               metadata: {
                 originalDuration: clip.duration,
                 timeline: {
-                  start: clip.startTime,
-                  end: clip.endTime
+                  // Original media timing
+                  sourceStart: clip.startTime,
+                  sourceEnd: clip.endTime,
+                  // Current timeline positions
+                  start: editorAction?.start ?? 0,
+                  end: editorAction?.end ?? clip.duration
                 }
+              },
+              position: {
+                timelineStart: editorAction?.start ?? 0,
+                timelineEnd: editorAction?.end ?? clip.duration,
+                row: editorAction?.data?.rowIndex ?? 0
+              },
+              state: {
+                selected: clip.id === timelineState.selectedClipId,
+                effectId: editorAction?.effectId ?? 'default'
               }
             };
           }),
@@ -49,30 +75,59 @@ const useTimelineExport = (timelineState) => {
         }
       };
 
-      // Log the final export data
-      console.log('Export Data Structure:', exportData);
+      // Log the final export data with timing comparison
+      console.log('=== EXPORT DATA ANALYSIS ===');
+      exportData.timeline.clips.forEach(clip => {
+        console.log(`Clip ${clip.id} Timing Analysis:`, {
+          sourceTimings: {
+            start: clip.source.startTime,
+            end: clip.source.endTime,
+            duration: clip.source.duration
+          },
+          timelinePositions: {
+            start: clip.position.timelineStart,
+            end: clip.position.timelineEnd,
+            duration: clip.position.timelineEnd - clip.position.timelineStart
+          },
+          metadata: clip.metadata
+        });
+      });
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
         type: 'application/json'
       });
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `timeline_export_${timestamp}.json`;
+      
+      console.log('Saving export file:', filename);
+
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `timeline_export_${new Date().toISOString().split('T')[0]}.json`;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      console.log('=== TIMELINE EXPORT COMPLETE ===');
     } catch (error) {
-      console.error('Failed to export timeline:', error);
-      console.error('Timeline State at error:', timelineState);
+      console.error('=== TIMELINE EXPORT ERROR ===');
+      console.error('Error details:', error);
+      console.error('Timeline State at error:', {
+        clips: timelineState.clips,
+        editorData: timelineState.editorData,
+        settings: timelineState.settings
+      });
+      throw new Error(`Failed to export timeline: ${error.message}`);
     }
   }, [timelineState]);
 
   return { exportTimelineData };
 };
 
-// Usage in your download button component:
 const TimelineExportButton = ({ timelineState }) => {
   const { exportTimelineData } = useTimelineExport(timelineState);
 
@@ -80,6 +135,7 @@ const TimelineExportButton = ({ timelineState }) => {
     <button
       onClick={exportTimelineData}
       className="export-button"
+      title="Download timeline state as JSON"
     >
       Download Timeline
     </button>

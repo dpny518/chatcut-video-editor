@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
 import { produce, enableMapSet } from 'immer';
+import debug from 'debug';
 
+// Create debuggers
+const logTrim = debug('timeline:trim');
+const logState = debug('timeline:state');
 enableMapSet();
 
 export const CLIP_STATES = {
@@ -30,9 +34,9 @@ class TimelineClipState {
     this.timelineEnd = clip.metadata.timeline.end;
     this.timelineDuration = this.timelineEnd - this.timelineStart;
 
-    // Playback segment within source media (changes with trims)
-    this.playbackStart = this.sourceStart;
-    this.playbackEnd = this.sourceEnd;
+    // Current in/out points (changes with trims)
+    this.currentIn = clip.metadata?.current?.in ?? this.sourceStart;
+    this.currentOut = clip.metadata?.current?.out ?? this.sourceEnd;
     
     this.modifications = [];
     this.state = CLIP_STATES.INITIAL;
@@ -46,8 +50,8 @@ class TimelineClipState {
       before: {
         timelineStart: this.timelineStart,
         timelineEnd: this.timelineEnd,
-        playbackStart: this.playbackStart,
-        playbackEnd: this.playbackEnd
+        currentIn: this.currentIn,
+        currentOut: this.currentOut
       }
     });
     return this;
@@ -55,15 +59,15 @@ class TimelineClipState {
 
   moveClip(newPosition) {
     const moveDelta = newPosition - this.timelineStart;
-    
+    console.log('=== moving clip in Trim Clip State===');
     this.timelineStart = newPosition;
     this.timelineEnd = newPosition + this.timelineDuration;
     
     this.modifications[this.modifications.length - 1].current = {
       timelineStart: this.timelineStart,
       timelineEnd: this.timelineEnd,
-      playbackStart: this.playbackStart,
-      playbackEnd: this.playbackEnd,
+      currentIn: this.currentIn,
+      currentOut: this.currentOut,
       moveDelta
     };
     
@@ -71,62 +75,106 @@ class TimelineClipState {
   }
 
   trimClip(newStart, newEnd) {
+    console.log('=== Called TRIM Function in Trim Clip State ===');
     // Store original values
-    const originalTimelineStart = this.timelineStart;
-    const originalTimelineEnd = this.timelineEnd;
-    const originalTimelineDuration = this.timelineDuration;
-    const originalPlaybackDuration = this.playbackEnd - this.playbackStart;
-    
+    const originalState = {
+      timeline: {
+        start: this.timelineStart,
+        end: this.timelineEnd,
+      },
+      current: {
+        in: this.currentIn,
+        out: this.currentOut,
+      }
+    };
+
+    // Calculate deltas
+    const startDelta = newStart - originalState.timeline.start;
+    const endDelta = newEnd - originalState.timeline.end;
+
     // Detect which end is being trimmed
-    const startChanged = Math.abs(newStart - originalTimelineStart) > 0.001;
-    const endChanged = Math.abs(newEnd - originalTimelineEnd) > 0.001;
-    
-    if (startChanged && !endChanged) {
-      // Left trim
-      const trimDelta = newStart - originalTimelineStart;
-      const trimRatio = trimDelta / originalTimelineDuration;
+    const startChanged = Math.abs(startDelta) > 0.001;
+    const endChanged = Math.abs(endDelta) > 0.001;
+
+    console.log('=== TRIM START ===');
+    console.log('Original Values:', originalState);
+    console.log('Deltas:', { startDelta, endDelta });
+
+    if (!startChanged && endChanged) {
+      // RIGHT TRIM
+      console.log('RIGHT TRIM DETECTED');
       
-      // Update timeline position
-      this.timelineStart = newStart;
+      // Keep start fixed
+      this.timelineStart = originalState.timeline.start;
+      this.currentIn = originalState.current.in;
       
-      // Update playback timing proportionally
-      const playbackDeltaTime = trimRatio * originalPlaybackDuration;
-      this.playbackStart = Math.max(
-        this.sourceStart,
-        this.playbackStart + playbackDeltaTime
-      );
-      
-    } else if (!startChanged && endChanged) {
-      // Right trim
-      const trimDelta = newEnd - originalTimelineEnd;
-      const trimRatio = trimDelta / originalTimelineDuration;
-      
-      // Update timeline position
+      // Update end points with same delta
       this.timelineEnd = newEnd;
-      
-      // Update playback timing proportionally
-      const playbackDeltaTime = trimRatio * originalPlaybackDuration;
-      this.playbackEnd = Math.min(
+      this.currentOut = Math.min(
         this.sourceEnd,
-        this.playbackEnd + playbackDeltaTime
+        originalState.current.out + endDelta  // Direct delta application
       );
+
+      console.log('Right Trim Results:', {
+        delta: endDelta,
+        originalOut: originalState.current.out,
+        newCurrentOut: this.currentOut,
+        direction: endDelta > 0 ? 'LENGTHENING' : 'SHORTENING'
+      });
+      
+    } else if (startChanged && !endChanged) {
+      // LEFT TRIM
+      console.log('LEFT TRIM DETECTED');
+      
+      // Keep end fixed
+      this.timelineEnd = originalState.timeline.end;
+      this.currentOut = originalState.current.out;
+      
+      // Update start points with same delta
+      this.timelineStart = newStart;
+      this.currentIn = Math.max(
+        this.sourceStart,
+        originalState.current.in + startDelta  // Direct delta application
+      );
+
+      console.log('Left Trim Results:', {
+        delta: startDelta,
+        originalIn: originalState.current.in,
+        newCurrentIn: this.currentIn,
+        direction: startDelta > 0 ? 'SHORTENING' : 'LENGTHENING'
+      });
     }
-    
-    // Update duration after trim
+
+    // Update duration
     this.timelineDuration = this.timelineEnd - this.timelineStart;
-    
+
     // Record the modification
     this.modifications[this.modifications.length - 1].current = {
       timelineStart: this.timelineStart,
       timelineEnd: this.timelineEnd,
-      playbackStart: this.playbackStart,
-      playbackEnd: this.playbackEnd,
+      currentIn: this.currentIn,
+      currentOut: this.currentOut,
       isLeftTrim: startChanged,
-      trimDelta: startChanged ? 
-        (newStart - originalTimelineStart) : 
-        (newEnd - originalTimelineEnd)
+      delta: startChanged ? startDelta : endDelta,
+      direction: startChanged ? 
+        (startDelta > 0 ? 'SHORTENING' : 'LENGTHENING') :
+        (endDelta > 0 ? 'LENGTHENING' : 'SHORTENING')
     };
-    
+
+    console.log('=== FINAL STATE ===');
+    console.log('Final Values:', {
+      timeline: {
+        start: this.timelineStart.toFixed(2),
+        end: this.timelineEnd.toFixed(2),
+        duration: this.timelineDuration.toFixed(2)
+      },
+      current: {
+        in: this.currentIn.toFixed(2),
+        out: this.currentOut.toFixed(2),
+        duration: (this.currentOut - this.currentIn).toFixed(2)
+      }
+    });
+
     return this;
   }
 
@@ -142,56 +190,50 @@ class TimelineClipState {
     if (lastMod) {
       this.timelineStart = lastMod.before.timelineStart;
       this.timelineEnd = lastMod.before.timelineEnd;
-      this.playbackStart = lastMod.before.playbackStart;
-      this.playbackEnd = lastMod.before.playbackEnd;
+      this.currentIn = lastMod.before.currentIn;
+      this.currentOut = lastMod.before.currentOut;
       this.timelineDuration = this.timelineEnd - this.timelineStart;
     }
     this.state = CLIP_STATES.COMPLETED;
     return this;
   }
 
-  getTimingInfo() {
-    // Calculate relative position of playback within source
-    const playbackOffset = this.playbackStart - this.sourceStart;
-    const currentInPoint = this.timelineStart;
-    const currentOutPoint = this.timelineEnd;
-    
+  getTimingInfo() {console.log('=== Getting Timeline info')
     return {
+      // Timeline timing
+      
       timelineStart: this.timelineStart,
       timelineEnd: this.timelineEnd,
-      playbackStart: this.playbackStart,
-      playbackEnd: this.playbackEnd,
-      sourceStart: this.sourceStart,
-      sourceEnd: this.sourceEnd,
-      duration: this.timelineEnd - this.timelineStart,
-      // Add these fields for proper time mapping
-      currentIn: currentInPoint,
-      currentOut: currentOutPoint,
+      timelineDuration: this.timelineEnd - this.timelineStart,
+      
+      // Current timing (changes with trims)
+      currentIn: this.currentIn,
+      currentOut: this.currentOut,
+      currentDuration: this.currentOut - this.currentIn,
+      
+      // Original source timing
       originalIn: this.sourceStart,
       originalOut: this.sourceEnd,
-      // Add relative timing information
-      relativeStart: this.playbackStart - this.sourceStart,
-      relativeDuration: this.playbackEnd - this.playbackStart
+      originalDuration: this.sourceDuration,
+      
+      // Relative timing
+      relativeStart: this.currentIn - this.sourceStart,
+      relativeDuration: this.currentOut - this.currentIn
     };
   }
 
-  // Helper method to map timeline time to source time
   mapTimelineToSource(timelinePosition) {
-    // Calculate how far into the timeline segment we are
     const timelineProgress = (timelinePosition - this.timelineStart) / this.timelineDuration;
-    // Map that same progress to the playback segment
-    const playbackDuration = this.playbackEnd - this.playbackStart;
-    return this.playbackStart + (timelineProgress * playbackDuration);
+    const currentDuration = this.currentOut - this.currentIn;
+    return this.currentIn + (timelineProgress * currentDuration);
   }
 
-  // Helper method to map source time to timeline time
   mapSourceToTimeline(sourcePosition) {
-    // Calculate how far into the playback segment we are
-    const playbackProgress = (sourcePosition - this.playbackStart) / (this.playbackEnd - this.playbackStart);
-    // Map that same progress to the timeline segment
-    return this.timelineStart + (playbackProgress * this.timelineDuration);
+    const currentProgress = (sourcePosition - this.currentIn) / (this.currentOut - this.currentIn);
+    return this.timelineStart + (currentProgress * this.timelineDuration);
   }
 }
+
 
 class TimelineStateManager {
   constructor() {
@@ -232,16 +274,43 @@ class TimelineStateManager {
   }
 
   trimClip(clipId, newStart, newEnd) {
+    console.log('TimelineStateManager.trimClip called:', {
+        clipId,
+        newStart,
+        newEnd
+    });
+
     const clipState = this.clips.get(clipId);
     if (clipState && this.currentOperation?.clipId === clipId) {
-      const updatedState = produce(clipState, draft => {
-        draft.trimClip(newStart, newEnd);
-      });
-      this.clips.set(clipId, updatedState);
-      return updatedState;
+        console.log('Found clipState:', {
+            timelineStart: clipState.timelineStart,
+            timelineEnd: clipState.timelineEnd,
+            currentIn: clipState.currentIn,
+            currentOut: clipState.currentOut
+        });
+
+        const updatedState = produce(clipState, draft => {
+            console.log('Calling draft.trimClip with:', { newStart, newEnd });
+            draft.trimClip(newStart, newEnd);
+        });
+
+        console.log('After trimClip:', {
+            timelineStart: updatedState.timelineStart,
+            timelineEnd: updatedState.timelineEnd,
+            currentIn: updatedState.currentIn,
+            currentOut: updatedState.currentOut
+        });
+
+        this.clips.set(clipId, updatedState);
+        return updatedState;
+    } else {
+        console.log('Clip state or operation not found:', {
+            hasClipState: Boolean(clipState),
+            currentOperation: this.currentOperation
+        });
     }
     return null;
-  }
+}
 
   completeModification(clipId) {
     const clipState = this.clips.get(clipId);
