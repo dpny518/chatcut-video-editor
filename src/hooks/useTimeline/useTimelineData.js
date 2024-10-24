@@ -118,33 +118,54 @@ export const useTimelineData = (clips = [], onClipsChange) => {
         row.actions.map(action => {
           const originalClip = clips.find(c => c.id === action.id);
           if (!originalClip) return null;
-          console.log("moving the file")
+  
           // Get source timing
           const sourceStart = originalClip.source?.startTime ?? 0;
           const sourceEnd = originalClip.source?.endTime ?? sourceStart + (action.end - action.start);
           const sourceDuration = sourceEnd - sourceStart;
-
+  
           // Calculate timeline timing
           const timelineStart = action.start;
           const timelineEnd = action.end;
           const timelineDuration = timelineEnd - timelineStart;
-
-          // Calculate playback timing based on timeline position and duration
-          const timelineOffset = timelineStart - (originalClip.metadata?.timeline?.start || 0);
-          const timelineRatio = timelineDuration / (originalClip.metadata?.timeline?.duration || sourceDuration);
-          
-          const originalPlaybackStart = originalClip.metadata?.playback?.start ?? sourceStart;
-          const originalPlaybackDuration = originalClip.metadata?.playback?.duration ?? sourceDuration;
-          
-          // Map timeline changes to playback timing
-          const playbackStart = originalPlaybackStart + (timelineOffset * (originalPlaybackDuration / sourceDuration));
-          const playbackDuration = originalPlaybackDuration * timelineRatio;
-          const playbackEnd = playbackStart + playbackDuration;
-
+  
+          // Check if this is a new clip (no metadata yet)
+          const isNewClip = !originalClip.metadata?.playback;
+  
+          let playbackStart, playbackEnd, playbackDuration;
+  
+          if (isNewClip) {
+            // For new clips, use source timing
+            console.log('Initializing new clip with source timing');
+            playbackStart = sourceStart;
+            playbackEnd = sourceEnd;
+            playbackDuration = sourceDuration;
+          } else {
+            // For existing clips, calculate based on changes
+            console.log('Updating existing clip timing');
+            const timelineOffset = timelineStart - (originalClip.metadata.timeline.start);
+            const timelineRatio = timelineDuration / originalClip.metadata.timeline.duration;
+            
+            const originalPlaybackStart = originalClip.metadata.playback.start;
+            const originalPlaybackDuration = originalClip.metadata.playback.duration;
+  
+            playbackStart = originalPlaybackStart + (timelineOffset * (originalPlaybackDuration / sourceDuration));
+            playbackDuration = originalPlaybackDuration * timelineRatio;
+            playbackEnd = playbackStart + playbackDuration;
+          }
+  
           // Calculate relative timing
           const relativeStart = playbackStart - sourceStart;
           const relativeDuration = playbackEnd - playbackStart;
-
+  
+          console.log('Clip Update:', {
+            id: action.id,
+            isNewClip,
+            source: { start: sourceStart, end: sourceEnd },
+            timeline: { start: timelineStart, end: timelineEnd },
+            playback: { start: playbackStart, end: playbackEnd }
+          });
+  
           return {
             ...action.data,
             id: action.id,
@@ -156,6 +177,7 @@ export const useTimelineData = (clips = [], onClipsChange) => {
             },
             metadata: {
               ...originalClip.metadata,
+              originalDuration: sourceDuration,
               timeline: {
                 start: timelineStart,
                 end: timelineEnd,
@@ -176,7 +198,7 @@ export const useTimelineData = (clips = [], onClipsChange) => {
           };
         })
       ).filter(Boolean);
-
+  
       onClipsChange(updatedClips);
       setError(null);
     } catch (err) {

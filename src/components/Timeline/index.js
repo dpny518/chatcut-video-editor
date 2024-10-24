@@ -1,5 +1,5 @@
 // src/components/Timeline/index.js
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Timeline as ReactTimelineEditor } from '@xzdarcy/react-timeline-editor';
 import { Box, Typography, Menu, MenuItem } from '@mui/material';
 import TimelineControls from './TimelineControls';
@@ -10,7 +10,6 @@ import { useTimelineData } from '../../hooks/useTimeline/useTimelineData';
 import { formatTime } from '../../utils/formatters';
 import { scrollbarStyles } from './styles/scrollbarStyles';
 import { timelineEditorStyles, customTimelineStyles } from './styles/timelineStyles';
-import { useTimelineStateManager } from '../../hooks/useTimeline/useTimelineStateManager';
 
 const ROW_HEIGHT = 64;
 const MIN_ROWS = 10;
@@ -22,59 +21,114 @@ const Timeline = ({
   onClipSelect,
 }) => {
   const { scale, handleZoomIn, handleZoomOut } = useTimelineZoom();
-  const { editorData, effects, error, handleChange } = useTimelineData(clips, onClipsChange);
-  const { 
-    startClipModification,
-    completeModification
-  } = useTimelineStateManager();
-  
-  // Context menu state
-  const [contextMenu, setContextMenu] = React.useState(null);
-  const [selectedActionId, setSelectedActionId] = React.useState(null);
+  const { editorData, effects, error } = useTimelineData(clips, onClipsChange);
 
-  // Enhanced clip modification handling with logging
-  // Enhanced trim start handler
-  const handleTrimStart = useCallback(({ action, event }) => {
-    console.log('=== TRIM START HANDLER ===');
-    console.log('Action:', {
-      id: action.id,
-      start: action.start.toFixed(3),
-      end: action.end.toFixed(3),
-      duration: (action.end - action.start).toFixed(3)
-    });
+    // Add context menu state
+    const [contextMenu, setContextMenu] = useState(null);
+    const [selectedActionId, setSelectedActionId] = useState(null);
+  // Handle move start
+  const handleMoveStart = useCallback(({ action, row }) => {
+    console.log('Move Start:', { action, row });
+    onClipSelect?.(action.id);
+  }, [onClipSelect]);
 
-    startClipModification(action.id, 'TRIMMING');
-    return action;
-  }, [startClipModification]);
+  // Handle move
+  const handleMoving = useCallback(({ action, row, start, end }) => {
+    console.log('Moving:', { action, start, end });
+    // Return true to allow the move
+    return true;
+  }, []);
 
-
-  // Enhanced trim end handler
-  const handleTrimEnd = useCallback(({ action }) => {
-    console.log('=== TRIM END HANDLER ===');
-    console.log('Final Action State:', {
-      id: action.id,
-      start: action.start.toFixed(3),
-      end: action.end.toFixed(3),
-      duration: (action.end - action.start).toFixed(3)
-    });
-
-    completeModification(action.id);
-    return action;
-  }, [completeModification]); // Remove timelineManager.clips dependency
-
-
-
-    // Add timeline state export functionality
-    const timelineState = {
-      clips,
-      totalDuration: editorData.duration,
-      settings: {
-        scale,
-        effects
+  // Handle move end
+  const handleMoveEnd = useCallback(({ action, row, start, end }) => {
+    console.log('Move End:', { action, start, end });
+    
+    // Update the clips with new positions
+    const updatedClips = clips.map(clip => {
+      if (clip.id === action.id) {
+        return {
+          ...clip,
+          metadata: {
+            ...clip.metadata,
+            timeline: {
+              start,
+              end,
+              duration: end - start
+            }
+          }
+        };
       }
-    };
+      return clip;
+    });
+
+    onClipsChange(updatedClips);
+  }, [clips, onClipsChange]);
+
+  // Handle resize start
+  const handleResizeStart = useCallback(({ action, row, dir }) => {
+    console.log('Resize Start:', { action, dir });
+    onClipSelect?.(action.id);
+  }, [onClipSelect]);
+
+  // Handle resizing
+  const handleResizing = useCallback(({ action, row, start, end, dir }) => {
+    console.log('Resizing:', { action, start, end, dir });
+    // Return true to allow the resize
+    return true;
+  }, []);
+
+  // Handle resize end
+  const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
+    console.log('Resize End:', { action, start, end, dir });
+    
+    // Update the clips with new dimensions
+    const updatedClips = clips.map(clip => {
+      if (clip.id === action.id) {
+        return {
+          ...clip,
+          metadata: {
+            ...clip.metadata,
+            timeline: {
+              start,
+              end,
+              duration: end - start
+            }
+          }
+        };
+      }
+      return clip;
+    });
+
+    onClipsChange(updatedClips);
+  }, [clips, onClipsChange]);
+
+  // Handle general changes
+  const handleChange = useCallback((newEditorData) => {
+    console.log('Timeline Changed:', newEditorData);
+    
+    if (!newEditorData?.actions) return;
+
+    const updatedClips = clips.map(clip => {
+      const action = newEditorData.actions.find(a => a.id === clip.id);
+      if (!action) return clip;
+
+      return {
+        ...clip,
+        metadata: action.data?.metadata || clip.metadata
+      };
+    });
+
+    onClipsChange(updatedClips);
+  }, [clips, onClipsChange]);
+
+  // Timeline state export functionality
+  const timelineState = {
+    clips,
+    totalDuration: editorData.duration,
+    settings: { scale, effects }
+  };
   
-    const { exportTimelineData } = useTimelineExport(timelineState);
+  const { exportTimelineData } = useTimelineExport(timelineState);
 
   // Enhanced debug handler
   const handleDebug = useCallback(() => {
@@ -86,7 +140,7 @@ const Timeline = ({
     console.log('Scale:', scale);
   }, [clips, selectedClipId, editorData, effects, scale]);
 
-  // Enhanced context menu handler with logging
+  // Context menu handler with logging
   const handleContextMenu = useCallback((e, action) => {
     console.log('=== CONTEXT MENU HANDLER ===');
     console.log('Action:', action);
@@ -96,13 +150,10 @@ const Timeline = ({
     setSelectedActionId(action.id);
     onClipSelect?.(action.id);
     
-    console.log('Context Menu State:', {
-      position: { x: e.clientX, y: e.clientY },
-      selectedActionId: action.id
-    });
+    console.log('Context Menu State:', { position: { x: e.clientX, y: e.clientY }, selectedActionId: action.id });
   }, [onClipSelect]);
 
-  // Enhanced delete handler with logging
+  // Delete handler with logging
   const handleDelete = useCallback(() => {
     console.log('=== DELETE HANDLER ===');
     console.log('Selected Action ID:', selectedActionId);
@@ -110,15 +161,14 @@ const Timeline = ({
     if (selectedActionId) {
       const newClips = clips.filter(clip => clip.id !== selectedActionId);
       console.log('Updated Clips:', newClips);
-      
       onClipsChange(newClips);
       setContextMenu(null);
       setSelectedActionId(null);
     }
   }, [clips, selectedActionId, onClipsChange]);
 
-  // Enhanced keyboard delete handler with logging
-  React.useEffect(() => {
+  // Keyboard delete handler with logging
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipId) {
         console.log('=== KEYBOARD DELETE HANDLER ===');
@@ -127,7 +177,6 @@ const Timeline = ({
         
         const newClips = clips.filter(clip => clip.id !== selectedClipId);
         console.log('Updated Clips:', newClips);
-        
         onClipsChange(newClips);
       }
     };
@@ -135,7 +184,6 @@ const Timeline = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [clips, selectedClipId, onClipsChange]);
-
 
   return (
     <Box sx={{ 
@@ -195,27 +243,41 @@ const Timeline = ({
         }
       }}>
         <ReactTimelineEditor
-          editorData={editorData}
-          effects={effects}
-          onChange={handleChange}
-          onActionResizeStart={handleTrimStart}
-          onActionResizeEnd={handleTrimEnd}
-          allowResizeStart={true}
-          allowResizeEnd={true}
-          resizeMin={0.1}
-          showResizeIndicator={true}
-          getActionRender={(action, row) => (
-            <Box onContextMenu={(e) => handleContextMenu(e, action)}>
-              <TimelineClip
-                clip={action.data}
-                action={action}
-                row={row}
-                isSelected={action.id === selectedClipId}
-                onSelect={onClipSelect}
-              />
-            </Box>
-          )}
-          getScaleRender={formatTime}
+        editorData={editorData}
+        effects={effects}
+        onChange={handleChange}
+        // Move handlers
+        onActionMoveStart={handleMoveStart}
+        onActionMoving={handleMoving}
+        onActionMoveEnd={handleMoveEnd}
+        // Resize handlers
+        onActionResizeStart={handleResizeStart}
+        onActionResizing={handleResizing}
+        onActionResizeEnd={handleResizeEnd}
+        // Other props
+        allowResizeStart={true}
+        allowResizeEnd={true}
+        resizeMin={0.1}
+        showResizeIndicator={true}
+        gridSnap={true}
+        dragLine={true}
+        autoScroll={true}
+        scaleWidth={160 * scale}
+        scale={1}
+        minScaleCount={20}
+        scaleSplitCount={10}
+        getActionRender={(action, row) => (
+          <Box onContextMenu={(e) => handleContextMenu(e, action)}>
+            <TimelineClip
+              clip={action.data || clips.find(c => c.id === action.id)}
+              action={action}
+              row={row}
+              isSelected={action.id === selectedClipId}
+              onSelect={onClipSelect}
+            />
+          </Box>
+        )}
+        getScaleRender={formatTime}
           style={{
             ...timelineEditorStyles,
             paddingBottom: '20px',
@@ -229,47 +291,23 @@ const Timeline = ({
             }
           }}
           rowHeight={ROW_HEIGHT}
-          scaleWidth={160 * scale}
-          scale={1}
-          minScaleCount={20}
-          scaleSplitCount={10}
-          autoScroll={true}
-          gridSnap={true}
-          dragLine={true}
-          onActionMoveStart={({ action }) => {
-            onClipSelect?.(action.id);
-          }}
           allowVerticalDrag={true}
           verticalDragThreshold={10}
           showDragIndicator={true}
           dragRowHeight={ROW_HEIGHT}
-          disableDrag={false}
+          disableDragOverlay={true}
         />
-  
-        <Menu
-          open={Boolean(contextMenu)}
-          onClose={() => setContextMenu(null)}
-          anchorReference="anchorPosition"
-          anchorPosition={
-            contextMenu 
-              ? { top: contextMenu.y, left: contextMenu.x } 
-              : undefined
-          }
-        >
-          <MenuItem 
-            onClick={handleDelete}
-            sx={{ 
-              color: 'error.main', 
-              '&:hover': { 
-                bgcolor: 'error.dark', 
-                color: 'white' 
-              }
-            }}
-          >
-            Delete Clip
-          </MenuItem>
-        </Menu>
       </Box>
+
+      {/* Context Menu */}
+      <Menu
+        open={!!contextMenu}
+        onClose={() => setContextMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={contextMenu ? { top: contextMenu.y, left: contextMenu.x } : null}
+      >
+        <MenuItem onClick={handleDelete}>Delete Clip</MenuItem>
+      </Menu>
     </Box>
   );
 };
