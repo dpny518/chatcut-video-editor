@@ -35,19 +35,21 @@ const TimelineClip = ({
     const ms = Math.floor((seconds % 1) * 100);
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
+  const initialTimelineStart = useRef(null);
 
   const calculateCurrentTimes = useCallback(() => {
     if (!isInitialized.current || !clip.metadata?.timeline) {
         isInitialized.current = true;
+        initialTimelineStart.current = action.start;  // Store initial position
         
-        // Initial metadata
         action.data = {
             ...clip,
             metadata: {
                 timeline: {
                     start: action.start,
                     end: action.end,
-                    duration: action.end - action.start
+                    duration: action.end - action.start,
+                    initialStart: action.start  // Store this too
                 },
                 playback: {
                     start: clip.startTime,
@@ -73,9 +75,9 @@ const TimelineClip = ({
     let currentEnd = clip.endTime;
 
     if (clip.resizeDir === 'left') {
-        const timelineShift = action.start - clip.metadata.timeline.start;
-        currentStart = clip.startTime + timelineShift;
-        currentEnd = clip.endTime;
+      currentEnd = clip.endTime;
+      const newDuration = action.end - action.start;
+      currentStart = clip.endTime - newDuration;
     } else if (clip.resizeDir === 'right') {
         currentStart = clip.startTime;
         const newDuration = action.end - action.start;
@@ -85,13 +87,14 @@ const TimelineClip = ({
     // Update action.data with new times
     action.data = {
         ...clip,
-        startTime: currentStart,  // Update the actual clip times
+        startTime: currentStart,
         endTime: currentEnd,
         metadata: {
             timeline: {
                 start: action.start,
                 end: action.end,
-                duration: action.end - action.start
+                duration: action.end - action.start,
+                initialStart: clip.metadata.timeline.initialStart || initialTimelineStart.current  // Preserve initial start
             },
             playback: {
                 start: currentStart,
@@ -100,22 +103,6 @@ const TimelineClip = ({
             }
         }
     };
-
-    console.log('Resize Calculation:', {
-        direction: clip.resizeDir,
-        timeline: {
-            oldStart: clip.metadata.timeline.start,
-            newStart: action.start,
-            oldEnd: clip.metadata.timeline.end,
-            newEnd: action.end
-        },
-        times: {
-            oldStart: clip.startTime,
-            newStart: currentStart,
-            oldEnd: clip.endTime,
-            newEnd: currentEnd
-        }
-    });
 
     return {
         timelinePosition: formatTime(action.start),
@@ -142,7 +129,7 @@ const TimelineClip = ({
       // Parse times removing formatting
       const currentStart = parseFloat(timingInfo.currentStart.split(':').pop());
       const currentEnd = parseFloat(timingInfo.currentEnd.split(':').pop());
-      const originalStart = parseFloat(timingInfo.originalStart.split(':').pop());
+
       
       // Update cache key to include current timing
       const cacheKey = `${clip.file.name}-${currentStart}-${currentEnd}-${containerRef.current.offsetWidth}`;

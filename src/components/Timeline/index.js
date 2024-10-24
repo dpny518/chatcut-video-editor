@@ -91,26 +91,24 @@ const Timeline = ({
       return true;
     }, []);
   
-    // Handle resize end
+// Handle resize end
 const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
   console.log('Resize End:', { action, start, end, dir });
   
   const updatedClips = clips.map(clip => {
       if (clip.id === action.id) {
-          const currentMetadata = action.data?.metadata || clip.metadata;
-          
+          // Use all the data we calculated during resize
           return {
               ...clip,
+              ...action.data,  // This includes the updated startTime, endTime
               metadata: {
-                  ...currentMetadata,
+                  ...action.data.metadata,  // Use the metadata we calculated during resize
                   timeline: {
                       start,
                       end,
                       duration: end - start
-                  },
-                  playback: currentMetadata.playback
-              },
-              resizeDir: dir
+                  }
+              }
           };
       }
       return clip;
@@ -118,14 +116,6 @@ const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
 
   onClipsChange(updatedClips);
 }, [clips, onClipsChange]);
- 
-    // Add debug effect
-    useEffect(() => {
-      console.log('Timeline Clips State:', clips.map(clip => ({
-        id: clip.id,
-        metadata: clip.metadata
-      })));
-    }, [clips]);
 
   // Handle general changes
   const handleChange = useCallback((newEditorData) => {
