@@ -43,9 +43,11 @@ export const useTimelineStateManager = ({
               }
             },
             position: {
-              timelineStart: editorAction?.start || 0,
-              timelineEnd: editorAction?.end || (clip.endTime - clip.startTime),
-              row: editorAction?.data?.rowIndex || 0
+              timelineStart: clip.metadata?.timeline?.start || 0,
+              timelineEnd: clip.metadata?.timeline?.end || clip.duration,
+              currentStart: clip.metadata?.playback?.start || clip.startTime,
+              currentEnd: clip.metadata?.playback?.end || clip.endTime,
+              row: clip.metadata?.timeline?.track || editorAction?.data?.rowIndex || 0
             },
             state: {
               selected: clip.id === selectedClipId,
@@ -99,41 +101,30 @@ export const useTimelineStateManager = ({
     }
   }, [timelineClips, timelineMetadata, selectedClipId, showNotification]);
 
-  const loadTimelineProject = useCallback((projectName) => {
-    try {
-      const savedProjects = JSON.parse(localStorage.getItem('timelineProjects') || '{}');
-      const project = savedProjects[projectName];
-      
-      if (!project) {
-        throw new Error(`Timeline project "${projectName}" not found`);
-      }
-  
-      console.log('Loading project:', project);
-  
-      // Validate all required media files are available
-      const missingFiles = project.timeline.clips.filter(clip => {
-        const fileName = clip.file?.name || clip.source?.name;
-        console.log('Checking file:', fileName, 'Available files:', mediaFiles.map(f => f.name));
-        return !mediaFiles.find(f => f.name === fileName);
-      });
-  
-      if (missingFiles.length > 0) {
-        throw new Error(
-          `Missing media files: ${missingFiles.map(f => f.file?.name || f.source?.name).join(', ')}`
-        );
-      }
-  
-      // Convert project clips back to app format with proper timeline positions
-      const loadedClips = project.timeline.clips.map(clip => {
+  const processTimelineClips = (project, mediaFiles) => {
+    // First validate all media files are available
+    const missingFiles = project.timeline.clips.filter(clip => {
+      const fileName = clip.file?.name || clip.source?.name;
+      return !mediaFiles.find(f => f.name === fileName);
+    });
+
+    if (missingFiles.length > 0) {
+      throw new Error(
+        `Missing media files: ${missingFiles.map(f => f.file?.name || f.source?.name).join(', ')}`
+      );
+    }
+
+    // Process clips in order of timeline position
+    return project.timeline.clips
+      .sort((a, b) => (a.position?.timelineStart || 0) - (b.position?.timelineStart || 0))
+      .map(clip => {
         const fileName = clip.file?.name || clip.source?.name;
         const mediaFile = mediaFiles.find(f => f.name === fileName);
-        
-        console.log('Processing clip:', clip.id, 'File:', fileName, 'Found:', mediaFile);
-  
+
         if (!mediaFile) {
           throw new Error(`Could not find media file: ${fileName}`);
         }
-  
+
         return {
           id: clip.id,
           file: mediaFile,
@@ -145,13 +136,39 @@ export const useTimelineStateManager = ({
           duration: clip.source?.duration || 0,
           metadata: {
             timeline: {
-              start: clip.metadata?.timeline?.start || clip.position?.timelineStart || 0,
-              end: clip.metadata?.timeline?.end || clip.position?.timelineEnd || 0,
-              track: clip.metadata?.timeline?.track || clip.position?.row || 0
+              start: clip.position?.timelineStart || 0,
+              end: clip.position?.timelineEnd || 0,
+              duration: (clip.position?.timelineEnd || 0) - (clip.position?.timelineStart || 0),
+              track: clip.position?.row || 0
+            },
+            playback: {
+              start: clip.source?.startTime || 0,
+              end: clip.source?.endTime || 0,
+              duration: clip.source?.duration || 0
             }
+          },
+          source: {
+            startTime: 0,
+            endTime: clip.source?.duration || 0,
+            duration: clip.source?.duration || 0
           }
         };
       });
+  };
+
+  const loadTimelineProject = useCallback((projectName) => {
+    try {
+      const savedProjects = JSON.parse(localStorage.getItem('timelineProjects') || '{}');
+      const project = savedProjects[projectName];
+      
+      if (!project) {
+        throw new Error(`Timeline project "${projectName}" not found`);
+      }
+  
+      console.log('Loading project:', project);
+
+      // Process clips in correct order with proper metadata
+      const loadedClips = processTimelineClips(project, mediaFiles);
   
       console.log('Loaded clips:', loadedClips);
   

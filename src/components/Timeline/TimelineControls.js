@@ -25,25 +25,25 @@ const TimelineControls = ({
   onDebugClips
 }) => {
   const handleDownloadState = () => {
-    console.log("downloading file")
-    console.log(timelineState.clip)
+    console.log("downloading file");
+    
     try {
       const stateToExport = {
         version: "2.0",
         timestamp: new Date().toISOString(),
         timeline: {
           clips: timelineState.clips.map(clip => {
-            // Get the actual timeline action data for this clip
-            const editorAction = timelineState.editorData?.actions?.find(
-              action => action.id === clip.id
-            );
+            // Get the stored metadata that was updated by TimelineClip
+            const metadata = clip.metadata || {};
+            const playback = metadata.playback || {};
+            const timeline = metadata.timeline || {};
 
             return {
               id: clip.id,
               source: {
-                startTime: clip.startTime,
-                endTime: clip.endTime,
-                duration: clip.endTime - clip.startTime,
+                startTime: playback.start,  // Use stored playback times
+                endTime: playback.end,
+                duration: clip.source?.duration,
                 name: clip.file.name
               },
               file: {
@@ -52,51 +52,37 @@ const TimelineControls = ({
                 type: clip.file.type
               },
               metadata: {
-                originalDuration: clip.endTime - clip.startTime,
+                originalDuration: clip.source?.duration,
                 timeline: {
-                  sourceStart: clip.startTime,
-                  sourceEnd: clip.endTime,
-                  start: editorAction?.start || 0,
-                  end: editorAction?.end || (clip.endTime - clip.startTime)
+                  sourceStart: clip.source?.startTime,
+                  sourceEnd: clip.source?.endTime,
+                  start: timeline.start,
+                  end: timeline.end,
+                  duration: timeline.duration
+                },
+                playback: {
+                  start: playback.start,
+                  end: playback.end,
+                  duration: playback.duration
                 }
               },
               position: {
-                timelineStart: editorAction?.start || 0,
-                timelineEnd: editorAction?.end || (clip.endTime - clip.startTime),
-                row: editorAction?.data?.rowIndex || 0
+                timelineStart: timeline.start,
+                timelineEnd: timeline.end,
+                currentStart: playback.start,
+                currentEnd: playback.end,
+                track: timeline.track || 0
               },
               state: {
                 selected: clip.id === selectedClipId,
-                effectId: editorAction?.effectId || 'default'
+                effectId: clip.effectId || 'default'
               }
             };
           }),
           duration: timelineState.duration || 0,
           settings: {
-            scale: timelineState.scale || 1,
-            effects: timelineState.effects || {
-              default: {
-                id: 'default',
-                name: 'Default',
-                style: {
-                  backgroundColor: '#2d3748',
-                  color: 'white',
-                  borderRadius: '4px',
-                  padding: '4px 8px'
-                }
-              },
-              selected: {
-                id: 'selected',
-                name: 'Selected',
-                style: {
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  borderRadius: '4px',
-                  padding: '4px 8px',
-                  boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)'
-                }
-              }
-            }
+            scale: scale || 1,
+            effects: timelineState.settings?.effects || {}
           }
         }
       };
@@ -117,6 +103,8 @@ const TimelineControls = ({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      console.log('Exported timeline state:', stateToExport);
 
     } catch (error) {
       console.error('Failed to download state:', error);

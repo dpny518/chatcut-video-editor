@@ -87,25 +87,25 @@ const TimelineClip = ({
      currentEnd = Math.min(currentEnd, clip.source.endTime);
      currentStart = Math.max(currentStart, clip.source.startTime);
 
-    // Update action.data with new times
-    action.data = {
-        ...clip,
-        startTime: currentStart,
-        endTime: currentEnd,
-        metadata: {
-            timeline: {
-                start: action.start,
-                end: action.end,
-                duration: action.end - action.start,
-                initialStart: clip.metadata.timeline.initialStart || initialTimelineStart.current  // Preserve initial start
-            },
-            playback: {
-                start: currentStart,
-                end: currentEnd,
-                duration: currentEnd - currentStart
-            }
-        }
-    };
+          // Update action.data with new times
+        action.data = {
+          ...clip,
+          startTime: currentStart,
+          endTime: currentEnd,
+          metadata: {
+              timeline: {
+                  start: action.start,
+                  end: action.end,
+                  duration: action.end - action.start,
+                  initialStart: clip.metadata.timeline.initialStart || initialTimelineStart.current
+              },
+              playback: {
+                  start: currentStart, // Use clamped value
+                  end: currentEnd,     // Use clamped value
+                  duration: currentEnd - currentStart
+              }
+          }
+};
 
     return {
         timelinePosition: formatTime(action.start),

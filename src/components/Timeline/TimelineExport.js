@@ -76,9 +76,11 @@ const useTimelineExport = (timelineState) => {
                 }
               },
               position: {
-                timelineStart: editorAction?.start ?? 0,
-                timelineEnd: editorAction?.end ?? clip.duration,
-                row: editorAction?.data?.rowIndex ?? 0
+                timelineStart: clip.metadata?.timeline?.start || 0,
+                timelineEnd: clip.metadata?.timeline?.end || clip.duration,
+                currentStart: clip.metadata?.playback?.start || clip.startTime,
+                currentEnd: clip.metadata?.playback?.end || clip.endTime,
+                row: clip.metadata?.timeline?.track || editorAction?.data?.rowIndex || 0
               },
               state: {
                 selected: clip.id === timelineState.selectedClipId,

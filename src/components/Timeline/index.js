@@ -71,6 +71,7 @@ const handleMoveStart = useCallback(({ action, row }) => {
 const handleMoving = useCallback(({ action, row, start, end }) => {
   console.log('Moving:', { action, start, end });
   
+  // Update both timeline and playback metadata during move
   action.data = {
     ...action.data,
     metadata: {
@@ -78,10 +79,23 @@ const handleMoving = useCallback(({ action, row, start, end }) => {
       timeline: {
         start,
         end,
-        duration: end - start
+        duration: end - start,
+        initialStart: action.data.metadata?.timeline?.initialStart
+      },
+      playback: {
+        start: action.data.metadata?.playback?.start || action.data.startTime,
+        end: action.data.metadata?.playback?.end || action.data.endTime,
+        duration: action.data.metadata?.playback?.duration || (action.data.endTime - action.data.startTime)
       }
     }
   };
+  console.log('Moving clip:', {
+    timeline: { start, end, duration: end - start },
+    playback: { 
+      start: action.data.metadata?.playback?.start || action.data.startTime,
+      end: action.data.metadata?.playback?.end || action.data.endTime 
+    }
+  });
   
   return true;
 }, []);
@@ -89,15 +103,22 @@ const handleMoving = useCallback(({ action, row, start, end }) => {
  // Handle move end
 const handleMoveEnd = useCallback(({ action, row, start, end }) => {
   console.log('Move End:', { action, start, end });
-  
+
+
   const updatedClips = clips.map(clip => {
     if (clip.id === action.id) {
+      const actionData = action.data || {};
+      const metadata = actionData.metadata || {};
+      const playback = metadata.playback || {};
       return {
         ...clip,
-        ...action.data,  // Include the updated data like we do in resize
+        ...actionData,
+        startTime: playback.start || clip.startTime,
+        endTime: playback.end || clip.endTime,
         metadata: {
-          ...action.data.metadata,
+          ...metadata,
           timeline: {
+            ...metadata.timeline,
             start,
             end,
             duration: end - start
@@ -126,7 +147,7 @@ const handleResizeStart = useCallback(({ action, row, dir }) => {
   onClipSelect?.(action.id);
 }, [onClipSelect]);
 
-// Handle resizing
+
 // Handle resizing
 const handleResizing = useCallback(({ action, row, start, end, dir }) => {
   console.log('Resizing:', { action, start, end, dir });
@@ -135,13 +156,30 @@ const handleResizing = useCallback(({ action, row, start, end, dir }) => {
   const sourceStart = action.data.source.startTime; // 0
   const sourceEnd = action.data.source.endTime;     // 42.944
 
-  // Clamp start and end to stay within the source bounds
+  // Check if resize would exceed bounds
+  if (dir === 'left' && start < sourceStart) {
+    return false; // Prevent resizing below source start
+  }
+  if (dir === 'right' && end > sourceEnd) {
+    return false; // Prevent resizing beyond source end
+  }
+
+  // Calculate new playback times based on resize direction
+  let playbackStart = action.data.metadata?.playback?.start || action.data.startTime;
+  let playbackEnd = action.data.metadata?.playback?.end || action.data.endTime;
+  const timelineDuration = end - start;
+
   if (dir === 'left') {
-    start = Math.max(start, sourceStart); // Prevent start going below 0
+    playbackEnd = action.data.metadata?.playback?.end || action.data.endTime;
+    playbackStart = playbackEnd - timelineDuration;
+  } else if (dir === 'right') {
+    playbackStart = action.data.metadata?.playback?.start || action.data.startTime;
+    playbackEnd = playbackStart + timelineDuration;
   }
-  if (dir === 'right') {
-    end = Math.min(end, sourceEnd);       // Prevent end going above sourceEnd
-  }
+
+  // Ensure playback times stay within source bounds
+  playbackStart = Math.max(playbackStart, sourceStart);
+  playbackEnd = Math.min(playbackEnd, sourceEnd);
 
   // Update action.data to reflect the resized clip
   action.data = {
@@ -150,12 +188,22 @@ const handleResizing = useCallback(({ action, row, start, end, dir }) => {
     metadata: {
       ...action.data.metadata,
       timeline: {
-        start, // Clamped start
-        end,   // Clamped end
+        start,
+        end,
         duration: end - start,
+      },
+      playback: {
+        start: playbackStart,
+        end: playbackEnd,
+        duration: playbackEnd - playbackStart
       }
     }
   };
+
+  console.log('Updated clip timing:', {
+    timeline: { start, end, duration: end - start },
+    playback: { start: playbackStart, end: playbackEnd, duration: playbackEnd - playbackStart }
+  });
 
   return true;
 }, []);
@@ -176,14 +224,21 @@ const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
   // Update the clips array with the final clamped values
   const updatedClips = clips.map(clip => {
     if (clip.id === action.id) {
+      const actionData = action.data || {};
+      const metadata = actionData.metadata || {};
+      const playback = metadata.playback || {};
+
       return {
         ...clip,
-        ...action.data,  // This includes the clamped startTime, endTime
+        ...actionData,
+        startTime: playback.start || clip.startTime,
+        endTime: playback.end || clip.endTime,
         metadata: {
-          ...action.data.metadata,  // Use the metadata we calculated during resize
+          ...metadata,
           timeline: {
+            ...metadata.timeline,
             start,
-            end,
+            end, 
             duration: end - start
           }
         }
@@ -191,6 +246,7 @@ const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
     }
     return clip;
   });
+  
 onClipsChange(updatedClips);
 }, [clips, onClipsChange]);
 
@@ -199,23 +255,51 @@ onClipsChange(updatedClips);
     console.log('Timeline Changed:', newEditorData);
     
     if (!newEditorData?.actions) return;
-
+  
     const updatedClips = clips.map(clip => {
       const action = newEditorData.actions.find(a => a.id === clip.id);
       if (!action) return clip;
-
+  
+      // Get the current metadata from the action data
+      const actionData = action.data || {};
+      const metadata = actionData.metadata || {};
+      const timeline = metadata.timeline || {};
+      const playback = metadata.playback || {};
+  
+      // Calculate the current duration based on timeline
+      const timelineDuration = action.end - action.start;
+  
       return {
         ...clip,
-        metadata: action.data?.metadata || clip.metadata
+        ...actionData, // Include all action data updates
+        startTime: playback.start || clip.startTime,
+        endTime: playback.end || clip.endTime,
+        metadata: {
+          ...metadata,
+          timeline: {
+            ...timeline,
+            start: action.start,
+            end: action.end,
+            duration: timelineDuration,
+          },
+          playback: {
+            start: playback.start || clip.startTime,
+            end: playback.end || clip.endTime,
+            duration: playback.duration || (playback.end - playback.start)
+          }
+        }
       };
     });
-
+  
     onClipsChange(updatedClips);
   }, [clips, onClipsChange]);
 
   // Timeline state export functionality
   const timelineState = {
-    clips,
+    clips: clips.map(clip => ({
+      ...clip,
+      timelinePosition: clip.metadata?.timeline || {}
+    })),
     totalDuration: editorData.duration,
     settings: { scale, effects }
   };
