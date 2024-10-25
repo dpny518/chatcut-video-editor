@@ -50,7 +50,29 @@ const TimelineViewer = ({ clips = [] }) => {
     };
   }, [clips]);
 
-  // Rest of the existing playback logic remains the same
+  // Component cleanup effect
+  useEffect(() => {
+    // Capture the current refs at effect creation time
+    const cleanup = () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+
+      // Get current videos and pause them
+      videoRefs.current.forEach(video => {
+        video.pause();
+        video.src = '';
+      });
+      
+      // Get current URLs and revoke them
+      urlRefs.current.forEach(url => URL.revokeObjectURL(url));
+    };
+
+    // Return the cleanup function that uses the captured values
+    return cleanup;
+  }, []); // Empty dependency array since this is component cleanup
+
+  // Rest of component remains the same
   const startPlayback = () => {
     setIsPlaying(true);
     startTimeRef.current = performance.now() - (currentTime * 1000);
@@ -117,24 +139,6 @@ const TimelineViewer = ({ clips = [] }) => {
     pausePlayback();
     setCurrentTime(0);
   };
-
-  useEffect(() => {
-    return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
-      
-      const currentVideoRefs = new Map(videoRefs.current);
-      const currentUrlRefs = new Map(urlRefs.current);
-      
-      currentVideoRefs.forEach(video => {
-        video.pause();
-        video.src = '';
-      });
-      
-      currentUrlRefs.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, []);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
