@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-
+import { formatTime } from '../../utils/formatters';
 const useTimelineExport = (timelineState) => {
   const exportTimelineData = useCallback(() => {
     try {
@@ -54,7 +54,17 @@ const useTimelineExport = (timelineState) => {
                   // Current timeline positions
                   start: editorAction?.start ?? 0,
                   end: editorAction?.end ?? clip.duration,
-                  position: clip.timelinePosition
+                  position: clip.timelinePosition,
+                  // Detailed timing information
+                  timing: {
+                    timelinePosition: formatTime(editorAction?.start ?? 0),
+                    originalStart: formatTime(clip.startTime),
+                    originalEnd: formatTime(clip.endTime), 
+                    currentStart: formatTime(clip.startTime),
+                    currentEnd: formatTime(clip.endTime),
+                    duration: formatTime(clip.endTime - clip.startTime),
+                    originalDuration: formatTime(clip.endTime - clip.startTime)
+                  }
                 },
                 playback: {
                   current: clip.currentInOut,

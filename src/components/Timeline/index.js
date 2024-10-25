@@ -26,35 +26,81 @@ const Timeline = ({
     // Add context menu state
     const [contextMenu, setContextMenu] = useState(null);
     const [selectedActionId, setSelectedActionId] = useState(null);
- 
-    // Handle move start
-  const handleMoveStart = useCallback(({ action, row }) => {
-    console.log('Move Start:', { action, row });
-    onClipSelect?.(action.id);
-  }, [onClipSelect]);
 
+// Log incoming clips
+useEffect(() => {
+  if (clips.length > 0) {
+    console.log('Timeline clips:', clips);
+    // Log the last added clip
+    const lastClip = clips[clips.length - 1];
+    console.log('Latest clip:', {
+      clipData: lastClip,
+      trimmedPortion: {
+        start: lastClip.startTime,
+        end: lastClip.endTime,
+        duration: lastClip.duration
+      },
+      sourceInfo: lastClip.source
+    });
+  }
+}, [clips]);
+
+  // Handle move start
+const handleMoveStart = useCallback(({ action, row }) => {
+  console.log('Move Start:', { action, row });
+  
+  // Store initial state like we do in resize
+  action.data = {
+    ...action.data,
+    initialStart: action.start,
+    initialEnd: action.end,
+    metadata: {
+      ...action.data.metadata,
+      timeline: {
+        start: action.start,
+        end: action.end,
+        duration: action.end - action.start
+      }
+    }
+  };
+  
+  onClipSelect?.(action.id);
+}, [onClipSelect]);
   // Handle move
-  const handleMoving = useCallback(({ action, row, start, end }) => {
-    console.log('Moving:', { action, start, end });
-    // Return true to allow the move
-    return true;
-  }, []);
+ // Handle move
+const handleMoving = useCallback(({ action, row, start, end }) => {
+  console.log('Moving:', { action, start, end });
+  
+  action.data = {
+    ...action.data,
+    metadata: {
+      ...action.data.metadata,
+      timeline: {
+        start,
+        end,
+        duration: end - start
+      }
+    }
+  };
+  
+  return true;
+}, []);
 
  // Handle move end
 const handleMoveEnd = useCallback(({ action, row, start, end }) => {
   console.log('Move End:', { action, start, end });
   
-  // Update the clips with new positions
   const updatedClips = clips.map(clip => {
     if (clip.id === action.id) {
       return {
         ...clip,
+        ...action.data,  // Include the updated data like we do in resize
         metadata: {
-          ...clip.metadata,
+          ...action.data.metadata,
           timeline: {
-            start, // New start time after move
-            end,   // New end time after move
-            duration: end - start  // Calculate new duration
+            start,
+            end,
+            duration: end - start
           }
         }
       };
@@ -62,60 +108,74 @@ const handleMoveEnd = useCallback(({ action, row, start, end }) => {
     return clip;
   });
 
+  onClipsChange(updatedClips);
+}, [clips, onClipsChange]);
 
-    onClipsChange(updatedClips);
-  }, [clips, onClipsChange]);
 
-    // Handle resize start
-    const handleResizeStart = useCallback(({ action, row, dir }) => {
-      console.log('Resize Start:', { action, dir });
-      
-      // Update the action data with the resize direction
-      action.data = {
-        ...action.data,
-        resizeDir: dir
-      };
-      
-      onClipSelect?.(action.id);
-    }, [onClipSelect]);
+
+// Handle resize start
+const handleResizeStart = useCallback(({ action, row, dir }) => {
+  console.log('Resize Start:', { action, dir });
   
-    // Handle resizing
-    const handleResizing = useCallback(({ action, row, start, end, dir }) => {
-      console.log('Resizing:', { action, start, end, dir });
-      
-      // Update the action data with current resize info
-      action.data = {
-        ...action.data,
-        resizeDir: dir
-      };
-      
-      return true;
-    }, []);
+  // Update the action data with the resize direction
+  action.data = {
+    ...action.data,
+    resizeDir: dir
+  };
   
+  onClipSelect?.(action.id);
+}, [onClipSelect]);
+
+// Handle resizing
+const handleResizing = useCallback(({ action, row, start, end, dir }) => {
+  console.log('Resizing:', { action, start, end, dir });
+  
+  // Get source video bounds
+  const sourceStart = action.data.source.startTime; // 0
+  const sourceEnd = action.data.source.endTime;     // 42.944
+  console.log(sourceStart)
+  console.log(sourceEnd)
+  // Check bounds based on direction
+  if (dir === 'left' && start < sourceStart) {
+    return false; // Prevent going before video start
+  }
+  if (dir === 'right' && end > sourceEnd) {
+    return false; // Prevent going past video end
+  }
+  
+  // Allow resize if within bounds
+  action.data = {
+    ...action.data,
+    resizeDir: dir
+  };
+  
+  return true;
+}, []);
+
 // Handle resize end
 const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
-  console.log('Resize End:', { action, start, end, dir });
-  
-  const updatedClips = clips.map(clip => {
-      if (clip.id === action.id) {
-          // Use all the data we calculated during resize
-          return {
-              ...clip,
-              ...action.data,  // This includes the updated startTime, endTime
-              metadata: {
-                  ...action.data.metadata,  // Use the metadata we calculated during resize
-                  timeline: {
-                      start,
-                      end,
-                      duration: end - start
-                  }
-              }
-          };
-      }
-      return clip;
-  });
+console.log('Resize End:', { action, start, end, dir });
 
-  onClipsChange(updatedClips);
+const updatedClips = clips.map(clip => {
+  if (clip.id === action.id) {
+      // Use all the data we calculated during resize
+      return {
+          ...clip,
+          ...action.data,  // This includes the updated startTime, endTime
+          metadata: {
+              ...action.data.metadata,  // Use the metadata we calculated during resize
+              timeline: {
+                  start,
+                  end,
+                  duration: end - start
+              }
+          }
+      };
+  }
+  return clip;
+});
+
+onClipsChange(updatedClips);
 }, [clips, onClipsChange]);
 
   // Handle general changes

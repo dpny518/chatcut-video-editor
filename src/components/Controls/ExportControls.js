@@ -19,6 +19,22 @@ const ExportControls = ({
   onDownloadState,
   onDebugClips
 }) => {
+  // Create wrapper functions to log before executing the passed functions
+  const handleExport = () => {
+    console.log("Export process started...");
+    onExport();
+  };
+
+  const handleDownloadState = () => {
+    console.log("Downloading current state...");
+    onDownloadState();
+  };
+
+  const handleDebugClips = () => {
+    console.log("Loading debug clips...");
+    onDebugClips();
+  };
+
   return (
     <Stack 
       direction="row" 
@@ -35,7 +51,7 @@ const ExportControls = ({
       <Button 
         variant="contained"
         startIcon={<FileDownload />}
-        onClick={onExport}
+        onClick={handleExport}  // Use the new logging function
         sx={{
           bgcolor: '#0ea5e9',
           color: 'white',
@@ -56,7 +72,7 @@ const ExportControls = ({
       <Box sx={{ display: 'flex', gap: 1 }}>
         <Tooltip title="Download Current State">
           <IconButton 
-            onClick={onDownloadState}
+            onClick={handleDownloadState}  // Use the new logging function
             size="small"
             sx={{ 
               bgcolor: 'rgba(255,255,255,0.1)',
@@ -68,7 +84,7 @@ const ExportControls = ({
         </Tooltip>
         <Tooltip title="Load Debug Clips">
           <IconButton 
-            onClick={onDebugClips}
+            onClick={handleDebugClips}  // Use the new logging function
             size="small"
             sx={{ 
               bgcolor: 'rgba(255,255,255,0.1)',

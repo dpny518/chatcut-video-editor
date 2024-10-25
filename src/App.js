@@ -59,17 +59,8 @@ function App() {
   const handleFileSelect = (selectedFile) => {
     setSelectedBinClip(selectedFile);
   };
-
   const handleAddToTimeline = (clip) => {
-    const newClip = {
-      id: `clip${timelineClips.length + 1}`,
-      file: clip.file,
-      name: clip.file.name,
-      startTime: clip.startTime || 0,
-      endTime: clip.endTime || 0,
-      duration: (clip.endTime || 0) - (clip.startTime || 0)
-    };
-    setTimelineClips(prevClips => [...prevClips, newClip]);
+    setTimelineClips(prevClips => [...prevClips, clip]);
   };
 
   const handleTimelineClipsChange = (newClips) => {

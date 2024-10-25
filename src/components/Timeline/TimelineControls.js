@@ -16,8 +16,8 @@ import {
 
 const TimelineControls = ({
   onExport, 
-  timelineState, // Add this prop
-  selectedClipId, // Add this prop
+  timelineState,
+  selectedClipId,
   scale, 
   onZoomIn, 
   onZoomOut, 
@@ -25,6 +25,8 @@ const TimelineControls = ({
   onDebugClips
 }) => {
   const handleDownloadState = () => {
+    console.log("downloading file")
+    console.log(timelineState.clip)
     try {
       const stateToExport = {
         version: "2.0",

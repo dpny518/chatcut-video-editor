@@ -118,11 +118,17 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
       id: `clip-${Date.now()}`, // Generate unique ID
       file: selectedClip.file,
       name: selectedClip.file.name,
-      startTime: range[0],
-      endTime: range[1],
-      duration: range[1] - range[0]
+      startTime: range[0],  // Start of trimmed section
+      endTime: range[1],    // End of trimmed section
+      duration: range[1] - range[0],  // Duration of trimmed section
+      source: {
+        startTime: 0,
+        endTime: duration,        // Full video duration from ReactPlayer
+        duration: duration        // Full video duration
+      }
     };
 
+    console.log('Adding clip with data:', clipData); // Let's see what we're passing
     onAddToTimeline?.(clipData);
   };
 

@@ -21,6 +21,24 @@ const TimelineClip = ({
   const containerRef = useRef(null);
   const isInitialized = useRef(false); // Moved to component level
 
+  // Add bounds indicator
+  const getBoundsIndicator = useCallback(() => {
+    if (!clip.source) return null;
+    
+    const sourceStart = clip.source.startTime ?? 0;
+    const sourceEnd = clip.source.endTime ?? clip.duration ?? 0;
+    const currentStart = clip.startTime;
+    const currentEnd = clip.endTime;
+    
+    // Calculate how close we are to bounds (as percentage of clip width)
+    const startDistance = ((currentStart - sourceStart) / (currentEnd - currentStart)) * 100;
+    const endDistance = ((sourceEnd - currentEnd) / (currentEnd - currentStart)) * 100;
+    
+    return {
+      left: startDistance <= 15, // Show indicator if within 15% of start
+      right: endDistance <= 15  // Show indicator if within 15% of end
+    };
+  }, [clip]);
   // Calculate number of thumbnails based on container width
   const getThumbnailCount = useCallback(() => {
     if (!containerRef.current) return 5;

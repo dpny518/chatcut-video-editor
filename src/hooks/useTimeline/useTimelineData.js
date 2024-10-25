@@ -1,3 +1,4 @@
+//src/hooks/useTimeline/useTimelineData.js
 import { useMemo, useState } from 'react';
 
 const formatTime = (seconds) => {
@@ -40,29 +41,41 @@ export const useTimelineData = (clips = [], onClipsChange) => {
       const clipsState = [];
       
       const rows = clips.map((clip, index) => {
+        console.log('Clip object:', {
+          clip,
+          currentInOut: {
+            start: clip.startTime,
+            end: clip.endTime
+          },
+          source: clip.source,  // This should show the whole source object
+          duration: clip.duration,  // Duration of trimmed clip
+          fullVideo: {
+            duration: clip.source?.duration,  // Full video duration
+            start: clip.source?.startTime,    // Always 0
+            end: clip.source?.endTime         // Full video duration
+          }
+        });
         // Calculate clip timings
         let timelineStart, timelineEnd, playbackStart, playbackEnd;
         
-        if (clip.metadata?.timeline && clip.metadata?.playback) {
-          // Use existing metadata if available
-          timelineStart = clip.metadata.timeline.start;
-          timelineEnd = clip.metadata.timeline.end;
-          playbackStart = clip.metadata.playback.start;
-          playbackEnd = clip.metadata.playback.end;
-        } else {
-          // Calculate initial positions for new clips
-          const sourceStart = clip.source?.startTime ?? 0;
-          const sourceEnd = clip.source?.endTime ?? (sourceStart + (clip.duration || 0));
-          
-          timelineStart = currentPosition;
-          timelineEnd = timelineStart + (sourceEnd - sourceStart);
-          playbackStart = sourceStart;
-          playbackEnd = sourceEnd;
-          
-          if (!clip.hasBeenPositioned) {
-            currentPosition = timelineEnd + 0.1;
+        // Calculate initial positions for new clips
+          if (clip.metadata?.timeline && clip.metadata?.playback) {
+            // Use existing metadata if available
+            timelineStart = clip.metadata.timeline.start;
+            timelineEnd = clip.metadata.timeline.end;
+            playbackStart = clip.metadata.playback.start;
+            playbackEnd = clip.metadata.playback.end;
+          } else {
+            // Calculate initial positions for new clips
+            timelineStart = currentPosition;
+            timelineEnd = timelineStart + clip.duration;  // Use clip duration instead of source
+            playbackStart = clip.startTime;  // Use clip start time
+            playbackEnd = clip.endTime;      // Use clip end time
+            
+            if (!clip.hasBeenPositioned) {
+              currentPosition = timelineEnd + 0.1;
+            }
           }
-        }
 
         // Store clip state information
         clipsState.push({
@@ -92,6 +105,9 @@ export const useTimelineData = (clips = [], onClipsChange) => {
             effectId: 'default',
             flexible: true,
             movable: true,
+            // Add min/max bounds based on source video
+            minStart: clip.source.startTime,
+            maxEnd: clip.source.endTime,
             data: {
               ...clip,
               hasBeenPositioned: true,
