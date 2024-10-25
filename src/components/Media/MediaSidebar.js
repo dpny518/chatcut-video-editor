@@ -38,7 +38,6 @@ const MediaSidebar = ({
   selectedFile,
   timelineProjects 
 }) => {
-  const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [currentTab, setCurrentTab] = useState(0);
   const [contextMenu, setContextMenu] = useState(null);
@@ -321,7 +320,7 @@ const MediaSidebar = ({
             </Button>
           </DialogActions>
         </Dialog>
-        
+
           <List sx={{ flexGrow: 1, overflow: 'auto' }}>
             {Object.entries(JSON.parse(localStorage.getItem('timelineProjects') || '{}')).map(([name, timeline]) => (
               <ListItem
