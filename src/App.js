@@ -14,7 +14,7 @@ import TimelineViewerSection from './components/Viewers/TimelineViewerSection';
 // Timeline components
 import TimelineSection from './components/Timeline/TimelineSection';
 import TimelineDebug from './components/Timeline/TimelineDebug';
-import TimelineManager from './components/Timeline/TimelineManager';
+import { useTimelineStateManager } from './hooks/useTimeline/useTimelineStateManager';
 
 const theme = createTheme({
   palette: {
@@ -77,126 +77,37 @@ function App() {
   };
 
   // Timeline Project Management
-  const handleTimelineProjectSave = useCallback((projectName) => {
-    const timelineProject = {
-      version: "2.0",
-      timestamp: new Date().toISOString(),
-      name: projectName,
-      timeline: {
-        clips: timelineClips.map(clip => ({
-          id: clip.id,
-          type: "video",
-          source: {
-            startTime: clip.startTime,
-            endTime: clip.endTime,
-            duration: clip.duration,
-            file: {
-              name: clip.file.name,
-              size: clip.file.size,
-              type: clip.file.type
-            }
-          },
-          timeline: {
-            startTime: clip.metadata?.timeline?.start || 0,
-            endTime: clip.metadata?.timeline?.end || clip.duration,
-            track: clip.metadata?.timeline?.track || 0
-          },
-          enabled: true
-        })),
-        duration: timelineClips.reduce((max, clip) => {
-          const endTime = clip.metadata?.timeline?.end || clip.duration;
-          return Math.max(max, endTime);
-        }, 0),
-        settings: {
-          scale: 0.5 // Or whatever your current timeline scale is
-        }
-      }
-    };
+  const { saveTimelineProject, loadTimelineProject, deleteTimelineProject } = useTimelineStateManager({
+    timelineClips,
+    timelineMetadata,
+    mediaFiles,
+    selectedClipId: timelineMetadata.selectedClipId,
+    setTimelineClips,
+    setTimelineMetadata,
+    showNotification
+  });
 
-    try {
-      // Get existing projects
-      const savedProjects = JSON.parse(localStorage.getItem('timelineProjects') || '{}');
-      
-      // Add/Update project
-      savedProjects[projectName] = {
-        ...timelineProject,
-        lastModified: new Date().toISOString()
-      };
-      
-      localStorage.setItem('timelineProjects', JSON.stringify(savedProjects));
+  // Replace the handlers with the new ones
+  const handleTimelineProjectSave = useCallback((projectName) => {
+    const success = saveTimelineProject(projectName);
+    if (success) {
       setSelectedTimelineProject(projectName);
-      showNotification(`Timeline project "${projectName}" saved successfully`, 'success');
-    } catch (error) {
-      console.error('Failed to save timeline project:', error);
-      showNotification('Failed to save timeline project', 'error');
     }
-  }, [timelineClips]);
+  }, [saveTimelineProject]);
 
   const handleTimelineProjectLoad = useCallback((projectName) => {
-    try {
-      const savedProjects = JSON.parse(localStorage.getItem('timelineProjects') || '{}');
-      const project = savedProjects[projectName];
-      
-      if (!project) {
-        throw new Error(`Timeline project "${projectName}" not found`);
-      }
-
-      // Validate all required media files are available
-      const missingFiles = project.timeline.clips.filter(clip => 
-        !mediaFiles.find(f => f.name === clip.source.file.name)
-      );
-
-      if (missingFiles.length > 0) {
-        throw new Error(
-          `Missing media files: ${missingFiles.map(f => f.source.file.name).join(', ')}`
-        );
-      }
-
-      // Convert project clips back to app format
-      const loadedClips = project.timeline.clips.map(clip => {
-        const mediaFile = mediaFiles.find(f => f.name === clip.source.file.name);
-        
-        return {
-          id: clip.id,
-          file: mediaFile.file,
-          startTime: clip.source.startTime,
-          endTime: clip.source.endTime,
-          duration: clip.source.duration,
-          metadata: {
-            timeline: {
-              start: clip.timeline.startTime,
-              end: clip.timeline.endTime,
-              track: clip.timeline.track
-            }
-          }
-        };
-      });
-
-      setTimelineClips(loadedClips);
+    const success = loadTimelineProject(projectName);
+    if (success) {
       setSelectedTimelineProject(projectName);
-      showNotification(`Timeline project "${projectName}" loaded successfully`, 'success');
-    } catch (error) {
-      console.error('Failed to load timeline project:', error);
-      showNotification(error.message, 'error');
     }
-  }, [mediaFiles]);
+  }, [loadTimelineProject]);
 
-  const handleDeleteTimelineProject = useCallback((projectName) => {
-    try {
-      const savedProjects = JSON.parse(localStorage.getItem('timelineProjects') || '{}');
-      delete savedProjects[projectName];
-      localStorage.setItem('timelineProjects', JSON.stringify(savedProjects));
-      
-      if (selectedTimelineProject === projectName) {
-        setSelectedTimelineProject(null);
-      }
-      
-      showNotification(`Timeline project "${projectName}" deleted`, 'success');
-    } catch (error) {
-      console.error('Failed to delete timeline project:', error);
-      showNotification('Failed to delete timeline project', 'error');
+  const handleTimelineProjectDelete = useCallback((projectName) => {
+    const success = deleteTimelineProject(projectName);
+    if (success && selectedTimelineProject === projectName) {
+      setSelectedTimelineProject(null);
     }
-  }, [selectedTimelineProject]);
+  }, [deleteTimelineProject, selectedTimelineProject]);
 
   return (
     <StyledEngineProvider injectFirst>
@@ -211,7 +122,7 @@ function App() {
             selected: selectedTimelineProject,
             onSave: handleTimelineProjectSave,
             onLoad: handleTimelineProjectLoad,
-            onDelete: handleDeleteTimelineProject
+            onDelete: handleTimelineProjectDelete
           }}
         >
           <EditorLayout>
