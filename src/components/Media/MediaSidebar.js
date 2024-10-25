@@ -38,6 +38,7 @@ const MediaSidebar = ({
   selectedFile,
   timelineProjects 
 }) => {
+  const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [currentTab, setCurrentTab] = useState(0);
   const [contextMenu, setContextMenu] = useState(null);
@@ -60,7 +61,7 @@ const MediaSidebar = ({
   const handleFileUpload = (event) => {
     const uploadedFiles = Array.from(event.target.files);
     setUploading(true);
-    
+    console.log(uploading)
     uploadedFiles.forEach(file => {
       const fileId = Date.now() + Math.random();
       setUploadProgress(prev => ({
@@ -320,7 +321,7 @@ const MediaSidebar = ({
             </Button>
           </DialogActions>
         </Dialog>
-
+        
           <List sx={{ flexGrow: 1, overflow: 'auto' }}>
             {Object.entries(JSON.parse(localStorage.getItem('timelineProjects') || '{}')).map(([name, timeline]) => (
               <ListItem
