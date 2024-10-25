@@ -77,6 +77,10 @@ export const useTimelineData = (clips = [], onClipsChange) => {
             }
           }
 
+        // Define min and max bounds based on source video duration
+            const minStart = clip.source?.startTime ?? 0;
+            const maxEnd = clip.source?.endTime ?? clip.duration ?? timelineEnd;
+
         // Store clip state information
         clipsState.push({
           id: clip.id,
@@ -105,9 +109,8 @@ export const useTimelineData = (clips = [], onClipsChange) => {
             effectId: 'default',
             flexible: true,
             movable: true,
-            // Add min/max bounds based on source video
-            minStart: clip.source.startTime,
-            maxEnd: clip.source.endTime,
+            minStart: minStart,
+            maxEnd: maxEnd,
             data: {
               ...clip,
               hasBeenPositioned: true,

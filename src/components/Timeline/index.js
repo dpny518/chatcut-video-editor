@@ -127,54 +127,70 @@ const handleResizeStart = useCallback(({ action, row, dir }) => {
 }, [onClipSelect]);
 
 // Handle resizing
+// Handle resizing
 const handleResizing = useCallback(({ action, row, start, end, dir }) => {
   console.log('Resizing:', { action, start, end, dir });
-  
+
   // Get source video bounds
   const sourceStart = action.data.source.startTime; // 0
   const sourceEnd = action.data.source.endTime;     // 42.944
-  console.log(sourceStart)
-  console.log(sourceEnd)
-  // Check bounds based on direction
-  if (dir === 'left' && start < sourceStart) {
-    return false; // Prevent going before video start
+
+  // Clamp start and end to stay within the source bounds
+  if (dir === 'left') {
+    start = Math.max(start, sourceStart); // Prevent start going below 0
   }
-  if (dir === 'right' && end > sourceEnd) {
-    return false; // Prevent going past video end
+  if (dir === 'right') {
+    end = Math.min(end, sourceEnd);       // Prevent end going above sourceEnd
   }
-  
-  // Allow resize if within bounds
+
+  // Update action.data to reflect the resized clip
   action.data = {
     ...action.data,
-    resizeDir: dir
+    resizeDir: dir,
+    metadata: {
+      ...action.data.metadata,
+      timeline: {
+        start, // Clamped start
+        end,   // Clamped end
+        duration: end - start,
+      }
+    }
   };
-  
+
   return true;
 }, []);
 
+
 // Handle resize end
 const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
-console.log('Resize End:', { action, start, end, dir });
+  console.log('Resize End:', { action, start, end, dir });
 
-const updatedClips = clips.map(clip => {
-  if (clip.id === action.id) {
-      // Use all the data we calculated during resize
+  // Get source video bounds (optional, you can pass the clamped values from handleResizing)
+  const sourceStart = action.data.source.startTime;
+  const sourceEnd = action.data.source.endTime;
+
+  // Ensure the final start and end times are clamped within the source video bounds
+  start = Math.max(start, sourceStart);
+  end = Math.min(end, sourceEnd);
+
+  // Update the clips array with the final clamped values
+  const updatedClips = clips.map(clip => {
+    if (clip.id === action.id) {
       return {
-          ...clip,
-          ...action.data,  // This includes the updated startTime, endTime
-          metadata: {
-              ...action.data.metadata,  // Use the metadata we calculated during resize
-              timeline: {
-                  start,
-                  end,
-                  duration: end - start
-              }
+        ...clip,
+        ...action.data,  // This includes the clamped startTime, endTime
+        metadata: {
+          ...action.data.metadata,  // Use the metadata we calculated during resize
+          timeline: {
+            start,
+            end,
+            duration: end - start
           }
+        }
       };
-  }
-  return clip;
-});
-
+    }
+    return clip;
+  });
 onClipsChange(updatedClips);
 }, [clips, onClipsChange]);
 
