@@ -15,16 +15,18 @@ const TimelineViewer = ({ clips = [] }) => {
   useEffect(() => {
     if (!clips?.length) return;
 
+    const currentUrlRefs = urlRefs.current;
+
     // Clean up old URLs
-    urlRefs.current.forEach(url => URL.revokeObjectURL(url));
-    urlRefs.current.clear();
+    currentUrlRefs.forEach(url => URL.revokeObjectURL(url));
+    currentUrlRefs.clear();
 
     // Create new URLs for valid files
     clips.forEach(clip => {
       if (clip.file instanceof File) {
         try {
           const url = URL.createObjectURL(clip.file);
-          urlRefs.current.set(clip.id, url);
+          currentUrlRefs.set(clip.id, url);
         } catch (error) {
           console.error('Failed to create URL for clip:', clip.id, error);
         }
@@ -43,8 +45,8 @@ const TimelineViewer = ({ clips = [] }) => {
 
     // Cleanup function
     return () => {
-      urlRefs.current.forEach(url => URL.revokeObjectURL(url));
-      urlRefs.current.clear();
+      const urlsToCleanup = new Map(currentUrlRefs);
+      urlsToCleanup.forEach(url => URL.revokeObjectURL(url));
     };
   }, [clips]);
 
@@ -121,12 +123,16 @@ const TimelineViewer = ({ clips = [] }) => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
-      videoRefs.current.forEach(video => {
+      
+      const currentVideoRefs = new Map(videoRefs.current);
+      const currentUrlRefs = new Map(urlRefs.current);
+      
+      currentVideoRefs.forEach(video => {
         video.pause();
         video.src = '';
       });
-      urlRefs.current.forEach(url => URL.revokeObjectURL(url));
-      urlRefs.current.clear();
+      
+      currentUrlRefs.forEach(url => URL.revokeObjectURL(url));
     };
   }, []);
 
