@@ -40,27 +40,28 @@ const Timeline = ({
     return true;
   }, []);
 
-  // Handle move end
-  const handleMoveEnd = useCallback(({ action, row, start, end }) => {
-    console.log('Move End:', { action, start, end });
-    
-    // Update the clips with new positions
-    const updatedClips = clips.map(clip => {
-      if (clip.id === action.id) {
-        return {
-          ...clip,
-          metadata: {
-            ...clip.metadata,
-            timeline: {
-              start,
-              end,
-              duration: end - start
-            }
+ // Handle move end
+const handleMoveEnd = useCallback(({ action, row, start, end }) => {
+  console.log('Move End:', { action, start, end });
+  
+  // Update the clips with new positions
+  const updatedClips = clips.map(clip => {
+    if (clip.id === action.id) {
+      return {
+        ...clip,
+        metadata: {
+          ...clip.metadata,
+          timeline: {
+            start, // New start time after move
+            end,   // New end time after move
+            duration: end - start  // Calculate new duration
           }
-        };
-      }
-      return clip;
-    });
+        }
+      };
+    }
+    return clip;
+  });
+
 
     onClipsChange(updatedClips);
   }, [clips, onClipsChange]);
@@ -217,6 +218,8 @@ const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
         scale={scale}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
+        timelineState={timelineState} 
+        selectedClipId={selectedClipId} 
         onDownloadState={exportTimelineData}
         onDebugClips={handleDebug}
       />

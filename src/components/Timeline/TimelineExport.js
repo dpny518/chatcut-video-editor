@@ -3,7 +3,6 @@ import { useCallback } from 'react';
 const useTimelineExport = (timelineState) => {
   const exportTimelineData = useCallback(() => {
     try {
-      // Enhanced debug logs
       console.log('=== TIMELINE EXPORT START ===');
       console.log('Timeline State:', {
         clips: timelineState.clips,
@@ -13,7 +12,7 @@ const useTimelineExport = (timelineState) => {
       });
 
       const exportData = {
-        version: "1.0",
+        version: "1.1",
         timestamp: new Date().toISOString(),
         timeline: {
           clips: timelineState.clips.map(clip => {
@@ -34,6 +33,7 @@ const useTimelineExport = (timelineState) => {
 
             return {
               id: clip.id,
+              name: clip.name,
               source: {
                 startTime: clip.startTime,
                 endTime: clip.endTime,
@@ -41,9 +41,9 @@ const useTimelineExport = (timelineState) => {
                 name: clip.name
               },
               file: {
-                name: clip.file.name,
-                size: clip.file.size,
-                type: clip.file.type
+                name: clip.file?.name,
+                size: clip.file?.size,
+                type: clip.file?.type
               },
               metadata: {
                 originalDuration: clip.duration,
@@ -53,7 +53,16 @@ const useTimelineExport = (timelineState) => {
                   sourceEnd: clip.endTime,
                   // Current timeline positions
                   start: editorAction?.start ?? 0,
-                  end: editorAction?.end ?? clip.duration
+                  end: editorAction?.end ?? clip.duration,
+                  position: clip.timelinePosition
+                },
+                playback: {
+                  current: clip.currentInOut,
+                  original: clip.originalInOut
+                },
+                duration: {
+                  current: clip.duration.current,
+                  original: clip.duration.original
                 }
               },
               position: {
@@ -70,7 +79,9 @@ const useTimelineExport = (timelineState) => {
           duration: timelineState.totalDuration || 0,
           settings: {
             scale: timelineState.settings?.scale,
-            effects: timelineState.settings?.effects
+            effects: timelineState.settings?.effects,
+            snapToGrid: timelineState.settings?.snapToGrid,
+            autoScroll: timelineState.settings?.autoScroll
           }
         }
       };
@@ -89,6 +100,8 @@ const useTimelineExport = (timelineState) => {
             end: clip.position.timelineEnd,
             duration: clip.position.timelineEnd - clip.position.timelineStart
           },
+          playback: clip.metadata.playback,
+          duration: clip.metadata.duration,
           metadata: clip.metadata
         });
       });
@@ -97,7 +110,6 @@ const useTimelineExport = (timelineState) => {
         type: 'application/json'
       });
       
-      // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `timeline_export_${timestamp}.json`;
       

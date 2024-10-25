@@ -1,4 +1,12 @@
 import { useMemo, useState } from 'react';
+
+const formatTime = (seconds) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 100);
+  return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+};
+
 export const useTimelineData = (clips = [], onClipsChange) => {
   const [error, setError] = useState(null);
 
@@ -26,38 +34,54 @@ export const useTimelineData = (clips = [], onClipsChange) => {
     }
   }), []);
 
-  const editorData = useMemo(() => {
+  const { editorData, timelineState } = useMemo(() => {
     try {
       let currentPosition = 0;
+      const clipsState = [];
+      
       const rows = clips.map((clip, index) => {
-        // If clip has existing metadata from resize, use it directly
-        if (clip.metadata?.timeline && clip.metadata?.playback) {
-          return {
-            id: String(index),
-            actions: [{
-              id: clip.id,
-              start: clip.metadata.timeline.start,
-              end: clip.metadata.timeline.end,
-              effectId: 'default',
-              flexible: true,
-              movable: true,
-              data: clip  // Use existing clip data without recalculating
-            }]
-          };
-        }
-
-        // Otherwise calculate initial positions for new clips
-        const sourceStart = clip.source?.startTime ?? 0;
-        const sourceEnd = clip.source?.endTime ?? (sourceStart + (clip.duration || 0));
-        const sourceDuration = sourceEnd - sourceStart;
-
-        const timelineStart = currentPosition;
-        const timelineEnd = timelineStart + sourceDuration;
+        // Calculate clip timings
+        let timelineStart, timelineEnd, playbackStart, playbackEnd;
         
-        // Update position for next clip
-        if (!clip.hasBeenPositioned) {
-          currentPosition = timelineEnd + 0.1;
+        if (clip.metadata?.timeline && clip.metadata?.playback) {
+          // Use existing metadata if available
+          timelineStart = clip.metadata.timeline.start;
+          timelineEnd = clip.metadata.timeline.end;
+          playbackStart = clip.metadata.playback.start;
+          playbackEnd = clip.metadata.playback.end;
+        } else {
+          // Calculate initial positions for new clips
+          const sourceStart = clip.source?.startTime ?? 0;
+          const sourceEnd = clip.source?.endTime ?? (sourceStart + (clip.duration || 0));
+          
+          timelineStart = currentPosition;
+          timelineEnd = timelineStart + (sourceEnd - sourceStart);
+          playbackStart = sourceStart;
+          playbackEnd = sourceEnd;
+          
+          if (!clip.hasBeenPositioned) {
+            currentPosition = timelineEnd + 0.1;
+          }
         }
+
+        // Store clip state information
+        clipsState.push({
+          id: clip.id,
+          name: clip.name || `Clip ${index + 1}`,
+          timelinePosition: formatTime(timelineStart),
+          currentInOut: {
+            in: formatTime(playbackStart),
+            out: formatTime(playbackEnd)
+          },
+          originalInOut: {
+            in: formatTime(clip.source?.startTime ?? 0),
+            out: formatTime(clip.source?.endTime ?? clip.duration ?? 0)
+          },
+          duration: {
+            current: formatTime(playbackEnd - playbackStart),
+            original: formatTime(clip.duration || 0)
+          }
+        });
 
         return {
           id: String(index),
@@ -78,9 +102,9 @@ export const useTimelineData = (clips = [], onClipsChange) => {
                   duration: timelineEnd - timelineStart
                 },
                 playback: {
-                  start: sourceStart,
-                  end: sourceEnd,
-                  duration: sourceDuration
+                  start: playbackStart,
+                  end: playbackEnd,
+                  duration: playbackEnd - playbackStart
                 }
               }
             }
@@ -94,20 +118,46 @@ export const useTimelineData = (clips = [], onClipsChange) => {
         actions: []
       });
 
-      return rows;
+      // Create timeline state object
+      const timelineState = {
+        totalDuration: formatTime(currentPosition),
+        clips: clipsState,
+        settings: {
+          effects: Object.keys(effects),
+          snapToGrid: true,
+          autoScroll: true
+        }
+      };
+
+      return {
+        editorData: rows,
+        timelineState
+      };
     } catch (err) {
       console.error('Error processing timeline data:', err);
       setError('Error processing timeline data: ' + err.message);
-      return [{
-        id: '0',
-        actions: []
-      }];
+      return {
+        editorData: [{
+          id: '0',
+          actions: []
+        }],
+        timelineState: {
+          totalDuration: '0:00.00',
+          clips: [],
+          settings: {
+            effects: Object.keys(effects),
+            snapToGrid: true,
+            autoScroll: true
+          }
+        }
+      };
     }
-  }, [clips]);
+  }, [clips, effects]);
 
   return { 
     editorData, 
     effects, 
-    error
+    error,
+    timelineState
   };
 };
