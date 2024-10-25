@@ -11,76 +11,66 @@ export const useTimelineStateManager = ({
 }) => {
   const saveTimelineProject = useCallback((projectName) => {
     const timelineProject = {
-      version: "1.0",
+      version: "2.0",
       timestamp: new Date().toISOString(),
       timeline: {
         clips: timelineClips.map(clip => {
-          // Get the actual timeline action data for this clip
-          const editorAction = timelineMetadata?.editorData?.actions?.find(
-            action => action.id === clip.id
-          );
-  
+          const metadata = clip.metadata || {};
+          const playback = metadata.playback || {};
+          const timeline = metadata.timeline || {};
+
           return {
             id: clip.id,
             source: {
-              startTime: clip.startTime,
-              endTime: clip.endTime,
-              duration: clip.endTime - clip.startTime,
+              startTime: playback.start,
+              endTime: playback.end,
+              duration: clip.source?.duration,
               name: clip.file.name
             },
             file: {
               name: clip.file.name,
               size: clip.file.size,
-              type: clip.file.type
+              type: clip.file.type,
+              // Store blob data as base64 string
+              data: clip.file instanceof Blob ? 
+                new Promise(resolve => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => resolve(reader.result);
+                  reader.readAsDataURL(clip.file);
+                }) : null
             },
             metadata: {
-              originalDuration: clip.endTime - clip.startTime,
+              originalDuration: clip.source?.duration,
               timeline: {
-                sourceStart: clip.startTime,
-                sourceEnd: clip.endTime,
-                start: editorAction?.start || 0,
-                end: editorAction?.end || (clip.endTime - clip.startTime)
+                sourceStart: clip.source?.startTime,
+                sourceEnd: clip.source?.endTime,
+                start: timeline.start,
+                end: timeline.end,
+                duration: timeline.duration
+              },
+              playback: {
+                start: playback.start,
+                end: playback.end,
+                duration: playback.duration
               }
             },
             position: {
-              timelineStart: clip.metadata?.timeline?.start || 0,
-              timelineEnd: clip.metadata?.timeline?.end || clip.duration,
-              currentStart: clip.metadata?.playback?.start || clip.startTime,
-              currentEnd: clip.metadata?.playback?.end || clip.endTime,
-              row: clip.metadata?.timeline?.track || editorAction?.data?.rowIndex || 0
+              timelineStart: timeline.start,
+              timelineEnd: timeline.end,
+              currentStart: playback.start,
+              currentEnd: playback.end,
+              track: timeline.track || 0
             },
             state: {
               selected: clip.id === selectedClipId,
-              effectId: editorAction?.effectId || 'default'
+              effectId: clip.effectId || 'default'
             }
           };
         }),
         duration: timelineMetadata.duration || 0,
         settings: {
           scale: timelineMetadata.scale || 1,
-          effects: timelineMetadata.effects || {
-            default: {
-              id: 'default',
-              name: 'Default',
-              style: {
-                backgroundColor: '#2d3748',
-                color: 'white',
-                borderRadius: '4px',
-                padding: '4px 8px'
-              }
-            },
-            selected: {
-              id: 'selected',
-              name: 'Selected',
-              style: {
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                borderRadius: '4px',
-                padding: '4px 8px',
-                boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)'
-              }
-            }
-          }
+          effects: timelineMetadata.effects || {}
         }
       }
     };
@@ -101,102 +91,125 @@ export const useTimelineStateManager = ({
     }
   }, [timelineClips, timelineMetadata, selectedClipId, showNotification]);
 
-  const processTimelineClips = (project, mediaFiles) => {
-    // First validate all media files are available
-    const missingFiles = project.timeline.clips.filter(clip => {
-      const fileName = clip.file?.name || clip.source?.name;
-      return !mediaFiles.find(f => f.name === fileName);
-    });
-
-    if (missingFiles.length > 0) {
-      throw new Error(
-        `Missing media files: ${missingFiles.map(f => f.file?.name || f.source?.name).join(', ')}`
-      );
-    }
-
-    // Process clips in order of timeline position
-    return project.timeline.clips
-      .sort((a, b) => (a.position?.timelineStart || 0) - (b.position?.timelineStart || 0))
-      .map(clip => {
-        const fileName = clip.file?.name || clip.source?.name;
-        const mediaFile = mediaFiles.find(f => f.name === fileName);
-
-        if (!mediaFile) {
-          throw new Error(`Could not find media file: ${fileName}`);
-        }
-
-        return {
-          id: clip.id,
-          file: mediaFile,
-          name: mediaFile.name,
-          type: mediaFile.type,
-          size: mediaFile.size,
-          startTime: clip.source?.startTime || 0,
-          endTime: clip.source?.endTime || 0,
-          duration: clip.source?.duration || 0,
-          metadata: {
-            timeline: {
-              start: clip.position?.timelineStart || 0,
-              end: clip.position?.timelineEnd || 0,
-              duration: (clip.position?.timelineEnd || 0) - (clip.position?.timelineStart || 0),
-              track: clip.position?.row || 0
-            },
-            playback: {
-              start: clip.source?.startTime || 0,
-              end: clip.source?.endTime || 0,
-              duration: clip.source?.duration || 0
-            }
-          },
-          source: {
-            startTime: 0,
-            endTime: clip.source?.duration || 0,
-            duration: clip.source?.duration || 0
-          }
-        };
-      });
-  };
-
-  const loadTimelineProject = useCallback((projectName) => {
+  // Helper function to convert file data to File object
+  const createFileFromData = useCallback(async (fileData) => {
     try {
+      // If we have base64 data
+      if (fileData.data) {
+        // Convert base64 to blob
+        const response = await fetch(fileData.data);
+        const blob = await response.blob();
+        return new File([blob], fileData.name, {
+          type: fileData.type,
+          lastModified: Date.now()
+        });
+      }
+      // If we have a mediaFile reference
+      else if (mediaFiles) {
+        const mediaFile = mediaFiles.find(f => f.name === fileData.name);
+        if (mediaFile?.data) {
+          const response = await fetch(mediaFile.data);
+          const blob = await response.blob();
+          return new File([blob], fileData.name, {
+            type: fileData.type,
+            lastModified: Date.now()
+          });
+        }
+      }
+      throw new Error(`No file data available for ${fileData.name}`);
+    } catch (error) {
+      console.error('Failed to create File:', error);
+      throw error;
+    }
+  }, [mediaFiles]);
+
+  const loadTimelineProject = useCallback(async (projectName) => {
+    try {
+      console.log('=== LOADING PROJECT START ===');
+      
+      if (!mediaFiles?.length) {
+        throw new Error('No media files available');
+      }
+
       const savedProjects = JSON.parse(localStorage.getItem('timelineProjects') || '{}');
       const project = savedProjects[projectName];
       
       if (!project) {
         throw new Error(`Timeline project "${projectName}" not found`);
       }
-  
-      console.log('Loading project:', project);
 
-      // Process clips in correct order with proper metadata
-      const loadedClips = processTimelineClips(project, mediaFiles);
-  
-      console.log('Loaded clips:', loadedClips);
-  
+      console.log('Loading project data:', project);
+
+      // Process clips sequentially to handle async file conversion
+      const loadedClips = [];
+      for (const clip of project.timeline.clips) {
+        try {
+          // Create File object from stored data
+          const fileObject = await createFileFromData(clip.file);
+          if (!fileObject) {
+            throw new Error(`Failed to create file for: ${clip.file.name}`);
+          }
+
+          const newClip = {
+            id: clip.id,
+            file: fileObject,
+            startTime: clip.metadata.playback.start,
+            endTime: clip.metadata.playback.end,
+            duration: clip.metadata.playback.duration,
+            metadata: {
+              timeline: {
+                start: clip.metadata.timeline.start,
+                end: clip.metadata.timeline.end,
+                duration: clip.metadata.timeline.duration
+              },
+              playback: {
+                start: clip.metadata.playback.start,
+                end: clip.metadata.playback.end,
+                duration: clip.metadata.playback.duration
+              }
+            },
+            source: {
+              startTime: clip.metadata.timeline.sourceStart,
+              endTime: clip.metadata.timeline.sourceEnd,
+              duration: clip.metadata.originalDuration
+            }
+          };
+
+          console.log('Created clip:', {
+            id: newClip.id,
+            startTime: newClip.startTime,
+            endTime: newClip.endTime,
+            file: {
+              name: newClip.file.name,
+              type: newClip.file.type,
+              isFile: newClip.file instanceof File
+            }
+          });
+
+          loadedClips.push(newClip);
+        } catch (error) {
+          console.error(`Failed to process clip ${clip.id}:`, error);
+          throw error;
+        }
+      }
+
+      console.log('Setting timeline clips:', loadedClips);
       setTimelineClips(loadedClips);
       setTimelineMetadata(prev => ({
         ...prev,
-        scale: project.timeline.settings?.scale || 1,
-        effects: project.timeline.settings?.effects || prev.effects,
-        duration: project.timeline.duration || loadedClips.reduce((max, clip) => {
-          const endTime = clip.metadata.timeline.end;
-          return Math.max(max, endTime);
-        }, 0)
+        scale: project.timeline.settings?.scale || 1
       }));
       
+      console.log('=== LOADING PROJECT COMPLETE ===');
       showNotification(`Timeline project "${projectName}" loaded successfully`, 'success');
       return true;
     } catch (error) {
-      // Get savedProjects inside the catch block to avoid undefined reference
-      const savedProjects = JSON.parse(localStorage.getItem('timelineProjects') || '{}');
-      console.error('Failed to load timeline project:', error, {
-        mediaFiles,
-        projectName,
-        project: savedProjects[projectName]
-      });
+      console.error('=== LOADING PROJECT ERROR ===');
+      console.error('Error details:', error);
       showNotification(error.message, 'error');
       return false;
     }
-  }, [mediaFiles, setTimelineClips, setTimelineMetadata, showNotification]);
+  }, [mediaFiles, setTimelineClips, setTimelineMetadata, showNotification, createFileFromData]);
 
   const deleteTimelineProject = useCallback((projectName) => {
     try {

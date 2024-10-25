@@ -7,14 +7,31 @@ const TimelineViewer = ({ clips = [] }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const videoRefs = useRef(new Map());
+  const urlRefs = useRef(new Map());
   const rafRef = useRef(null);
   const startTimeRef = useRef(0);
 
-  // Calculate total timeline duration and create video elements
+  // Create and manage video URLs
   useEffect(() => {
     if (!clips?.length) return;
 
-    // Find the latest ending clip
+    // Clean up old URLs
+    urlRefs.current.forEach(url => URL.revokeObjectURL(url));
+    urlRefs.current.clear();
+
+    // Create new URLs for valid files
+    clips.forEach(clip => {
+      if (clip.file instanceof File) {
+        try {
+          const url = URL.createObjectURL(clip.file);
+          urlRefs.current.set(clip.id, url);
+        } catch (error) {
+          console.error('Failed to create URL for clip:', clip.id, error);
+        }
+      }
+    });
+
+    // Calculate duration
     const maxEndTime = Math.max(...clips.map(clip => {
       const clipDuration = clip.endTime - clip.startTime;
       const timelineStart = clip.metadata?.timeline?.start || 0;
@@ -23,9 +40,15 @@ const TimelineViewer = ({ clips = [] }) => {
     
     setDuration(maxEndTime);
     videoRefs.current = new Map();
+
+    // Cleanup function
+    return () => {
+      urlRefs.current.forEach(url => URL.revokeObjectURL(url));
+      urlRefs.current.clear();
+    };
   }, [clips]);
 
-  // Start playback of all relevant clips
+  // Rest of the existing playback logic remains the same
   const startPlayback = () => {
     setIsPlaying(true);
     startTimeRef.current = performance.now() - (currentTime * 1000);
@@ -45,7 +68,6 @@ const TimelineViewer = ({ clips = [] }) => {
         const clipEnd = clipStart + clipDuration;
 
         if (newTime >= clipStart && newTime <= clipEnd) {
-          // Calculate where in the source video we should be
           const sourceOffset = clip.startTime + (newTime - clipStart);
           
           if (video.paused) {
@@ -103,6 +125,8 @@ const TimelineViewer = ({ clips = [] }) => {
         video.pause();
         video.src = '';
       });
+      urlRefs.current.forEach(url => URL.revokeObjectURL(url));
+      urlRefs.current.clear();
     };
   }, []);
 
@@ -129,7 +153,6 @@ const TimelineViewer = ({ clips = [] }) => {
 
   return (
     <Box sx={{ width: '100%', height: '100%' }}>
-      {/* Video container */}
       <Box sx={{ 
         position: 'relative', 
         width: '100%', 
@@ -138,6 +161,9 @@ const TimelineViewer = ({ clips = [] }) => {
         overflow: 'hidden'
       }}>
         {clips.map(clip => {
+          const url = urlRefs.current.get(clip.id);
+          if (!url) return null;
+
           const clipStart = clip.metadata?.timeline?.start || 0;
           const clipDuration = clip.endTime - clip.startTime;
           const clipEnd = clipStart + clipDuration;
@@ -146,7 +172,7 @@ const TimelineViewer = ({ clips = [] }) => {
             <video
               key={clip.id}
               ref={el => el && videoRefs.current.set(clip.id, el)}
-              src={URL.createObjectURL(clip.file)}
+              src={url}
               style={{
                 position: 'absolute',
                 width: '100%',
@@ -159,7 +185,6 @@ const TimelineViewer = ({ clips = [] }) => {
         })}
       </Box>
 
-      {/* Playback controls */}
       <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Button 
           onClick={togglePlay}

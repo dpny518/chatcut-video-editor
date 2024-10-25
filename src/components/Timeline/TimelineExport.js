@@ -1,132 +1,86 @@
 import { useCallback } from 'react';
-import { formatTime } from '../../utils/formatters';
+
 const useTimelineExport = (timelineState) => {
   const exportTimelineData = useCallback(() => {
     try {
-      console.log('=== TIMELINE EXPORT START ===');
-      console.log('Timeline State:', {
-        clips: timelineState.clips,
-        editorData: timelineState.editorData,
-        settings: timelineState.settings,
-        duration: timelineState.totalDuration
-      });
-
-      const exportData = {
-        version: "1.1",
+      console.log("Exporting timeline data");
+      
+      const stateToExport = {
+        version: "2.0",
         timestamp: new Date().toISOString(),
         timeline: {
           clips: timelineState.clips.map(clip => {
-            // Find corresponding editor action to get current timeline position
-            const editorAction = timelineState.editorData?.actions?.find(
-              action => action.id === clip.id
-            );
-
-            console.log('Processing Clip:', {
-              clipId: clip.id,
-              clipData: clip,
-              editorAction: editorAction,
-              currentPosition: {
-                start: editorAction?.start,
-                end: editorAction?.end
-              }
-            });
+            // Get the stored metadata that was updated by TimelineClip
+            const metadata = clip.metadata || {};
+            const playback = metadata.playback || {};
+            const timeline = metadata.timeline || {};
 
             return {
               id: clip.id,
-              name: clip.name,
               source: {
-                startTime: clip.startTime,
-                endTime: clip.endTime,
-                duration: clip.duration,
-                name: clip.name
+                startTime: playback.start,  // Use stored playback times
+                endTime: playback.end,
+                duration: clip.source?.duration,
+                name: clip.file.name
               },
               file: {
-                name: clip.file?.name,
-                size: clip.file?.size,
-                type: clip.file?.type
+                name: clip.file.name,
+                size: clip.file.size,
+                type: clip.file.type
               },
               metadata: {
-                originalDuration: clip.duration,
+                originalDuration: clip.source?.duration,
                 timeline: {
-                  // Original media timing
-                  sourceStart: clip.startTime,
-                  sourceEnd: clip.endTime,
-                  // Current timeline positions
-                  start: editorAction?.start ?? 0,
-                  end: editorAction?.end ?? clip.duration,
-                  position: clip.timelinePosition,
-                  // Detailed timing information
-                  timing: {
-                    timelinePosition: formatTime(editorAction?.start ?? 0),
-                    originalStart: formatTime(clip.startTime),
-                    originalEnd: formatTime(clip.endTime), 
-                    currentStart: formatTime(clip.startTime),
-                    currentEnd: formatTime(clip.endTime),
-                    duration: formatTime(clip.endTime - clip.startTime),
-                    originalDuration: formatTime(clip.endTime - clip.startTime)
-                  }
+                  sourceStart: clip.source?.startTime,
+                  sourceEnd: clip.source?.endTime,
+                  start: timeline.start,
+                  end: timeline.end,
+                  duration: timeline.duration
                 },
                 playback: {
-                  current: clip.currentInOut,
-                  original: clip.originalInOut
-                },
-                duration: {
-                  current: clip.duration.current,
-                  original: clip.duration.original
+                  start: playback.start,
+                  end: playback.end,
+                  duration: playback.duration
                 }
               },
               position: {
-                timelineStart: clip.metadata?.timeline?.start || 0,
-                timelineEnd: clip.metadata?.timeline?.end || clip.duration,
-                currentStart: clip.metadata?.playback?.start || clip.startTime,
-                currentEnd: clip.metadata?.playback?.end || clip.endTime,
-                row: clip.metadata?.timeline?.track || editorAction?.data?.rowIndex || 0
+                timelineStart: timeline.start,
+                timelineEnd: timeline.end,
+                currentStart: playback.start,
+                currentEnd: playback.end,
+                track: timeline.track || 0
               },
               state: {
                 selected: clip.id === timelineState.selectedClipId,
-                effectId: editorAction?.effectId ?? 'default'
+                effectId: clip.effectId || 'default'
               }
             };
           }),
-          duration: timelineState.totalDuration || 0,
+          duration: timelineState.duration || 0,
           settings: {
-            scale: timelineState.settings?.scale,
-            effects: timelineState.settings?.effects,
-            snapToGrid: timelineState.settings?.snapToGrid,
-            autoScroll: timelineState.settings?.autoScroll
+            scale: timelineState.settings?.scale || 1,
+            effects: timelineState.settings?.effects || {}
           }
         }
       };
 
-      // Log the final export data with timing comparison
-      console.log('=== EXPORT DATA ANALYSIS ===');
-      exportData.timeline.clips.forEach(clip => {
-        console.log(`Clip ${clip.id} Timing Analysis:`, {
-          sourceTimings: {
-            start: clip.source.startTime,
-            end: clip.source.endTime,
-            duration: clip.source.duration
-          },
-          timelinePositions: {
-            start: clip.position.timelineStart,
-            end: clip.position.timelineEnd,
-            duration: clip.position.timelineEnd - clip.position.timelineStart
-          },
-          playback: clip.metadata.playback,
-          duration: clip.metadata.duration,
-          metadata: clip.metadata
-        });
+      // Debug logging
+      console.log('Timeline Export Data:', {
+        clipCount: stateToExport.timeline.clips.length,
+        clips: stateToExport.timeline.clips.map(clip => ({
+          id: clip.id,
+          timeline: `${clip.position.timelineStart}-${clip.position.timelineEnd}`,
+          playback: `${clip.position.currentStart}-${clip.position.currentEnd}`
+        }))
       });
 
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      const blob = new Blob([JSON.stringify(stateToExport, null, 2)], {
         type: 'application/json'
       });
       
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `timeline_export_${timestamp}.json`;
       
-      console.log('Saving export file:', filename);
-
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -136,16 +90,9 @@ const useTimelineExport = (timelineState) => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      console.log('=== TIMELINE EXPORT COMPLETE ===');
     } catch (error) {
-      console.error('=== TIMELINE EXPORT ERROR ===');
-      console.error('Error details:', error);
-      console.error('Timeline State at error:', {
-        clips: timelineState.clips,
-        editorData: timelineState.editorData,
-        settings: timelineState.settings
-      });
-      throw new Error(`Failed to export timeline: ${error.message}`);
+      console.error('Failed to export timeline:', error);
+      throw error;
     }
   }, [timelineState]);
 
