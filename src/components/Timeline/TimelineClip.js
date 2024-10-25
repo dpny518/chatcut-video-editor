@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Box, Skeleton, Tooltip, Typography } from '@mui/material';
 import { AlertCircle } from 'lucide-react';
 
-
-const thumbnailCache = new Map();
+const thumbnailCacheByClip = new Map();
 const THUMBNAIL_WIDTH = 80;
 
 const TimelineClip = ({ 
@@ -19,130 +18,164 @@ const TimelineClip = ({
   const videoRef = useRef(null);
   const videoUrlRef = useRef(null);
   const containerRef = useRef(null);
-  const isInitialized = useRef(false); // Moved to component level
+  const containerWidth = useRef(null);
+  const isInitialized = useRef(false);
+  const initialTimelineStart = useRef(null);
+  const lastThumbnailKey = useRef(null);
+ // Add this ref to store original values
+ const originalValues = useRef({
+  startTime: clip.startTime,
+  endTime: clip.endTime,
+  duration: clip.endTime - clip.startTime
+});
 
-  // Calculate number of thumbnails based on container width
+const onUpdateData = useCallback((newData) => {
+  action.data = newData;
+}, [action]);
+
+const timingValues = useMemo(() => ({
+  startTime: clip.startTime,
+  endTime: clip.endTime,
+  actionStart: action.start,
+  actionEnd: action.end,
+  resizeDir: clip.resizeDir,
+  sourceStartTime: clip.source?.startTime || 0,
+  sourceEndTime: clip.source?.endTime,
+  clipId: clip.id,
+  metadata: clip.metadata,
+  hasMetadata: Boolean(clip.metadata?.timeline),
+  clipData: clip,
+  updateData: onUpdateData,
+}), [
+  clip,
+  action.start,
+  action.end,
+  onUpdateData,
+]);
+
   const getThumbnailCount = useCallback(() => {
-    if (!containerRef.current) return 5;
-    const width = containerRef.current.offsetWidth;
-    return Math.max(3, Math.ceil(width / THUMBNAIL_WIDTH));
+    if (!containerWidth.current) return 5;
+    return Math.max(3, Math.ceil(containerWidth.current / THUMBNAIL_WIDTH));
   }, []);
 
-  // Format time helper
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 100);
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
-  const initialTimelineStart = useRef(null);
 
   const calculateCurrentTimes = useCallback(() => {
-    if (!isInitialized.current || !clip.metadata?.timeline) {
-        isInitialized.current = true;
-        initialTimelineStart.current = action.start;  // Store initial position
-        
-        action.data = {
-            ...clip,
-            metadata: {
-                timeline: {
-                    start: action.start,
-                    end: action.end,
-                    duration: action.end - action.start,
-                    initialStart: action.start  // Store this too
-                },
-                playback: {
-                    start: clip.startTime,
-                    end: clip.endTime,
-                    duration: clip.endTime - clip.startTime
-                }
-            }
-        };
-
-        return {
-            timelinePosition: formatTime(action.start),
-            originalStart: formatTime(clip.startTime),
-            originalEnd: formatTime(clip.endTime),
-            currentStart: formatTime(clip.startTime),
-            currentEnd: formatTime(clip.endTime),
-            duration: formatTime(clip.endTime - clip.startTime),
-            originalDuration: formatTime(clip.endTime - clip.startTime)
-        };
-    }
-
-    // Calculate new times based on resize
-    let currentStart = clip.startTime;
-    let currentEnd = clip.endTime;
-
-    if (clip.resizeDir === 'left') {
-      currentEnd = clip.endTime;
-      const newDuration = action.end - action.start;
-      currentStart = clip.endTime - newDuration;
-    } else if (clip.resizeDir === 'right') {
-        currentStart = clip.startTime;
-        const newDuration = action.end - action.start;
-        currentEnd = clip.startTime + newDuration;
-    }
-     // Ensure end time doesn't exceed maxEnd
-     currentEnd = Math.min(currentEnd, clip.source.endTime);
-     currentStart = Math.max(currentStart, clip.source.startTime);
-
-          // Update action.data with new times
-        action.data = {
-          ...clip,
-          startTime: currentStart,
-          endTime: currentEnd,
-          metadata: {
-              timeline: {
-                  start: action.start,
-                  end: action.end,
-                  duration: action.end - action.start,
-                  initialStart: clip.metadata.timeline.initialStart || initialTimelineStart.current
-              },
-              playback: {
-                  start: currentStart, // Use clamped value
-                  end: currentEnd,     // Use clamped value
-                  duration: currentEnd - currentStart
-              }
+    if (!isInitialized.current || !timingValues.hasMetadata) {
+      isInitialized.current = true;
+      initialTimelineStart.current = timingValues.actionStart;
+      
+      timingValues.updateData({
+        ...timingValues.clipData,
+        metadata: {
+          timeline: {
+            start: timingValues.actionStart,
+            end: timingValues.actionEnd,
+            duration: timingValues.actionEnd - timingValues.actionStart,
+            initialStart: timingValues.actionStart
+          },
+          playback: {
+            start: timingValues.startTime,
+            end: timingValues.endTime,
+            duration: timingValues.endTime - timingValues.startTime
           }
-};
+        }
+      });
+
+      return {
+        timelinePosition: formatTime(timingValues.actionStart),
+        originalStart: formatTime(originalValues.current.startTime),  // Use ref values
+        originalEnd: formatTime(originalValues.current.endTime),      // Use ref values
+        currentStart: formatTime(timingValues.startTime),
+        currentEnd: formatTime(timingValues.endTime),
+        duration: formatTime(timingValues.endTime - timingValues.startTime),
+        originalDuration: formatTime(originalValues.current.duration) // Use ref value
+      };
+    }
+
+    let currentStart = timingValues.startTime;
+    let currentEnd = timingValues.endTime;
+
+    if (timingValues.resizeDir === 'left') {
+      currentEnd = timingValues.endTime;
+      const newDuration = timingValues.actionEnd - timingValues.actionStart;
+      currentStart = timingValues.endTime - newDuration;
+    } else if (timingValues.resizeDir === 'right') {
+      currentStart = timingValues.startTime;
+      const newDuration = timingValues.actionEnd - timingValues.actionStart;
+      currentEnd = timingValues.startTime + newDuration;
+    }
+    
+    currentEnd = Math.min(currentEnd, timingValues.sourceEndTime);
+    currentStart = Math.max(currentStart, timingValues.sourceStartTime);
+
+    timingValues.updateData({
+      ...timingValues.clipData,
+      startTime: currentStart,
+      endTime: currentEnd,
+      metadata: {
+        timeline: {
+          start: timingValues.actionStart,
+          end: timingValues.actionEnd,
+          duration: timingValues.actionEnd - timingValues.actionStart,
+          initialStart: timingValues.metadata?.timeline?.initialStart || initialTimelineStart.current
+        },
+        playback: {
+          start: currentStart,
+          end: currentEnd,
+          duration: currentEnd - currentStart
+        }
+      }
+    });
 
     return {
-        timelinePosition: formatTime(action.start),
-        originalStart: formatTime(clip.startTime),
-        originalEnd: formatTime(clip.endTime),
-        currentStart: formatTime(currentStart),
-        currentEnd: formatTime(currentEnd),
-        duration: formatTime(currentEnd - currentStart),
-        originalDuration: formatTime(clip.endTime - clip.startTime)
+      timelinePosition: formatTime(timingValues.actionStart),
+      originalStart: formatTime(originalValues.current.startTime),  // Use ref values
+      originalEnd: formatTime(originalValues.current.endTime),      // Use ref values
+      currentStart: formatTime(currentStart),
+      currentEnd: formatTime(currentEnd),
+      duration: formatTime(currentEnd - currentStart),
+      originalDuration: formatTime(originalValues.current.duration) // Use ref value
     };
-}, [clip, action]);
+  }, [timingValues]); 
+
+  const thumbnailParams = useMemo(() => {
+    const timingInfo = calculateCurrentTimes();
+    if (!timingInfo) return null;
+
+    return {
+      clipId: timingValues.clipId,
+      currentStart: parseFloat(timingInfo.currentStart.split(':').pop()),
+      currentEnd: parseFloat(timingInfo.currentEnd.split(':').pop()),
+      width: containerWidth.current
+    };
+  }, [calculateCurrentTimes, timingValues.clipId]);
 
   const generateThumbnails = useCallback(async () => {
-    if (!videoRef.current || !clip.file || !containerRef.current) return;
+    if (!videoRef.current || !clip.file || !thumbnailParams) return;
     
+    const { clipId, currentStart, currentEnd, width } = thumbnailParams;
+    const cacheKey = `${clipId}-${currentStart}-${currentEnd}-${width}`;
+
+    // Skip if we're already showing these thumbnails
+    if (lastThumbnailKey.current === cacheKey) return;
+    
+    if (thumbnailCacheByClip.has(cacheKey)) {
+      lastThumbnailKey.current = cacheKey;
+      setThumbnails(thumbnailCacheByClip.get(cacheKey));
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      // Get clip state for accurate timing
-      const timingInfo = calculateCurrentTimes();
-      if (!timingInfo) return;
-
-      // Parse times removing formatting
-      const currentStart = parseFloat(timingInfo.currentStart.split(':').pop());
-      const currentEnd = parseFloat(timingInfo.currentEnd.split(':').pop());
-
-      
-      // Update cache key to include current timing
-      const cacheKey = `${clip.file.name}-${currentStart}-${currentEnd}-${containerRef.current.offsetWidth}`;
-      
-      if (thumbnailCache.has(cacheKey)) {
-        setThumbnails(thumbnailCache.get(cacheKey));
-        setLoading(false);
-        return;
-      }
-
       const video = videoRef.current;
       const newThumbnails = [];
       
@@ -161,14 +194,10 @@ const TimelineClip = ({
       const duration = currentEnd - currentStart;
       
       for (let i = 0; i < thumbnailCount; i++) {
-        // Calculate position within the current segment
         const progress = i / (thumbnailCount - 1);
         const timeOffset = progress * duration;
-        
-        // Map to source video time
         const sourceTime = currentStart + timeOffset;
         
-        // Set video to the source time position
         video.currentTime = sourceTime;
         
         await new Promise((resolve) => {
@@ -185,7 +214,8 @@ const TimelineClip = ({
         newThumbnails.push(canvas.toDataURL('image/jpeg', 0.7));
       }
       
-      thumbnailCache.set(cacheKey, newThumbnails);
+      lastThumbnailKey.current = cacheKey;
+      thumbnailCacheByClip.set(cacheKey, newThumbnails);
       setThumbnails(newThumbnails);
 
     } catch (err) {
@@ -194,9 +224,16 @@ const TimelineClip = ({
     } finally {
       setLoading(false);
     }
-  }, [clip.file, calculateCurrentTimes, getThumbnailCount]);
+  }, [clip.file, getThumbnailCount, thumbnailParams]);
 
-  // Handle video source and thumbnail generation
+  // Initialize container width
+  useEffect(() => {
+    if (containerRef.current) {
+      containerWidth.current = containerRef.current.offsetWidth;
+    }
+  }, []);
+
+  // Handle video source
   useEffect(() => {
     if (videoRef.current && clip.file) {
       if (videoUrlRef.current) {
@@ -215,36 +252,66 @@ const TimelineClip = ({
     };
   }, [clip.file, generateThumbnails]);
 
-  // Handle resize
+  // Handle resize with debouncing
   useEffect(() => {
+    let resizeTimeout;
+    
+    const handleResize = () => {
+      if (containerRef.current) {
+        const newWidth = containerRef.current.offsetWidth;
+        if (newWidth !== containerWidth.current) {
+          containerWidth.current = newWidth;
+          generateThumbnails();
+        }
+      }
+    };
+
     const observer = new ResizeObserver(() => {
-      generateThumbnails();
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(handleResize, 150);
     });
 
     if (containerRef.current) {
       observer.observe(containerRef.current);
     }
 
-    return () => observer.disconnect();
+    return () => {
+      clearTimeout(resizeTimeout);
+      observer.disconnect();
+    };
   }, [generateThumbnails]);
 
-  // Add effect to regenerate thumbnails on clip changes
+  // Generate thumbnails on essential changes
   useEffect(() => {
-    generateThumbnails();
-  }, [clip.startTime, clip.endTime, action.start, action.end, generateThumbnails]);
-
-  // Cache cleanup
-  useEffect(() => {
-    if (thumbnailCache.size > 50) {
-      const entriesToRemove = Array.from(thumbnailCache.keys()).slice(0, 20);
-      entriesToRemove.forEach(key => thumbnailCache.delete(key));
+    if (thumbnailParams) {
+      generateThumbnails();
     }
-  }, [thumbnails]);
+  }, [thumbnailParams, generateThumbnails]);
 
-  // Update hover info whenever the clip position or duration changes
+  // Clean up clip-specific cache
+  useEffect(() => {
+    if (thumbnailCacheByClip.size > 50) {
+      const clipPrefix = `${timingValues.clipId}-`;
+      const entriesToRemove = Array.from(thumbnailCacheByClip.keys())
+        .filter(key => key.startsWith(clipPrefix))
+        .slice(0, 20);
+      entriesToRemove.forEach(key => thumbnailCacheByClip.delete(key));
+    }
+    
+    return () => {
+      const clipPrefix = `${timingValues.clipId}-`;
+      for (const key of thumbnailCacheByClip.keys()) {
+        if (key.startsWith(clipPrefix)) {
+          thumbnailCacheByClip.delete(key);
+        }
+      }
+    };
+  }, [timingValues.clipId]);
+
+  // Update hover info
   useEffect(() => {
     setHoverInfo(calculateCurrentTimes());
-  }, [action.start, action.end, calculateCurrentTimes]);
+  }, [calculateCurrentTimes]);
 
   const tooltipContent = () => (
     <Box sx={{ p: 1 }}>
