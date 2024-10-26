@@ -6,18 +6,26 @@ const TimelineViewer = ({ clips = [] }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [videosReady, setVideosReady] = useState(false);
   const videoRefs = useRef(new Map());
   const urlRefs = useRef(new Map());
   const rafRef = useRef(null);
   const startTimeRef = useRef(0);
 
+  const togglePlay = () => {
+    if (isPlaying) {
+      pausePlayback();
+    } else {
+      startPlayback();
+    }
+  };
+  
   // Create and manage video URLs
   useEffect(() => {
     if (!clips?.length) return;
+    setVideosReady(false);
 
     const currentUrlRefs = urlRefs.current;
-
-    // Clean up old URLs
     currentUrlRefs.forEach(url => URL.revokeObjectURL(url));
     currentUrlRefs.clear();
 
@@ -35,45 +43,71 @@ const TimelineViewer = ({ clips = [] }) => {
 
     // Calculate duration
     const maxEndTime = Math.max(...clips.map(clip => {
-      const clipDuration = clip.endTime - clip.startTime;
-      const timelineStart = clip.metadata?.timeline?.start || 0;
-      return timelineStart + clipDuration;
+      const timelineEnd = clip.metadata?.timeline?.end || 0;
+      return timelineEnd;
     }));
     
     setDuration(maxEndTime);
     videoRefs.current = new Map();
 
-    // Cleanup function
     return () => {
       const urlsToCleanup = new Map(currentUrlRefs);
       urlsToCleanup.forEach(url => URL.revokeObjectURL(url));
     };
   }, [clips]);
 
-  // Component cleanup effect
+  // Initialize videos to their starting frames
   useEffect(() => {
-    const currentUrlRefs = new Map(urlRefs.current);
-    const currentVideoRefs = new Map(videoRefs.current);
-    
+    const initializeVideos = async () => {
+      const loadPromises = clips.map(clip => {
+        return new Promise((resolve) => {
+          const video = videoRefs.current.get(clip.id);
+          if (!video) {
+            resolve();
+            return;
+          }
+
+          const handleCanPlay = () => {
+            // Set initial frame to clip start time
+            video.currentTime = clip.startTime;
+            video.removeEventListener('canplay', handleCanPlay);
+            resolve();
+          };
+
+          video.addEventListener('canplay', handleCanPlay);
+          // In case the video is already loaded
+          if (video.readyState >= 3) {
+            handleCanPlay();
+          }
+        });
+      });
+
+      await Promise.all(loadPromises);
+      setVideosReady(true);
+    };
+
+    if (clips.length > 0) {
+      initializeVideos();
+    }
+  }, [clips]);
+
+  // Component cleanup
+  useEffect(() => {
     return () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
-
-      // Use captured video refs
-      currentVideoRefs.forEach(video => {
+      videoRefs.current.forEach(video => {
         video.pause();
         video.src = '';
       });
-      
-      // Use captured URL refs
-      currentUrlRefs.forEach(url => URL.revokeObjectURL(url));
+      urlRefs.current.forEach(url => URL.revokeObjectURL(url));
     };
   }, []);
 
- 
-  // Rest of component remains the same
   const startPlayback = () => {
+    if (!videosReady) return;
+    
     setIsPlaying(true);
     startTimeRef.current = performance.now() - (currentTime * 1000);
 
@@ -88,8 +122,7 @@ const TimelineViewer = ({ clips = [] }) => {
         if (!video) return;
 
         const clipStart = clip.metadata?.timeline?.start || 0;
-        const clipDuration = clip.endTime - clip.startTime;
-        const clipEnd = clipStart + clipDuration;
+        const clipEnd = clip.metadata?.timeline?.end || clipStart + (clip.endTime - clip.startTime);
 
         if (newTime >= clipStart && newTime <= clipEnd) {
           const sourceOffset = clip.startTime + (newTime - clipStart);
@@ -102,8 +135,16 @@ const TimelineViewer = ({ clips = [] }) => {
           if (Math.abs(video.currentTime - sourceOffset) > 0.1) {
             video.currentTime = sourceOffset;
           }
-        } else if (!video.paused) {
-          video.pause();
+        } else {
+          if (!video.paused) {
+            video.pause();
+          }
+          // Reset to start/end frame when outside clip bounds
+          if (newTime < clipStart) {
+            video.currentTime = clip.startTime;
+          } else if (newTime > clipEnd) {
+            video.currentTime = clip.endTime;
+          }
         }
       });
 
@@ -127,17 +168,16 @@ const TimelineViewer = ({ clips = [] }) => {
     videoRefs.current.forEach(video => video.pause());
   };
 
-  const togglePlay = () => {
-    if (isPlaying) {
-      pausePlayback();
-    } else {
-      startPlayback();
-    }
-  };
-
   const handleReset = () => {
     pausePlayback();
     setCurrentTime(0);
+    // Reset all videos to their starting frames
+    clips.forEach(clip => {
+      const video = videoRefs.current.get(clip.id);
+      if (video) {
+        video.currentTime = clip.startTime;
+      }
+    });
   };
 
   const formatTime = (seconds) => {
@@ -170,13 +210,27 @@ const TimelineViewer = ({ clips = [] }) => {
         bgcolor: 'black',
         overflow: 'hidden'
       }}>
+        {!videosReady && (
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white'
+          }}>
+            Loading...
+          </Box>
+        )}
         {clips.map(clip => {
           const url = urlRefs.current.get(clip.id);
           if (!url) return null;
 
           const clipStart = clip.metadata?.timeline?.start || 0;
-          const clipDuration = clip.endTime - clip.startTime;
-          const clipEnd = clipStart + clipDuration;
+          const clipEnd = clip.metadata?.timeline?.end || clipStart + (clip.endTime - clip.startTime);
 
           return (
             <video
@@ -188,7 +242,8 @@ const TimelineViewer = ({ clips = [] }) => {
                 width: '100%',
                 height: '100%',
                 objectFit: 'contain',
-                opacity: currentTime >= clipStart && currentTime <= clipEnd ? 1 : 0
+                opacity: currentTime >= clipStart && currentTime <= clipEnd ? 1 : 0,
+                transition: 'opacity 0.1s'
               }}
             />
           );
@@ -199,6 +254,7 @@ const TimelineViewer = ({ clips = [] }) => {
         <Button 
           onClick={togglePlay}
           startIcon={isPlaying ? <PauseCircle /> : <PlayCircle />}
+          disabled={!videosReady}
         >
           {isPlaying ? 'Pause' : 'Play'}
         </Button>
@@ -206,6 +262,7 @@ const TimelineViewer = ({ clips = [] }) => {
         <Button 
           onClick={handleReset}
           startIcon={<SkipBack />}
+          disabled={!videosReady}
         >
           Reset
         </Button>
@@ -218,8 +275,10 @@ const TimelineViewer = ({ clips = [] }) => {
               height: 8, 
               cursor: 'pointer',
               '& .MuiLinearProgress-bar': {
-                transition: 'none'
-              }
+                transition: 'none',
+                backgroundColor: '#2196f3' // More subtle blue color
+              },
+              backgroundColor: 'rgba(255, 255, 255, 0.1)' // Darker background
             }}
           />
         </Box>
