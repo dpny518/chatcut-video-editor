@@ -64,3 +64,95 @@ implementation_notes:{
   performance:"Optimizes re-renders with useCallback",
   effects:"Manages side effects with useEffect"
 }}
+
+```
+src/
+├── components/           # UI Components
+│   ├── Controls/        # Control-related components
+│   │   └── ExportControls.js          # Handles video export functionality
+│   │
+│   ├── Layout/          # Layout components
+│   │   ├── EditorLayout.js            # Main editor layout structure
+│   │   ├── MainLayout.js              # App's main layout wrapper
+│   │   └── SidebarLayout.js           # Sidebar layout structure
+│   │
+│   ├── Media/           # Media management
+│   │   ├── MediaBin.js                # Displays uploaded media files
+│   │   └── MediaSidebar.js            # File upload and project management UI
+│   │
+│   ├── Timeline/        # Timeline-related components
+│   │   ├── TimelineClip.js            # Individual clip representation
+│   │   ├── TimelineControls.js        # Timeline control buttons
+│   │   ├── TimelineDebug.js           # Debug information display
+│   │   ├── TimelineExport.js          # Timeline export functionality
+│   │   ├── TimelineSection.js         # Timeline section wrapper
+│   │   └── index.js                   # Main timeline component
+│   │
+│   ├── TimelineTransition/  # Transition effects
+│   │   ├── TimelineTransitionContainer.js  # Manages transitions between clips
+│   │   └── TimelineTransitionPlayer.js     # Plays transition animations
+│   │
+│   └── Viewers/         # Video preview components
+│       ├── BinViewer.js               # Preview for media bin items
+│       ├── TimelineViewer.js          # Timeline preview player
+│       └── TimelineViewerSection.js    # Timeline viewer wrapper
+│
+├── hooks/               # Custom React hooks
+│   └── useTimeline/    # Timeline-related hooks
+│       ├── useTimelineData.js         # Timeline data management
+│       ├── useTimelineStateManager.js  # Timeline state management
+│       ├── useTimelineTransition.js    # Transition management
+│       └── useTimelineZoom.js         # Timeline zoom functionality
+│
+├── services/           # Service layer
+│   └── fileStorage.js               # File storage handling
+│
+├── types/              # TypeScript type definitions
+│   └── clip.ts                      # Clip-related types
+│
+├── utils/              # Utility functions
+│   ├── constants.js                 # Global constants
+│   ├── formatters.js                # Formatting utilities
+│   └── timelineUtils.js            # Timeline helper functions
+│
+└── App.js             # Main application component
+
+```
+
+Key Components and Their Purposes:
+
+1. **App.js**: Main application component, manages global state and routing
+
+2. **Media Components**:
+   - `MediaSidebar.js`: Handles file uploads and project management
+   - `MediaBin.js`: Displays uploaded media files and manages selection
+
+3. **Timeline Components**:
+   - `Timeline/index.js`: Core timeline editing functionality
+   - `TimelineClip.js`: Individual clip management and display
+   - `TimelineControls.js`: Timeline navigation and control buttons
+
+4. **Viewers**:
+   - `TimelineViewer.js`: Preview player for timeline
+   - `BinViewer.js`: Preview player for media bin items
+
+5. **Hooks**:
+   - `useTimelineStateManager.js`: Manages timeline state and operations
+   - `useTimelineData.js`: Handles timeline data processing
+   - `useTimelineTransition.js`: Manages transitions between clips
+
+6. **Utils**:
+   - `timelineUtils.js`: Helper functions for timeline operations
+   - `constants.js`: Global constants
+   - `formatters.js`: Formatting utilities
+
+7. **Services**:
+   - `fileStorage.js`: Handles file storage and retrieval operations
+
+This structure follows a component-based architecture with clear separation of concerns:
+- Components handle UI and user interaction
+- Hooks manage state and business logic
+- Utils provide helper functions
+- Services handle external operations
+- Types define data structures
+
