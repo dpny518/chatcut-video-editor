@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Box, Skeleton, Tooltip, Typography } from '@mui/material';
-import { AlertCircle } from 'lucide-react';
+import { Box, Skeleton, Tooltip, Typography, Badge } from '@mui/material';
+import { AlertCircle, Link, ExternalLink } from 'lucide-react';
 
 const thumbnailCacheByClip = new Map();
 const THUMBNAIL_WIDTH = 80;
@@ -9,7 +9,11 @@ const TimelineClip = ({
   clip, 
   action, 
   isSelected, 
-  onSelect
+  onSelect,
+  isReference = false,
+  referenceData = null,
+  onNavigateToSource,
+  disabled = false
 }) => {
   const [thumbnails, setThumbnails] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,24 +37,42 @@ const onUpdateData = useCallback((newData) => {
   action.data = newData;
 }, [action]);
 
-const timingValues = useMemo(() => ({
-  startTime: clip.startTime,
-  endTime: clip.endTime,
-  actionStart: action.start,
-  actionEnd: action.end,
-  resizeDir: clip.resizeDir,
-  sourceStartTime: clip.source?.startTime || 0,
-  sourceEndTime: clip.source?.endTime,
-  clipId: clip.id,
-  metadata: clip.metadata,
-  hasMetadata: Boolean(clip.metadata?.timeline),
-  clipData: clip,
-  updateData: onUpdateData,
-}), [
+const timingValues = useMemo(() => {
+  const baseValues = {
+    startTime: clip.startTime,
+    endTime: clip.endTime,
+    actionStart: action.start,
+    actionEnd: action.end,
+    resizeDir: clip.resizeDir,
+    sourceStartTime: clip.source?.startTime || 0,
+    sourceEndTime: clip.source?.endTime,
+    clipId: clip.id,
+    metadata: clip.metadata,
+    hasMetadata: Boolean(clip.metadata?.timeline),
+    clipData: clip,
+    updateData: onUpdateData,
+  };
+
+  // Add reference-specific data
+  if (isReference && referenceData) {
+    return {
+      ...baseValues,
+      referenceType: referenceData.sourceType,
+      referenceSourceId: referenceData.sourceId,
+      referenceStart: referenceData.sourceStart,
+      referenceEnd: referenceData.sourceEnd,
+      needsUpdate: referenceData.needsUpdate,
+    };
+  }
+
+  return baseValues;
+}, [
   clip,
   action.start,
   action.end,
   onUpdateData,
+  isReference,
+  referenceData,
 ]);
 
   const getThumbnailCount = useCallback(() => {
@@ -65,7 +87,7 @@ const timingValues = useMemo(() => ({
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
 
-  const calculateCurrentTimes = useCallback(() => {
+ const calculateCurrentTimes = useCallback(() => {
     if (!isInitialized.current || !timingValues.hasMetadata) {
       isInitialized.current = true;
       initialTimelineStart.current = timingValues.actionStart;
@@ -157,7 +179,7 @@ const timingValues = useMemo(() => ({
   }, [calculateCurrentTimes, timingValues.clipId]);
 
   const generateThumbnails = useCallback(async () => {
-    if (!videoRef.current || !clip.file || !thumbnailParams) return;
+    if (!videoRef.current || (!clip.file && !isReference) || !thumbnailParams) return;
     
     const { clipId, currentStart, currentEnd, width } = thumbnailParams;
     const cacheKey = `${clipId}-${currentStart}-${currentEnd}-${width}`;
@@ -178,6 +200,23 @@ const timingValues = useMemo(() => ({
     try {
       const video = videoRef.current;
       const newThumbnails = [];
+
+      // Handle video source based on reference type
+      if (isReference && referenceData) {
+        // For timeline references, get the source video from the reference data
+        if (referenceData.sourceType === 'timeline') {
+          if (!referenceData.sourceUrl) {
+            throw new Error('Source video not available for reference');
+          }
+          video.src = referenceData.sourceUrl;
+        } else {
+          // For bin references, use the original file
+          video.src = videoUrlRef.current;
+        }
+      } else {
+        // For regular clips, use the clip's file
+        video.src = videoUrlRef.current;
+      }
       
       await new Promise((resolve, reject) => {
         const handleLoad = () => resolve();
@@ -193,10 +232,13 @@ const timingValues = useMemo(() => ({
       const thumbnailCount = getThumbnailCount();
       const duration = currentEnd - currentStart;
       
+      // Adjust source times based on reference
+      const sourceOffset = isReference ? (referenceData?.sourceStart || 0) : 0;
+      
       for (let i = 0; i < thumbnailCount; i++) {
         const progress = i / (thumbnailCount - 1);
         const timeOffset = progress * duration;
-        const sourceTime = currentStart + timeOffset;
+        const sourceTime = sourceOffset + currentStart + timeOffset;
         
         video.currentTime = sourceTime;
         
@@ -209,22 +251,62 @@ const timingValues = useMemo(() => ({
         canvas.width = video.videoWidth * scale;
         canvas.height = video.videoHeight * scale;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Apply any reference-specific transformations
+        if (isReference && referenceData?.transform) {
+          ctx.save();
+          if (referenceData.transform.flip) ctx.scale(-1, 1);
+          if (referenceData.transform.rotate) ctx.rotate(referenceData.transform.rotate);
+          // Add more transformations as needed
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
+        } else {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+        
+        // Add reference indicator if needed
+        if (isReference) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(0, 0, 20, 20);
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(5, 10);
+          ctx.lineTo(15, 10);
+          ctx.moveTo(10, 5);
+          ctx.lineTo(10, 15);
+          ctx.stroke();
+        }
         
         newThumbnails.push(canvas.toDataURL('image/jpeg', 0.7));
       }
       
-      lastThumbnailKey.current = cacheKey;
-      thumbnailCacheByClip.set(cacheKey, newThumbnails);
+      // Cache with reference-specific key
+      const finalCacheKey = isReference ? `ref-${cacheKey}` : cacheKey;
+      lastThumbnailKey.current = finalCacheKey;
+      thumbnailCacheByClip.set(finalCacheKey, newThumbnails);
       setThumbnails(newThumbnails);
 
     } catch (err) {
       console.error('Thumbnail generation error:', err);
       setError(err.message);
+      
+      // Set placeholder thumbnails for failed references
+      if (isReference) {
+        const placeholderThumbnails = Array(getThumbnailCount()).fill(null);
+        setThumbnails(placeholderThumbnails);
+      }
     } finally {
       setLoading(false);
     }
-  }, [clip.file, getThumbnailCount, thumbnailParams]);
+  }, [
+    clip.file,
+    getThumbnailCount,
+    thumbnailParams,
+    isReference,
+    referenceData,
+    videoUrlRef.current
+  ]);
 
   // Initialize container width
   useEffect(() => {
@@ -351,27 +433,90 @@ const timingValues = useMemo(() => ({
     >
       <Box
         ref={containerRef}
-        onClick={() => onSelect?.(action.id)}
+        onClick={() => !disabled && onSelect?.(action.id)}
         sx={{
           position: 'relative',
           width: '100%',
           height: '100%',
-          cursor: 'pointer',
+          cursor: disabled ? 'not-allowed' : 'pointer',
           bgcolor: 'black',
           borderRadius: 1,
-          border: theme => `2px solid ${isSelected ? theme.palette.primary.main : theme.palette.grey[700]}`,
+          border: theme => {
+            if (disabled) return `2px solid ${theme.palette.grey[800]}`;
+            if (isSelected) return `2px solid ${theme.palette.primary.main}`;
+            if (isReference) return `2px solid ${theme.palette.info.main}`;
+            return `2px solid ${theme.palette.grey[700]}`;
+          },
+          opacity: disabled ? 0.7 : 1,
           overflow: 'hidden',
           '&:hover': {
-            borderColor: theme => isSelected ? theme.palette.primary.main : theme.palette.grey[500],
+            borderColor: theme => {
+              if (disabled) return theme.palette.grey[800];
+              if (isSelected) return theme.palette.primary.main;
+              if (isReference) return theme.palette.info.light;
+              return theme.palette.grey[500];
+            },
           }
         }}
       >
+        {/* Reference Indicator */}
+        {isReference && (
+          <Badge
+            sx={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              zIndex: 1,
+            }}
+            badgeContent={
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  p: 0.5,
+                  bgcolor: 'background.paper',
+                  borderRadius: 1,
+                  boxShadow: 1,
+                }}
+              >
+                <Link size={14} />
+                {referenceData?.needsUpdate && (
+                  <Box
+                    sx={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      bgcolor: 'warning.main',
+                    }}
+                  />
+                )}
+              </Box>
+            }
+          >
+            {onNavigateToSource && (
+              <Tooltip title="Go to Source">
+                <ExternalLink
+                  size={16}
+                  className="cursor-pointer hover:text-blue-400 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigateToSource(referenceData?.sourceId, referenceData?.sourceClipId);
+                  }}
+                />
+              </Tooltip>
+            )}
+          </Badge>
+        )}
+
+        {/* Thumbnail Container */}
         <Box
           sx={{
             display: 'flex',
             width: '100%',
             height: '100%',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            position: 'relative'
           }}
         >
           {loading ? (
@@ -392,44 +537,111 @@ const timingValues = useMemo(() => ({
                 width: '100%',
                 height: '100%',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
+                gap: 1,
                 bgcolor: 'grey.900',
-                color: 'error.main'
+                color: 'error.main',
+                p: 2,
               }}
             >
               <AlertCircle size={24} />
+              <Typography
+                variant="caption"
+                color="error"
+                sx={{ textAlign: 'center' }}
+              >
+                {isReference ? 'Reference source unavailable' : 'Error loading thumbnails'}
+              </Typography>
             </Box>
           ) : (
-            thumbnails.map((thumbnail, index) => (
-              <Box
-                key={index}
-                sx={{
-                  flex: 1,
-                  height: '100%',
-                  position: 'relative',
-                  borderRight: index < thumbnails.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none'
-                }}
-              >
-                <img
-                  src={thumbnail}
-                  alt={`Frame ${index + 1}`}
-                  style={{
-                    width: '100%',
+            <>
+              {thumbnails.map((thumbnail, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    flex: 1,
                     height: '100%',
-                    objectFit: 'cover'
+                    position: 'relative',
+                    borderRight: index < thumbnails.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none'
                   }}
-                />
-              </Box>
-            ))
+                >
+                  <img
+                    src={thumbnail}
+                    alt={`Frame ${index + 1}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                </Box>
+              ))}
+              
+              {/* Reference Overlay */}
+              {isReference && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'linear-gradient(rgba(0,0,0,0) 80%, rgba(0,0,0,0.6) 100%)',
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    p: 1,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      fontSize: '0.7rem',
+                    }}
+                  >
+                    <Link size={12} />
+                    {referenceData?.sourceName || 'Referenced Clip'}
+                  </Typography>
+                </Box>
+              )}
+            </>
           )}
         </Box>
+
+        {/* Video Element (hidden) */}
         <video
           ref={videoRef}
           style={{ display: 'none' }}
           muted
           playsInline
+          crossOrigin="anonymous"
         />
+
+        {/* Loading Overlay */}
+        {isReference && loading && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              bgcolor: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Typography variant="caption" color="white">
+              Loading reference...
+            </Typography>
+          </Box>
+        )}
       </Box>
     </Tooltip>
   );

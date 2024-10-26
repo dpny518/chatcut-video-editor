@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Box, Snackbar, Alert } from '@mui/material';
+import { Box, Snackbar, Alert, Typography, TextField, Button } from '@mui/material';
+import { Upload, Clock } from 'lucide-react';
 
 // Layout components
 import MainLayout from './components/Layout/MainLayout';
@@ -14,7 +15,13 @@ import TimelineViewerSection from './components/Viewers/TimelineViewerSection';
 // Timeline components
 import TimelineSection from './components/Timeline/TimelineSection';
 import TimelineDebug from './components/Timeline/TimelineDebug';
-import { useTimelineStateManager } from './hooks/useTimeline/useTimelineStateManager';
+import TimelineList from './components/Timeline/TimelineManager/TimelineList';
+import TimelineActions from './components/Timeline/TimelineManager/TimelineActions';
+
+// Hooks
+import { useTimelineManager } from './hooks/useTimeline/useTimelineManager';
+import { useTimelineReferences } from './hooks/useTimeline/useTimelineReferences';
+import { useTimelineValidation } from './hooks/useTimeline/useTimelineValidation';
 
 const theme = createTheme({
   palette: {
@@ -27,78 +34,291 @@ const theme = createTheme({
   },
 });
 
+const EmptyState = () => (
+  <Box
+    sx={{
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 2,
+      p: 4,
+      bgcolor: 'background.paper',
+      borderRadius: 1,
+      border: '2px dashed',
+      borderColor: 'divider'
+    }}
+  >
+    <Upload size={48} />
+    <Typography variant="h6" color="text.primary">
+      Start Your Project
+    </Typography>
+    <Typography variant="body2" color="text.secondary" textAlign="center">
+      Upload your media files to the bin first.<br />
+      Then you can create timelines and start editing.
+    </Typography>
+  </Box>
+);
+
+const CreateTimelinePrompt = ({ onCreateTimeline }) => {
+  const [name, setName] = useState('');
+
+  return (
+    <Box
+      sx={{
+        p: 4,
+        textAlign: 'center',
+        color: 'text.secondary',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 2
+      }}
+    >
+      <Clock size={32} />
+      <Typography variant="h6">Create Your First Timeline</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Create a timeline to start arranging your clips
+      </Typography>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <TextField
+          size="small"
+          placeholder="Timeline Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button
+          variant="contained"
+          onClick={() => {
+            if (name.trim()) {
+              onCreateTimeline(name);
+              setName('');
+            }
+          }}
+          disabled={!name.trim()}
+        >
+          Create Timeline
+        </Button>
+      </Box>
+    </Box>
+  );
+};
+
+const TimelineSelectionPrompt = () => (
+  <Box sx={{ 
+    p: 4, 
+    textAlign: 'center', 
+    color: 'text.secondary',
+    bgcolor: 'background.paper',
+    borderRadius: 1 
+  }}>
+    <Typography>Select a timeline from the list above to begin editing</Typography>
+  </Box>
+);
+
+const UploadPrompt = () => (
+  <Box
+    sx={{
+      p: 4,
+      textAlign: 'center',
+      color: 'text.secondary',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 2
+    }}
+  >
+    <Upload size={32} />
+    <Typography>
+      Start by uploading media files to your bin
+    </Typography>
+    <Typography variant="caption">
+      Supported formats: MP4, WebM, MOV
+    </Typography>
+  </Box>
+);
+
 function App() {
+  // Media bin state
   const [mediaFiles, setMediaFiles] = useState([]);
   const [selectedBinClip, setSelectedBinClip] = useState(null);
-  const [timelineClips, setTimelineClips] = useState([]);
+  
+  // Notification state
   const [notification, setNotification] = useState(null);
-  const [selectedTimelineProject, setSelectedTimelineProject] = useState(null);
 
+  // Initialize timeline management hooks
+  const {
+    timelines,
+    activeTimelineId,
+    setActiveTimelineId,
+    createTimeline,
+    deleteTimeline,
+    addClipToTimeline,
+    moveClipBetweenTimelines
+  } = useTimelineManager();
 
-  // Timeline metadata state
-  const [timelineMetadata, setTimelineMetadata] = useState({
-    scale: 1,
-    selectedClipId: null
-  });
+  // Initialize reference management
+  const {
+    createReference,
+    updateReference,
+    validateReference,
+    getTimelineReferences
+  } = useTimelineReferences();
 
+  // Initialize validation
+  const validation = useTimelineValidation(timelines, getTimelineReferences());
+
+  // Notification helper
   const showNotification = (message, severity = 'info') => {
     setNotification({ message, severity });
   };
 
+  // Media handlers
   const handleFileUpload = (file) => {
     const newFile = { 
-      id: Date.now().toString(), 
-      file: file, 
+      id: `bin-${Date.now()}`, 
+      file, 
       name: file.name,
       type: file.type,
       size: file.size 
     };
-    setMediaFiles(prevFiles => [...prevFiles, newFile]);
+    setMediaFiles(prev => [...prev, newFile]);
   };
 
   const handleFileSelect = (selectedFile) => {
     setSelectedBinClip(selectedFile);
   };
-  const handleAddToTimeline = (clip) => {
-    setTimelineClips(prevClips => [...prevClips, clip]);
-  };
 
-  const handleTimelineClipsChange = (newClips) => {
-    setTimelineClips(newClips);
-  };
-
-  // Timeline Project Management
-  const { saveTimelineProject, loadTimelineProject, deleteTimelineProject } = useTimelineStateManager({
-    timelineClips,
-    timelineMetadata,
-    mediaFiles,
-    selectedClipId: timelineMetadata.selectedClipId,
-    setTimelineClips,
-    setTimelineMetadata,
-    showNotification
-  });
-
-  // Replace the handlers with the new ones
-  const handleTimelineProjectSave = useCallback((projectName) => {
-    const success = saveTimelineProject(projectName);
-    if (success) {
-      setSelectedTimelineProject(projectName);
+  // Timeline handlers
+  const handleAddToTimeline = useCallback((clipData) => {
+    if (!activeTimelineId) {
+      showNotification('No timeline selected', 'warning');
+      return;
     }
-  }, [saveTimelineProject]);
 
-  const handleTimelineProjectLoad = useCallback((projectName) => {
-    const success = loadTimelineProject(projectName);
-    if (success) {
-      setSelectedTimelineProject(projectName);
-    }
-  }, [loadTimelineProject]);
+    try {
+      const validationResult = validation.validateClipAddition({
+        sourceType: 'bin',
+        sourceId: clipData.file.id,
+        targetTimelineId: activeTimelineId,
+        clipData
+      });
 
-  const handleTimelineProjectDelete = useCallback((projectName) => {
-    const success = deleteTimelineProject(projectName);
-    if (success && selectedTimelineProject === projectName) {
-      setSelectedTimelineProject(null);
+      if (!validationResult.valid) {
+        throw new Error(validationResult.errors[0].message);
+      }
+
+      const result = addClipToTimeline({
+        sourceType: 'bin',
+        sourceId: clipData.file.id,
+        targetTimelineId: activeTimelineId,
+        clipData
+      });
+
+      if (result.success) {
+        showNotification('Clip added to timeline', 'success');
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      showNotification(error.message, 'error');
     }
-  }, [deleteTimelineProject, selectedTimelineProject]);
+  }, [activeTimelineId, addClipToTimeline, validation]);
+
+  // Timeline management handlers
+  const handleCreateTimeline = useCallback((name) => {
+    try {
+      const newTimeline = {
+        id: `timeline-${Date.now()}`,
+        name: name.trim(),
+        clips: [],
+        settings: {
+          snapToGrid: true,
+          autoScroll: true
+        },
+        metadata: {
+          timeline: {
+            start: 0,
+            end: 300,
+            duration: 300
+          }
+        }
+      };
+  
+      const timelineId = createTimeline(newTimeline);
+      setActiveTimelineId(timelineId);
+      showNotification(`Timeline "${name}" created`, 'success');
+      return timelineId;
+    } catch (error) {
+      console.error('Error creating timeline:', error);
+      showNotification(error.message, 'error');
+      return null;
+    }
+  }, [createTimeline, setActiveTimelineId]);
+  
+  const handleDeleteTimeline = useCallback((timelineId) => {
+    try {
+      const validationResult = validation.validateTimelineDeletion(timelineId);
+      if (!validationResult.valid) {
+        throw new Error(validationResult.errors[0].message);
+      }
+
+      deleteTimeline(timelineId);
+      showNotification('Timeline deleted', 'success');
+    } catch (error) {
+      showNotification(error.message, 'error');
+    }
+  }, [deleteTimeline, validation]);
+
+  const handleDuplicateTimeline = useCallback((sourceId, newName) => {
+    try {
+      const sourceTimeline = timelines[sourceId];
+      if (!sourceTimeline) throw new Error('Source timeline not found');
+
+      const newTimelineId = createTimeline(newName);
+
+      sourceTimeline.clips.forEach(clip => {
+        addClipToTimeline({
+          sourceType: clip.source.type,
+          sourceId: clip.source.id,
+          targetTimelineId: newTimelineId,
+          clipData: clip
+        });
+      });
+
+      showNotification(`Timeline "${newName}" created`, 'success');
+    } catch (error) {
+      showNotification(error.message, 'error');
+    }
+  }, [timelines, createTimeline, addClipToTimeline]);
+
+  // Reference handlers
+  const handleCreateReference = useCallback((sourceTimelineId, clipId, targetTimelineId) => {
+    try {
+      const validationResult = validateReference({
+        sourceTimelineId,
+        targetTimelineId
+      });
+
+      if (!validationResult.valid) {
+        throw new Error(validationResult.error);
+      }
+
+      const reference = createReference({
+        sourceType: 'timeline',
+        sourceId: sourceTimelineId,
+        sourceClipId: clipId,
+        targetTimelineId
+      });
+
+      showNotification('Reference created', 'success');
+      return reference;
+    } catch (error) {
+      showNotification(error.message, 'error');
+      return null;
+    }
+  }, [createReference, validateReference]);
 
   return (
     <StyledEngineProvider injectFirst>
@@ -109,46 +329,73 @@ function App() {
           selectedBinClip={selectedBinClip}
           onFileUpload={handleFileUpload}
           onFileSelect={handleFileSelect}
-          timelineProjects={{
-            selected: selectedTimelineProject,
-            onSave: handleTimelineProjectSave,
-            onLoad: handleTimelineProjectLoad,
-            onDelete: handleTimelineProjectDelete
-          }}
         >
           <EditorLayout>
+            {/* Timeline Management - Show only after media is uploaded */}
+            {mediaFiles.length > 0 && (
+              <Box sx={{ px: 2, py: 1, borderBottom: 1, borderColor: 'divider' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <TimelineActions
+                    onCreateTimeline={handleCreateTimeline}
+                    onDeleteTimeline={handleDeleteTimeline}
+                    onDuplicateTimeline={handleDuplicateTimeline}
+                    currentTimeline={timelines[activeTimelineId]}
+                  />
+                  <Box sx={{ flex: 1, overflow: 'auto' }}>
+                    <TimelineList
+                      timelines={Object.values(timelines)}
+                      activeId={activeTimelineId}
+                      onSelect={setActiveTimelineId}
+                    />
+                  </Box>
+                </Box>
+              </Box>
+            )}
+
             {/* Main Content Area */}
             <Box sx={{ display: 'flex', flexGrow: 1, gap: 2, p: 2, pb: 0 }}>
               <BinViewerSection
                 selectedClip={selectedBinClip}
                 onAddToTimeline={handleAddToTimeline}
+                mediaFiles={mediaFiles}
               />
-              <TimelineViewerSection clips={timelineClips} />
+              {mediaFiles.length > 0 ? (
+                <TimelineViewerSection 
+                  timeline={timelines[activeTimelineId]}
+                  references={getTimelineReferences(activeTimelineId)}
+                />
+              ) : (
+                <EmptyState />
+              )}
             </Box>
 
-            {/* Timeline and Controls Area */}
+            {/* Timeline Area */}
             <Box sx={{ 
               mt: 2, 
               px: 2, 
               pb: 2, 
               bgcolor: 'background.default', 
               borderTop: 1, 
-              borderColor: 'divider',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-              '& > *:last-child': {
-                marginBottom: '20px',
-              }
+              borderColor: 'divider'
             }}>
-              <TimelineSection
-                clips={timelineClips}
-                onClipsChange={handleTimelineClipsChange}
-              />
-              <TimelineDebug
-                timelineClips={timelineClips}
-                selectedBinClip={selectedBinClip}
-              />
+              {mediaFiles.length > 0 ? (
+                Object.keys(timelines).length > 0 ? (
+                  activeTimelineId ? (
+                    <TimelineSection
+                      timeline={timelines[activeTimelineId]}
+                      onClipAdd={handleAddToTimeline}
+                      onCreateReference={handleCreateReference}
+                      references={getTimelineReferences(activeTimelineId)}
+                    />
+                  ) : (
+                    <TimelineSelectionPrompt />
+                  )
+                ) : (
+                  <CreateTimelinePrompt onCreateTimeline={handleCreateTimeline} />
+                )
+              ) : (
+                <UploadPrompt />
+              )}
             </Box>
           </EditorLayout>
         </MainLayout>

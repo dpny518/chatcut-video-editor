@@ -2,11 +2,19 @@ export { useTimelineData } from './useTimelineData';
 export { useTimelineEffects } from './useTimelineEffects';
 export { useTimelineStateManager } from './useTimelineStateManager';
 export { useTimelineTransition } from './useTimelineTransition';
+export { useTimelineManager } from './useTimelineManager';
+export { useTimelineReferences } from './useTimelineReferences';
+export { useTimelineValidation } from './useTimelineValidation';
+export { useTimelineZoom } from './useTimelineZoom';
 
-// You can also bundle them into an object if you want to namespace them
+// Bundle them into an object for namespaced usage
 export const useTimeline = {
   data: useTimelineData,
   effects: useTimelineEffects,
   stateManager: useTimelineStateManager,
-  transition: useTimelineTransition
+  transition: useTimelineTransition,
+  manager: useTimelineManager,
+  references: useTimelineReferences,
+  validation: useTimelineValidation,
+  zoom: useTimelineZoom
 };

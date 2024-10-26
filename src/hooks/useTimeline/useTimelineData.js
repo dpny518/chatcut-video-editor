@@ -1,4 +1,3 @@
-//src/hooks/useTimeline/useTimelineData.js
 import { useMemo, useState } from 'react';
 
 const formatTime = (seconds) => {
@@ -37,51 +36,60 @@ export const useTimelineData = (clips = [], onClipsChange) => {
 
   const { editorData, timelineState } = useMemo(() => {
     try {
+      // Initialize with default values for empty timeline
+      if (!Array.isArray(clips) || clips.length === 0) {
+        return {
+          editorData: {
+            actions: [],
+            rows: [{ id: '0' }],
+            duration: 300, // 5 minutes default
+            startAt: 0,
+            endAt: 300
+          },
+          timelineState: {
+            totalDuration: formatTime(300),
+            clips: [],
+            settings: {
+              effects: Object.keys(effects),
+              snapToGrid: true,
+              autoScroll: true
+            }
+          }
+        };
+      }
+
       let currentPosition = 0;
       const clipsState = [];
+      const actions = [];
       
-      const rows = clips.map((clip, index) => {
-        console.log('Clip object:', {
-          clip,
-          currentInOut: {
-            start: clip.startTime,
-            end: clip.endTime
-          },
-          source: clip.source,  // This should show the whole source object
-          duration: clip.duration,  // Duration of trimmed clip
-          fullVideo: {
-            duration: clip.source?.duration,  // Full video duration
-            start: clip.source?.startTime,    // Always 0
-            end: clip.source?.endTime         // Full video duration
-          }
-        });
+      // Process clips
+      clips.forEach((clip, index) => {
         // Calculate clip timings
         let timelineStart, timelineEnd, playbackStart, playbackEnd;
         
-        // Calculate initial positions for new clips
-          if (clip.metadata?.timeline && clip.metadata?.playback) {
-            // Use existing metadata if available
-            timelineStart = clip.metadata.timeline.start;
-            timelineEnd = clip.metadata.timeline.end;
-            playbackStart = clip.metadata.playback.start;
-            playbackEnd = clip.metadata.playback.end;
-          } else {
-            // Calculate initial positions for new clips
-            timelineStart = currentPosition;
-            timelineEnd = timelineStart + clip.duration;  // Use clip duration instead of source
-            playbackStart = clip.startTime;  // Use clip start time
-            playbackEnd = clip.endTime;      // Use clip end time
-            
-            if (!clip.hasBeenPositioned) {
-              currentPosition = timelineEnd + 0.1;
-            }
+        if (clip.metadata?.timeline && clip.metadata?.playback) {
+          // Use existing metadata if available
+          timelineStart = clip.metadata.timeline.start;
+          timelineEnd = clip.metadata.timeline.end;
+          playbackStart = clip.metadata.playback.start;
+          playbackEnd = clip.metadata.playback.end;
+        } else {
+          // Calculate initial positions for new clips
+          timelineStart = currentPosition;
+          timelineEnd = timelineStart + clip.duration;
+          playbackStart = clip.startTime;
+          playbackEnd = clip.endTime;
+          
+          if (!clip.hasBeenPositioned) {
+            currentPosition = timelineEnd + 0.1;
           }
+        }
 
-        // Define min and max bounds based on source video duration
-            const minStart = clip.source?.startTime ?? 0;
-            const maxEnd = clip.source?.endTime ?? clip.duration ?? timelineEnd;
+        // Define min and max bounds
+        const minStart = clip.source?.startTime ?? 0;
+        const maxEnd = clip.source?.endTime ?? clip.duration ?? timelineEnd;
 
-        // Store clip state information
+        // Store clip state
         clipsState.push({
           id: clip.id,
           name: clip.name || `Clip ${index + 1}`,
@@ -100,68 +108,73 @@ export const useTimelineData = (clips = [], onClipsChange) => {
           }
         });
 
-        return {
-          id: String(index),
-          actions: [{
-            id: clip.id,
-            start: timelineStart,
-            end: timelineEnd,
-            effectId: 'default',
-            flexible: true,
-            movable: true,
-            minStart: minStart,
-            maxEnd: maxEnd,
-            data: {
-              ...clip,
-              hasBeenPositioned: true,
-              metadata: {
-                timeline: {
-                  start: timelineStart,
-                  end: timelineEnd,
-                  duration: timelineEnd - timelineStart
-                },
-                playback: {
-                  start: playbackStart,
-                  end: playbackEnd,
-                  duration: playbackEnd - playbackStart
-                }
+        // Create action for the clip
+        actions.push({
+          id: clip.id,
+          start: timelineStart,
+          end: timelineEnd,
+          row: 0, // All clips start in first row
+          effectId: 'default',
+          flexible: true,
+          movable: true,
+          minStart: minStart,
+          maxEnd: maxEnd,
+          data: {
+            ...clip,
+            hasBeenPositioned: true,
+            metadata: {
+              timeline: {
+                start: timelineStart,
+                end: timelineEnd,
+                duration: timelineEnd - timelineStart
+              },
+              playback: {
+                start: playbackStart,
+                end: playbackEnd,
+                duration: playbackEnd - playbackStart
               }
             }
-          }]
-        };
+          }
+        });
       });
 
-      // Add empty row at the end
-      rows.push({
-        id: String(clips.length),
-        actions: []
-      });
+      // Calculate total duration - use max of current position or 5 minutes
+      const totalDuration = Math.max(currentPosition, 300);
 
-      // Create timeline state object
-      const timelineState = {
-        totalDuration: formatTime(currentPosition),
-        clips: clipsState,
-        settings: {
-          effects: Object.keys(effects),
-          snapToGrid: true,
-          autoScroll: true
+      return {
+        editorData: {
+          actions, // Array of actions at top level
+          rows: [{ id: '0' }], // Single row to start
+          duration: totalDuration,
+          startAt: 0,
+          endAt: totalDuration
+        },
+        timelineState: {
+          totalDuration: formatTime(totalDuration),
+          clips: clipsState,
+          settings: {
+            effects: Object.keys(effects),
+            snapToGrid: true,
+            autoScroll: true
+          }
         }
       };
 
-      return {
-        editorData: rows,
-        timelineState
-      };
     } catch (err) {
       console.error('Error processing timeline data:', err);
       setError('Error processing timeline data: ' + err.message);
+      
+      // Return safe default state
       return {
-        editorData: [{
-          id: '0',
-          actions: []
-        }],
+        editorData: {
+          actions: [],
+          rows: [{ id: '0' }],
+          duration: 300,
+          startAt: 0,
+          endAt: 300
+        },
         timelineState: {
-          totalDuration: '0:00.00',
+          totalDuration: formatTime(300),
           clips: [],
           settings: {
             effects: Object.keys(effects),
@@ -172,6 +185,13 @@ export const useTimelineData = (clips = [], onClipsChange) => {
       };
     }
   }, [clips, effects]);
+
+  // Log the processed data
+  console.log('Timeline Data:', {
+    clips,
+    editorData,
+    timelineState
+  });
 
   return { 
     editorData, 

@@ -2,7 +2,16 @@
 import React from 'react';
 import { Box } from '@mui/material';
 import Timeline from './index';
-const TimelineSection = ({ clips, onClipsChange }) => {
+
+const TimelineSection = ({ timeline, onClipAdd, onCreateReference, references }) => {
+  console.log('TimelineSection rendered with:', {
+    timeline,
+    references,
+    hasTimeline: Boolean(timeline),
+    clipCount: timeline?.clips?.length
+  });
+
+  // This is how we used to pass clips in the single timeline version
   return (
     <Box sx={{ 
       width: '100%',
@@ -14,10 +23,30 @@ const TimelineSection = ({ clips, onClipsChange }) => {
       }
     }}>
       <Timeline 
-        clips={clips}
-        onClipsChange={onClipsChange}
+        clips={timeline?.clips || []}  // Pass clips directly like before
+        onClipsChange={(newClips) => {
+          if (timeline && onClipAdd) {
+            onClipAdd({
+              ...timeline,
+              clips: newClips
+            });
+          }
+        }}
+        selectedClipId={timeline?.metadata?.selectedClipId}
+        onClipSelect={(clipId) => {
+          if (timeline && onClipAdd) {
+            onClipAdd({
+              ...timeline,
+              metadata: {
+                ...timeline.metadata,
+                selectedClipId: clipId
+              }
+            });
+          }
+        }}
       />
     </Box>
   );
 };
-export default TimelineSection
+
+export default TimelineSection;

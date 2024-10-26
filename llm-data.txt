@@ -156,3 +156,55 @@ This structure follows a component-based architecture with clear separation of c
 - Services handle external operations
 - Types define data structures
 
+CONTEXT[web-video-editor]:
+PREV_STATE{single_timeline:true;bin_to_timeline_flow:direct;no_references}
+CURR_STATE{multi_timeline:true;timeline_relationships:enabled;reference_system:implemented}
+
+CORE_CHANGES[
+  STRUCT{
+    +useTimelineManager[state:timelines{id,name,clips[],settings,metadata,references[]},activeTimelineId]
+    +useTimelineReferences[validateRef,createRef,updateRef,getTimelineRefs]
+    +useTimelineValidation[validateClipAdd,validateTimelineDel,validateStructure]
+    MOD[App.js:replaced_single_timeline_with_manager]
+  }
+  DATA{
+    timeline:{id,name,clips[],settings,metadata:Map<refs>}
+    clip:{source:{type:('bin'|'timeline'),id,timeRange},target:{timelineId,position}}
+    reference:{sourceType,sourceId,targetId,clipId,metadata}
+  }
+]
+
+KEY_FEATURES[
+  multi_timeline_support:{create,delete,duplicate,switch}
+  clip_referencing:{bin_to_timeline,timeline_to_timeline}
+  circular_ref_prevention:true
+  relationship_tracking:Map<timelineId,Set<dependencies>>
+]
+
+IMPLEMENTATION_STATE[
+  DONE{
+    hooks/useTimeline/{manager,references,validation}
+    components/Timeline/TimelineManager/{List,Tab,Actions}
+    core_state_management
+    reference_system
+  }
+  TODO{
+    timeline_layout_management
+    enhanced_reference_visualization
+    multi_timeline_playback
+  }
+]
+
+CRITICAL_CONTEXT:
+- Timeline references must handle source availability
+- Validation prevents circular dependencies
+- Timeline deletion checks reference integrity
+- Each timeline maintains own clip list + reference list
+
+NEXT_FOCUS:
+1. Timeline layout/sizing system
+2. Reference visualization enhancements
+3. Multi-timeline playback coordination
+
+ERROR_TRACKING:
+Currently fixing null timeline access in TimelineList/Tab components
