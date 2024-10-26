@@ -28,12 +28,13 @@ const theme = createTheme({
 });
 
 function App() {
+  // State
   const [mediaFiles, setMediaFiles] = useState([]);
   const [selectedBinClip, setSelectedBinClip] = useState(null);
   const [timelineClips, setTimelineClips] = useState([]);
   const [notification, setNotification] = useState(null);
   const [selectedTimelineProject, setSelectedTimelineProject] = useState(null);
-
+  const [transcripts, setTranscripts] = useState(new Map());
 
   // Timeline metadata state
   const [timelineMetadata, setTimelineMetadata] = useState({
@@ -45,22 +46,71 @@ function App() {
     setNotification({ message, severity });
   };
 
-  const handleFileUpload = (file) => {
-    const newFile = { 
-      id: Date.now().toString(), 
-      file: file, 
-      name: file.name,
-      type: file.type,
-      size: file.size 
-    };
-    setMediaFiles(prevFiles => [...prevFiles, newFile]);
+  // File handling
+  const handleFileUpload = async (file) => {
+    try {
+      if (file.type.startsWith('video/')) {
+        // Handle video file
+        const newFile = { 
+          id: Date.now().toString(), 
+          file: file, 
+          name: file.name,
+          type: file.type,
+          size: file.size 
+        };
+        setMediaFiles(prevFiles => [...prevFiles, newFile]);
+  
+        // Automatically look for matching transcript
+        const transcriptName = file.name.replace(/\.[^/.]+$/, '.json');
+        const hasTranscript = transcripts.has(transcriptName);
+        if (hasTranscript) {
+          showNotification(`Found matching transcript for ${file.name}`, 'success');
+        }
+      } 
+      else if (file.name.endsWith('.json')) {
+        // Handle transcript file
+        try {
+          const text = await file.text();
+          const transcriptData = JSON.parse(text);
+  
+          if (!transcriptData.transcription) {
+            throw new Error('Invalid transcript format');
+          }
+  
+          // Get the corresponding video name
+          const videoName = file.name.replace('.json', '.mp4');
+          const hasVideo = mediaFiles.some(f => f.name === videoName);
+  
+          setTranscripts(prev => new Map(prev).set(file.name, transcriptData));
+          
+          if (hasVideo) {
+            showNotification(`Transcript loaded for ${videoName}`, 'success');
+          } else {
+            showNotification('Transcript loaded. Upload matching video file to use it.', 'info');
+          }
+        } catch (error) {
+          showNotification(`Invalid transcript file: ${error.message}`, 'error');
+        }
+      }
+    } catch (error) {
+      showNotification(`Error uploading file: ${error.message}`, 'error');
+    }
   };
 
   const handleFileSelect = (selectedFile) => {
     setSelectedBinClip(selectedFile);
   };
+
   const handleAddToTimeline = (clip) => {
-    setTimelineClips(prevClips => [...prevClips, clip]);
+    const transcriptName = clip.file.name.replace(/\.[^/.]+$/, '.json');
+    const transcriptData = transcripts.get(transcriptName);
+    
+    const enrichedClip = {
+      ...clip,
+      transcript: transcriptData || null
+    };
+    
+    setTimelineClips(prevClips => [...prevClips, enrichedClip]);
   };
 
   const handleTimelineClipsChange = (newClips) => {
@@ -78,7 +128,7 @@ function App() {
     showNotification
   });
 
-  // Replace the handlers with the new ones
+  // Project management handlers
   const handleTimelineProjectSave = useCallback((projectName) => {
     const success = saveTimelineProject(projectName);
     if (success) {
@@ -118,12 +168,15 @@ function App() {
         >
           <EditorLayout>
             {/* Main Content Area */}
-            <Box sx={{ display: 'flex', flexGrow: 1, gap: 2, p: 2, pb: 0 }}>
-              <BinViewerSection
-                selectedClip={selectedBinClip}
-                onAddToTimeline={handleAddToTimeline}
+            <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
+             <BinViewerSection
+                  selectedClip={selectedBinClip}
+                  onAddToTimeline={handleAddToTimeline}
+                  transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
+                />
+              <TimelineViewerSection 
+                clips={timelineClips}
               />
-              <TimelineViewerSection clips={timelineClips} />
             </Box>
 
             {/* Timeline and Controls Area */}

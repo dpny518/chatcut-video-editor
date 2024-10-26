@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { 
   Box, 
   Typography, 
-  IconButton, 
   List, 
   ListItem, 
   ListItemIcon, 
   ListItemText, 
   LinearProgress, 
-  Button, 
+  Button,
+  IconButton,
   Tabs,
   Tab,
   Menu,
@@ -19,13 +19,12 @@ import {
   DialogActions,
   TextField
 } from '@mui/material';
-
-// Import icons
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import AudioFileIcon from '@mui/icons-material/AudioFile';
 import ImageIcon from '@mui/icons-material/Image';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import TextSnippetIcon from '@mui/icons-material/TextSnippet'; // Add this import
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -112,6 +111,8 @@ const MediaSidebar = ({
     if (type.startsWith('video/')) return <VideoFileIcon />;
     if (type.startsWith('image/')) return <ImageIcon />;
     if (type.startsWith('audio/')) return <AudioFileIcon />;
+    // Add handling for JSON/transcript files
+    if (type === 'application/json' || type.endsWith('.json')) return <TextSnippetIcon />;
     return <InsertDriveFileIcon />;
   };
 
@@ -176,39 +177,43 @@ const MediaSidebar = ({
       {/* Media Tab */}
       {currentTab === 0 && (
         <>
-          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6">Media</Typography>
-              <IconButton size="small">
-                <ExpandMoreIcon />
-              </IconButton>
-            </Box>
+       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">Media</Typography>
+            <IconButton size="small">
+              <ExpandMoreIcon />
+            </IconButton>
+          </Box>
 
-            <label htmlFor="upload-input">
-              <input
-                id="upload-input"
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-                accept="video/*,image/*,audio/*"
-              />
-              <Button
-                component="span"
-                variant="outlined"
-                startIcon={<CloudUploadIcon />}
-                fullWidth
-                sx={{ 
-                  color: 'primary.main',
-                  borderColor: 'primary.main',
-                  '&:hover': {
-                    borderColor: 'primary.dark',
-                    bgcolor: 'action.hover'
-                  }
-                }}
-              >
-                Upload
-              </Button>
+          <Typography variant="caption" display="block" sx={{ mb: 1, color: 'text.secondary' }}>
+            Upload video files with matching .json transcripts
+          </Typography>
+
+          <label htmlFor="upload-input">
+            <input
+              id="upload-input"
+              type="file"
+              multiple
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
+              accept="video/*,image/*,audio/*,.json" // Added .json
+            />
+            <Button
+              component="span"
+              variant="outlined"
+              startIcon={<CloudUploadIcon />}
+              fullWidth
+              sx={{ 
+                color: 'primary.main',
+                borderColor: 'primary.main',
+                '&:hover': {
+                  borderColor: 'primary.dark',
+                  bgcolor: 'action.hover'
+                }
+              }}
+            >
+              Upload
+            </Button>
             </label>
           </Box>
 

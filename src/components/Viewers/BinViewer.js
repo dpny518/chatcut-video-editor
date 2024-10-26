@@ -111,7 +111,7 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
     setPlaying(false);
   };
 
-  const handleAddToTimeline = () => {
+ const handleAddToTimeline = () => {
     if (!selectedClip || error) return;
 
     const clipData = {
