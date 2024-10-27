@@ -3,25 +3,23 @@ import {
   Box, 
   Card, 
   CardContent, 
-  Button, 
   IconButton,
   Typography,
   Paper,
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
-import AddIcon from '@mui/icons-material/Add';
 
 const TimelineTranscriptViewer = ({ 
-  selectedClip,
+clips,
   transcriptData, 
   viewMode // Now controlled by parent
 }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [selection, setSelection] = useState(null);
   const videoRef = useRef(null);
   const videoUrlRef = useRef(null);
+  const selectedClip = clips[0]
   console.log('TimelineTranscriptViewer received:', {
     selectedClip,
     transcriptData,
