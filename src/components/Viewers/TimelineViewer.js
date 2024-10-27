@@ -1,45 +1,49 @@
-// src/components/Timeline/TimelineViewer.js
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Player } from 'video-react';
 import 'video-react/dist/video-react.css';
 import { Box, Button, Typography, Alert } from '@mui/material';
 import { PlayCircle, PauseCircle, SkipBack } from 'lucide-react';
 import useTimelineStore from '../../stores/timelineStore';
 import useMediaStore from '../../stores/mediaStore';
+import { shallow } from 'zustand/shallow';
 
 const TimelineViewer = () => {
-  // Get state from stores
+  // Split store selectors to prevent unnecessary re-renders
   const {
     clips,
     playbackTime,
     isPlaying,
     setPlaybackTime,
-    setIsPlaying,
-    getCurrentClip
-  } = useTimelineStore(state => ({
-    clips: state.clips,
-    playbackTime: state.playbackTime,
-    isPlaying: state.isPlaying,
-    setPlaybackTime: state.setPlaybackTime,
-    setIsPlaying: state.setIsPlaying,
-    getCurrentClip: state.getCurrentClip
-  }));
+    setIsPlaying
+  } = useTimelineStore(
+    state => ({
+      clips: state.clips,
+      playbackTime: state.playbackTime,
+      isPlaying: state.isPlaying,
+      setPlaybackTime: state.setPlaybackTime,
+      setIsPlaying: state.setIsPlaying
+    }),
+    shallow
+  );
 
-  const { setNotification } = useMediaStore();
+  const setNotification = useMediaStore(state => state.setNotification);
 
-  // Refs for playback control
+  // Refs
   const playerRef = useRef(null);
   const rafRef = useRef(null);
   const lastTimeRef = useRef(0);
   const currentClipRef = useRef(null);
 
-  // Calculate total timeline duration
-  const duration = clips.reduce((max, clip) => {
-    const end = clip.metadata?.timeline?.end || (clip.startTime + clip.duration);
-    return Math.max(max, end);
-  }, 0);
+  // Memoized calculations
+  const duration = useMemo(() => 
+    clips.reduce((max, clip) => {
+      const end = clip.metadata?.timeline?.end || (clip.startTime + clip.duration);
+      return Math.max(max, end);
+    }, 0),
+    [clips]
+  );
 
-  // Get active clip and source time for current timeline position
+  // Memoized active clip getter
   const getActiveClip = useCallback((time) => {
     for (const clip of clips) {
       const timelineStart = clip.metadata?.timeline?.start || 0;
@@ -60,7 +64,7 @@ const TimelineViewer = () => {
     return null;
   }, [clips]);
 
-  // Handle timeline playback
+  // Playback animation effect
   useEffect(() => {
     if (!isPlaying) return;
 
@@ -92,17 +96,15 @@ const TimelineViewer = () => {
     };
   }, [isPlaying, duration, setPlaybackTime, setIsPlaying, setNotification]);
 
-  // Handle video playback and seeking
+  // Video playback and seeking effect
   useEffect(() => {
-    if (!playerRef.current) return;
+    const player = playerRef.current;
+    if (!player) return;
 
     const activeClip = getActiveClip(playbackTime);
-    const player = playerRef.current;
     
     if (activeClip) {
-      // Only seek if changing clips
       if (!currentClipRef.current || currentClipRef.current.clip.id !== activeClip.clip.id) {
-        console.log('Changing to clip:', activeClip.clip.id, 'at time:', activeClip.sourceTime);
         player.seek(activeClip.sourceTime);
         currentClipRef.current = activeClip;
         setNotification(`Playing clip: ${activeClip.clip.name}`, 'info');
@@ -117,38 +119,40 @@ const TimelineViewer = () => {
     }
   }, [playbackTime, getActiveClip, isPlaying, setNotification]);
 
-  // Monitor playback and handle clip transitions
+  // Clip transition effect
   useEffect(() => {
-    if (!playerRef.current) return;
+    const player = playerRef.current;
+    if (!player) return;
 
     const handleStateChange = (state) => {
       if (!currentClipRef.current) return;
 
       const activeClip = currentClipRef.current;
       if (state.currentTime >= activeClip.clip.endTime) {
-        playerRef.current.pause();
+        player.pause();
         
-        // Find next clip if available
         const nextClipInfo = getActiveClip(activeClip.timelineEnd + 0.1);
         if (nextClipInfo) {
-          playerRef.current.seek(nextClipInfo.sourceTime);
+          player.seek(nextClipInfo.sourceTime);
           currentClipRef.current = nextClipInfo;
           if (isPlaying) {
-            playerRef.current.play();
+            player.play();
           }
           setNotification(`Playing next clip: ${nextClipInfo.clip.name}`, 'info');
         }
       }
     };
 
-    playerRef.current.subscribeToStateChange(handleStateChange);
+    const unsubscribe = player.subscribeToStateChange(handleStateChange);
+    return () => unsubscribe?.();
   }, [isPlaying, getActiveClip, setNotification]);
 
+  // Memoized handlers
   const handlePlay = useCallback(() => {
     const activeClip = getActiveClip(playbackTime);
     if (activeClip) {
       if (!currentClipRef.current || currentClipRef.current.clip.id !== activeClip.clip.id) {
-        playerRef.current.seek(activeClip.sourceTime);
+        playerRef.current?.seek(activeClip.sourceTime);
         currentClipRef.current = activeClip;
       }
       setIsPlaying(true);
@@ -180,12 +184,29 @@ const TimelineViewer = () => {
     }
   }, [setIsPlaying, setPlaybackTime, getActiveClip, setNotification]);
 
-  const formatTime = (seconds) => {
+  // Memoized formatTime function
+  const formatTime = useCallback((seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 100);
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
-  };
+  }, []);
+
+  // Memoized debug info
+  const debugInfo = useMemo(() => {
+    if (process.env.NODE_ENV !== 'development') return null;
+    
+    const activeClip = getActiveClip(playbackTime);
+    return {
+      playbackTime,
+      activeClip: activeClip ? {
+        id: activeClip.clip.id,
+        timelineStart: activeClip.timelineStart,
+        timelineEnd: activeClip.timelineEnd,
+        sourceTime: activeClip.sourceTime
+      } : null
+    };
+  }, [playbackTime, getActiveClip]);
 
   if (!clips.length) {
     return (
@@ -248,18 +269,10 @@ const TimelineViewer = () => {
         </Typography>
       </Box>
 
-      {process.env.NODE_ENV === 'development' && (
+      {debugInfo && (
         <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
           <Typography variant="caption" component="pre" sx={{ m: 0 }}>
-            {JSON.stringify({
-              playbackTime,
-              activeClip: getActiveClip(playbackTime) ? {
-                id: getActiveClip(playbackTime).clip.id,
-                timelineStart: getActiveClip(playbackTime).timelineStart,
-                timelineEnd: getActiveClip(playbackTime).timelineEnd,
-                sourceTime: getActiveClip(playbackTime).sourceTime
-              } : null
-            }, null, 2)}
+            {JSON.stringify(debugInfo, null, 2)}
           </Typography>
         </Box>
       )}
@@ -267,4 +280,4 @@ const TimelineViewer = () => {
   );
 };
 
-export default TimelineViewer;
+export default React.memo(TimelineViewer);

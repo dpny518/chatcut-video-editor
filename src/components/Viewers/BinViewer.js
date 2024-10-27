@@ -1,73 +1,49 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import ReactPlayer from 'react-player';
 import { Box, Typography, Slider, Alert, CircularProgress, Button } from '@mui/material';
 import { debounce } from 'lodash';
-import useMediaStore from   '../../stores/mediaStore';
+import useMediaStore from '../../stores/mediaStore';
 
 const MIN_CLIP_DURATION = 1;
 const SEEK_DEBOUNCE_MS = 100;
 const PROGRESS_INTERVAL = 100;
 
-const BinViewer = () => {
-  // Get state and actions from store
-  const {
-    selectedFile,
-    addToTimeline,
-    setNotification,
-    getTranscriptForFile
-  } = useMediaStore(state => ({
-    selectedFile: state.selectedFile,
-    addToTimeline: state.addToTimeline,
-    setNotification: state.setNotification,
-    getTranscriptForFile: state.getTranscriptForFile
-  }));
+const formatTime = (time) => {
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
 
-  // Local state
-  const [playing, setPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [range, setRange] = useState([0, 0]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [videoUrl, setVideoUrl] = useState(null);
+const BinViewer = () => {
+  // Memoized selectors for store
+  const selectedFile = useMediaStore(state => state.selectedFile);
+  const addToTimeline = useMediaStore(state => state.addToTimeline);
+  const setNotification = useMediaStore(state => state.setNotification);
+  const getTranscriptForFile = useMediaStore(state => state.getTranscriptForFile);
+
+  // Player state
+  const [playerState, setPlayerState] = useState({
+    playing: false,
+    duration: 0,
+    currentTime: 0,
+    range: [0, 0]
+  });
+
+  // UI state
+  const [uiState, setUiState] = useState({
+    loading: false,
+    error: null,
+    videoUrl: null
+  });
 
   // Refs
   const playerRef = useRef(null);
   const urlRef = useRef(null);
+  const debouncedSeekRef = useRef(null);
 
-  const cleanupVideoUrl = useCallback(() => {
-    if (urlRef.current) {
-      URL.revokeObjectURL(urlRef.current);
-      urlRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-
-    if (selectedFile?.file) {
-      try {
-        cleanupVideoUrl();
-        urlRef.current = URL.createObjectURL(selectedFile.file);
-        setVideoUrl(urlRef.current);
-        setPlaying(false);
-        setCurrentTime(0);
-        setRange([0, 0]);
-      } catch (err) {
-        setError(`Failed to load video: ${err.message}`);
-        setNotification(`Failed to load video: ${err.message}`, 'error');
-      }
-    } else {
-      setVideoUrl(null);
-    }
-
-    setLoading(false);
-    return cleanupVideoUrl;
-  }, [selectedFile, cleanupVideoUrl, setNotification]);
-
-  const debouncedSeek = useCallback(
-    debounce((time) => {
+  // Memoize debounced seek function
+  debouncedSeekRef.current = useMemo(
+    () => debounce((time) => {
       if (playerRef.current) {
         playerRef.current.seekTo(time, 'seconds');
       }
@@ -75,118 +51,167 @@ const BinViewer = () => {
     []
   );
 
-  const handlePlayPause = () => {
-    if (error) return;
-    setPlaying(!playing);
-  };
+  // Cleanup function
+  const cleanupVideoUrl = useCallback(() => {
+    if (urlRef.current) {
+      URL.revokeObjectURL(urlRef.current);
+      urlRef.current = null;
+    }
+  }, []);
 
-  const handleDuration = (duration) => {
-    setDuration(duration);
-    setRange([0, duration]);
-  };
+  // Handle file changes
+  useEffect(() => {
+    setUiState(prev => ({ ...prev, loading: true, error: null }));
+
+    if (selectedFile?.file) {
+      try {
+        cleanupVideoUrl();
+        urlRef.current = URL.createObjectURL(selectedFile.file);
+        
+        setUiState(prev => ({ 
+          ...prev, 
+          videoUrl: urlRef.current 
+        }));
+        
+        setPlayerState(prev => ({
+          ...prev,
+          playing: false,
+          currentTime: 0,
+          range: [0, 0]
+        }));
+      } catch (err) {
+        const errorMsg = `Failed to load video: ${err.message}`;
+        setUiState(prev => ({ ...prev, error: errorMsg }));
+        setNotification(errorMsg, 'error');
+      }
+    } else {
+      setUiState(prev => ({ ...prev, videoUrl: null }));
+    }
+
+    setUiState(prev => ({ ...prev, loading: false }));
+    return cleanupVideoUrl;
+  }, [selectedFile, cleanupVideoUrl, setNotification]);
+
+  // Handlers
+  const handlePlayPause = useCallback(() => {
+    if (uiState.error) return;
+    setPlayerState(prev => ({ ...prev, playing: !prev.playing }));
+  }, [uiState.error]);
+
+  const handleDuration = useCallback((duration) => {
+    setPlayerState(prev => ({
+      ...prev,
+      duration,
+      range: [0, duration]
+    }));
+  }, []);
 
   const handleProgress = useCallback(
     state => {
-      setCurrentTime(state.playedSeconds);
-      
-      if (state.playedSeconds >= range[1]) {
-        setPlaying(false);
-        debouncedSeek(range[0]);
-      }
+      setPlayerState(prev => {
+        const newTime = state.playedSeconds;
+        
+        if (newTime >= prev.range[1]) {
+          debouncedSeekRef.current?.(prev.range[0]);
+          return {
+            ...prev,
+            playing: false,
+            currentTime: prev.range[0]
+          };
+        }
+        
+        return {
+          ...prev,
+          currentTime: newTime
+        };
+      });
     },
-    [range, debouncedSeek]
+    []
   );
 
-  const handleRangeChange = (event, newValue) => {
+  const handleRangeChange = useCallback((event, newValue) => {
     const [start, end] = newValue;
     
     if (end - start < MIN_CLIP_DURATION) {
       return;
     }
     
-    setRange(newValue);
-    debouncedSeek(newValue[0]);
-  };
+    setPlayerState(prev => ({ ...prev, range: newValue }));
+    debouncedSeekRef.current?.(newValue[0]);
+  }, []);
 
-  const handleError = (error) => {
+  const handleError = useCallback((error) => {
     console.error('Video playback error:', error);
     const errorMessage = 'Failed to play video. Please try again or select a different file.';
-    setError(errorMessage);
+    setUiState(prev => ({ ...prev, error: errorMessage }));
     setNotification(errorMessage, 'error');
-    setPlaying(false);
-  };
+    setPlayerState(prev => ({ ...prev, playing: false }));
+  }, [setNotification]);
 
   const handleAddToTimeline = useCallback(() => {
-    if (!selectedFile || error) return;
+    if (!selectedFile || uiState.error) return;
 
     const clipData = {
       id: `clip-${Date.now()}`,
       file: selectedFile.file,
       name: selectedFile.file.name,
-      startTime: range[0],
-      endTime: range[1],
-      duration: range[1] - range[0],
+      startTime: playerState.range[0],
+      endTime: playerState.range[1],
+      duration: playerState.range[1] - playerState.range[0],
       source: {
         startTime: 0,
-        endTime: duration,
-        duration: duration
+        endTime: playerState.duration,
+        duration: playerState.duration
       },
-      // Get matching transcript if exists
       transcript: getTranscriptForFile(selectedFile.name)
     };
 
     addToTimeline(clipData);
-    setNotification(`Added clip from ${formatTime(range[0])} to ${formatTime(range[1])}`, 'success');
-  }, [selectedFile, error, range, duration, addToTimeline, getTranscriptForFile, setNotification]);
-
-  const formatTime = (time) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  if (loading) {
-    return (
-      <Box sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center' 
-      }}>
-        <CircularProgress />
-      </Box>
+    setNotification(
+      `Added clip from ${formatTime(playerState.range[0])} to ${formatTime(playerState.range[1])}`,
+      'success'
     );
-  }
+  }, [
+    selectedFile,
+    uiState.error,
+    playerState.range,
+    playerState.duration,
+    addToTimeline,
+    getTranscriptForFile,
+    setNotification
+  ]);
 
-  if (error) {
-    return (
-      <Box sx={{ height: '100%', p: 2 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={() => setError(null)}
-        >
-          Try Again
-        </Button>
-      </Box>
-    );
-  }
+  // Memoized UI elements
+  const loadingView = useMemo(() => (
+    <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <CircularProgress />
+    </Box>
+  ), []);
 
-  if (!selectedFile) {
-    return (
-      <Box sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center' 
-      }}>
-        <Typography>No video selected</Typography>
-      </Box>
-    );
-  }
+  const errorView = useMemo(() => (
+    <Box sx={{ height: '100%', p: 2 }}>
+      <Alert severity="error" sx={{ mb: 2 }}>
+        {uiState.error}
+      </Alert>
+      <Button 
+        variant="contained" 
+        color="primary" 
+        onClick={() => setUiState(prev => ({ ...prev, error: null }))}
+      >
+        Try Again
+      </Button>
+    </Box>
+  ), [uiState.error]);
+
+  const emptyView = useMemo(() => (
+    <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Typography>No video selected</Typography>
+    </Box>
+  ), []);
+
+  if (uiState.loading) return loadingView;
+  if (uiState.error) return errorView;
+  if (!selectedFile) return emptyView;
 
   return (
     <Box sx={{ 
@@ -213,13 +238,13 @@ const BinViewer = () => {
         borderRadius: 1,
         overflow: 'hidden'
       }}>
-        {videoUrl && (
+        {uiState.videoUrl && (
           <ReactPlayer
             ref={playerRef}
-            url={videoUrl}
+            url={uiState.videoUrl}
             width="100%"
             height="100%"
-            playing={playing}
+            playing={playerState.playing}
             onDuration={handleDuration}
             onProgress={handleProgress}
             onError={handleError}
@@ -237,14 +262,14 @@ const BinViewer = () => {
 
       <Box sx={{ mb: 2, px: 1 }}>
         <Slider
-          value={range}
+          value={playerState.range}
           onChange={handleRangeChange}
           valueLabelDisplay="auto"
           valueLabelFormat={formatTime}
           min={0}
-          max={duration}
+          max={playerState.duration}
           step={0.1}
-          disabled={!duration}
+          disabled={!playerState.duration}
           sx={{
             '& .MuiSlider-thumb': {
               width: 12,
@@ -260,7 +285,7 @@ const BinViewer = () => {
         }}>
           <Box sx={{
             position: 'absolute',
-            left: `${(currentTime / duration) * 100}%`,
+            left: `${(playerState.currentTime / playerState.duration) * 100}%`,
             transform: 'translateX(-50%)',
             width: '2px',
             height: '16px',
@@ -278,18 +303,18 @@ const BinViewer = () => {
         px: 1
       }}>
         <Typography variant="body2" color="text.secondary">
-          Selected: {formatTime(range[0])} - {formatTime(range[1])}
+          Selected: {formatTime(playerState.range[0])} - {formatTime(playerState.range[1])}
           <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-            ({formatTime(range[1] - range[0])})
+            ({formatTime(playerState.range[1] - playerState.range[0])})
           </Typography>
         </Typography>
         <Button 
           onClick={handlePlayPause}
           variant="contained"
           size="small"
-          disabled={!duration}
+          disabled={!playerState.duration}
         >
-          {playing ? 'Pause' : 'Play'}
+          {playerState.playing ? 'Pause' : 'Play'}
         </Button>
       </Box>
 
@@ -297,7 +322,7 @@ const BinViewer = () => {
         onClick={handleAddToTimeline}
         variant="contained"
         color="primary"
-        disabled={!duration || range[1] - range[0] < MIN_CLIP_DURATION}
+        disabled={!playerState.duration || playerState.range[1] - playerState.range[0] < MIN_CLIP_DURATION}
         fullWidth
       >
         Add to Timeline
@@ -306,4 +331,4 @@ const BinViewer = () => {
   );
 };
 
-export default BinViewer;
+export default React.memo(BinViewer);

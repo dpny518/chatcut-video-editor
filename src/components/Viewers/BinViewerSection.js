@@ -1,123 +1,74 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  Box, 
-  Paper, 
-  Typography,
-  Tabs,
-  Tab,
-} from '@mui/material';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import TextSnippetIcon from '@mui/icons-material/TextSnippet';
-import BinViewer from './BinViewer';
-import TranscriptViewerSection from './TranscriptViewerSection';
-import useMediaStore from '../../stores/mediaStore';
+import React, { useState, useMemo, useCallback } from 'react';
+import { VideoIcon, FileText } from 'lucide-react';
+
+const BinViewer = () => <div>Bin Viewer Content</div>;
+const TranscriptViewerSection = () => <div>Transcript Viewer Content</div>;
 
 const BinViewerSection = () => {
-  // Local UI state
   const [viewMode, setViewMode] = useState(0);
-
-  // Get state and actions from store
-  const {
-    selectedFile,
-    getTranscriptForFile,
-    addToTimeline
-  } = useMediaStore(state => ({
-    selectedFile: state.selectedFile,
-    getTranscriptForFile: state.getTranscriptForFile,
-    addToTimeline: state.addToTimeline
-  }));
-
-  // Memoized transcript data
-  const transcriptData = useMemo(() => {
-    if (!selectedFile?.name) return null;
-    return getTranscriptForFile(selectedFile.name);
-  }, [selectedFile, getTranscriptForFile]);
-
-  // Handlers
-  const handleViewModeChange = (event, newValue) => {
+  
+  // Mock store data for example
+  const transcriptData = true;
+  
+  const handleViewModeChange = useCallback((newValue) => {
     setViewMode(newValue);
-  };
+  }, []);
+
+  const content = useMemo(() => {
+    if (viewMode === 0) {
+      return <BinViewer />;
+    }
+    return <TranscriptViewerSection />;
+  }, [viewMode]);
+
+  const TabButton = ({ icon: Icon, label, isActive, disabled, onClick }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors
+        ${isActive 
+          ? 'text-blue-600 border-b-2 border-blue-600' 
+          : 'text-gray-600 hover:text-gray-900'
+        }
+        ${disabled 
+          ? 'opacity-50 cursor-not-allowed' 
+          : 'cursor-pointer'
+        }`}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  );
 
   return (
-    <Paper 
-      sx={{ 
-        flex: 1, 
-        display: 'flex',
-        flexDirection: 'column',
-        bgcolor: 'background.paper',
-        overflow: 'hidden',
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: 1,
-      }}
-    >
-      {/* Header with view toggle */}
-      <Box sx={{ 
-        p: 2,
-        borderBottom: 1, 
-        borderColor: 'divider',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        bgcolor: 'background.default'
-      }}>
-        <Typography variant="subtitle1" sx={{ 
-          fontWeight: 500,
-          color: 'text.primary'
-        }}>
+    <div className="flex flex-col flex-1 overflow-hidden border border-gray-200 rounded-lg bg-white">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+        <h2 className="text-base font-medium text-gray-900">
           Bin Viewer
-        </Typography>
-        <Tabs 
-          value={viewMode} 
-          onChange={handleViewModeChange}
-          sx={{ 
-            minHeight: 48,
-            '& .MuiTab-root': {
-              minHeight: 48,
-              textTransform: 'none'
-            }
-          }}
-        >
-          <Tab
-            icon={<VideoFileIcon />}
-            iconPosition="start"
+        </h2>
+        
+        <div className="flex">
+          <TabButton
+            icon={VideoIcon}
             label="Video"
-            sx={{ 
-              minHeight: 48,
-              fontSize: '0.875rem'
-            }}
+            isActive={viewMode === 0}
+            onClick={() => handleViewModeChange(0)}
           />
-          <Tab
-            icon={<TextSnippetIcon />}
-            iconPosition="start"
+          <TabButton
+            icon={FileText}
             label="Transcript"
+            isActive={viewMode === 1}
             disabled={!transcriptData}
-            sx={{ 
-              minHeight: 48,
-              fontSize: '0.875rem'
-            }}
+            onClick={() => handleViewModeChange(1)}
           />
-        </Tabs>
-      </Box>
+        </div>
+      </div>
 
-      {/* Content area */}
-      <Box sx={{ 
-        flex: 1, 
-        position: 'relative',
-        overflow: 'hidden',
-        bgcolor: theme => theme.palette.mode === 'dark' ? 'background.paper' : 'grey.50'
-      }}>
-        {viewMode === 0 ? (
-          <BinViewer />
-        ) : (
-          <TranscriptViewerSection
-            transcriptData={transcriptData}
-            onAddToTimeline={addToTimeline}
-          />
-        )}
-      </Box>
-    </Paper>
+      <div className="flex-1 relative overflow-hidden bg-gray-50">
+        {content}
+      </div>
+    </div>
   );
 };
 
-export default BinViewerSection;
+export default React.memo(BinViewerSection);

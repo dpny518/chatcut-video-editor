@@ -1,64 +1,78 @@
-// src/components/Viewers/TranscriptViewerSection.js
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Paper, Box, Alert, Typography } from '@mui/material';
 import TimelineTranscriptViewer from './TimelineTranscriptViewer';
 import useTimelineStore from '../../stores/timelineStore';
 import useTranscriptStore from '../../stores/transcriptStore';
+import { shallow } from 'zustand/shallow';
 
 const TranscriptViewerSection = () => {
-  // Get state from stores
-  const { 
-    timelineTranscripts,
-    searchResults,
-    searchQuery
-  } = useTranscriptStore(state => ({
-    timelineTranscripts: state.timelineTranscripts,
-    searchResults: state.searchResults,
-    searchQuery: state.searchQuery
-  }));
+  // Split selectors to prevent unnecessary re-renders
+  const { timelineTranscripts } = useTranscriptStore(
+    state => ({ 
+      timelineTranscripts: state.timelineTranscripts 
+    }), 
+    shallow
+  );
 
-  const {
-    clips,
-    selectedClipId
-  } = useTimelineStore(state => ({
-    clips: state.clips,
-    selectedClipId: state.selectedClipId
-  }));
+  const searchState = useTranscriptStore(
+    state => ({ 
+      searchResults: state.searchState.results,
+      searchQuery: state.searchState.query 
+    }), 
+    shallow
+  );
 
-  // Early return for no clips
-  if (clips.length === 0) {
-    return (
-      <Paper sx={{ 
-        flex: 1, 
-        p: 2, 
-        bgcolor: 'background.paper',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <Alert severity="info">
-          Add clips to the timeline to view transcripts
-        </Alert>
-      </Paper>
-    );
+  const timelineState = useTimelineStore(
+    state => ({
+      clips: state.clips,
+      selectedClipId: state.selectedClipId
+    }), 
+    shallow
+  );
+
+  // Memoize selected clip info
+  const selectedClip = useMemo(() => 
+    timelineState.clips.find(c => c.id === timelineState.selectedClipId),
+    [timelineState.clips, timelineState.selectedClipId]
+  );
+
+  // Early returns with memoized components
+  const emptyClipsView = useMemo(() => (
+    <Paper sx={{ 
+      flex: 1, 
+      p: 2, 
+      bgcolor: 'background.paper',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}>
+      <Alert severity="info">
+        Add clips to the timeline to view transcripts
+      </Alert>
+    </Paper>
+  ), []);
+
+  const emptyTranscriptsView = useMemo(() => (
+    <Paper sx={{ 
+      flex: 1, 
+      p: 2, 
+      bgcolor: 'background.paper',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}>
+      <Alert severity="info">
+        No transcript data available for the current clips
+      </Alert>
+    </Paper>
+  ), []);
+
+  if (timelineState.clips.length === 0) {
+    return emptyClipsView;
   }
 
-  // Early return for no transcripts
   if (!timelineTranscripts.size) {
-    return (
-      <Paper sx={{ 
-        flex: 1, 
-        p: 2, 
-        bgcolor: 'background.paper',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <Alert severity="info">
-          No transcript data available for the current clips
-        </Alert>
-      </Paper>
-    );
+    return emptyTranscriptsView;
   }
 
   return (
@@ -75,24 +89,21 @@ const TranscriptViewerSection = () => {
         borderRadius: 1
       }}
     >
-      {/* Search Results Summary (if search is active) */}
-      {searchQuery && (
+      {searchState.searchQuery && (
         <Box sx={{ 
           p: 1, 
           bgcolor: 'background.default',
           borderRadius: 1
         }}>
           <Typography variant="caption" color="text.secondary">
-            {searchResults.length} matches found for "{searchQuery}"
+            {searchState.searchResults.length} matches found for "{searchState.searchQuery}"
           </Typography>
         </Box>
       )}
 
-      {/* Main Transcript Viewer */}
       <TimelineTranscriptViewer />
 
-      {/* Selected Clip Info (if any clip is selected) */}
-      {selectedClipId && (
+      {selectedClip && (
         <Box sx={{ 
           mt: 'auto',
           pt: 1,
@@ -100,7 +111,7 @@ const TranscriptViewerSection = () => {
           borderColor: 'divider'
         }}>
           <Typography variant="caption" color="text.secondary">
-            Currently viewing: {clips.find(c => c.id === selectedClipId)?.name}
+            Currently viewing: {selectedClip.name}
           </Typography>
         </Box>
       )}
@@ -108,4 +119,4 @@ const TranscriptViewerSection = () => {
   );
 };
 
-export default TranscriptViewerSection;
+export default React.memo(TranscriptViewerSection);

@@ -1,5 +1,4 @@
-// src/components/Viewers/TimelineViewerSection.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Box, Paper, ToggleButtonGroup, ToggleButton, Alert } from '@mui/material';
 import { FileVideo, FileText } from 'lucide-react';
 import TimelineViewer from './TimelineViewer';
@@ -7,49 +6,38 @@ import TimelineTranscriptViewer from './TimelineTranscriptViewer';
 import useTimelineStore from '../../stores/timelineStore';
 import useTranscriptStore from '../../stores/transcriptStore';
 
-const TimelineViewerSection = () => {
-  // Local UI state
+const TimelineViewerSection = React.memo(() => {
   const [viewMode, setViewMode] = useState('video');
 
-  // Get state from stores
-  const {
-    clips,
-    selectedClipId,
-    playbackTime
-  } = useTimelineStore(state => ({
-    clips: state.clips,
-    selectedClipId: state.selectedClipId,
-    playbackTime: state.playbackTime
-  }));
+  // Split store selectors to prevent unnecessary re-renders
+  const clips = useTimelineStore(state => state.clips);
+  const selectedClipId = useTimelineStore(state => state.selectedClipId);
+  const playbackTime = useTimelineStore(state => state.playbackTime);
 
-  const {
-    timelineTranscripts,
-    processClipTranscript,
-    clearTimelineTranscripts
-  } = useTranscriptStore(state => ({
-    timelineTranscripts: state.timelineTranscripts,
-    processClipTranscript: state.processClipTranscript,
-    clearTimelineTranscripts: state.clearTimelineTranscripts
-  }));
+  const timelineTranscripts = useTranscriptStore(state => state.timelineTranscripts);
+  const processClipTranscript = useTranscriptStore(state => state.processClipTranscript);
+  const clearTimelineTranscripts = useTranscriptStore(state => state.clearTimelineTranscripts);
 
   // Process transcripts when clips change
   useEffect(() => {
+    const unprocessedClips = clips.filter(clip => !timelineTranscripts.has(clip.id));
+    
+    if (unprocessedClips.length === 0) return;
+    
     clearTimelineTranscripts();
-    clips.forEach(clip => {
-      if (!timelineTranscripts.has(clip.id)) {
-        processClipTranscript(clip);
-      }
-    });
-  }, [clips, processClipTranscript, clearTimelineTranscripts, timelineTranscripts]);
+    unprocessedClips.forEach(processClipTranscript);
+  }, [clips, processClipTranscript, clearTimelineTranscripts]); // Remove timelineTranscripts from deps
 
-  // Handle view mode change
-  const handleViewModeChange = (event, newMode) => {
+  const handleViewModeChange = useCallback((event, newMode) => {
     if (newMode) {
       setViewMode(newMode);
     }
-  };
+  }, []);
 
-  const currentClip = clips.find(clip => clip.id === selectedClipId);
+  const currentClip = useMemo(() => 
+    clips.find(clip => clip.id === selectedClipId),
+    [clips, selectedClipId]
+  );
 
   if (!clips.length) {
     return (
@@ -113,10 +101,7 @@ const TimelineViewerSection = () => {
           onChange={handleViewModeChange}
           size="small"
         >
-          <ToggleButton 
-            value="video"
-            aria-label="video view"
-          >
+          <ToggleButton value="video" aria-label="video view">
             <FileVideo className="w-4 h-4 mr-2" />
             Video
           </ToggleButton>
@@ -148,6 +133,8 @@ const TimelineViewerSection = () => {
       </Box>
     </Paper>
   );
-};
+});
+
+TimelineViewerSection.displayName = 'TimelineViewerSection';
 
 export default TimelineViewerSection;

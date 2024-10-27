@@ -1,23 +1,65 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Box, Card, CardContent, Typography, Alert } from '@mui/material';
 import useTimelineStore from '../../stores/timelineStore';
 import useTranscriptStore from '../../stores/transcriptStore';
+import { shallow } from 'zustand/shallow';
 
 const TimelineTranscriptViewer = () => {
-  const { clips, playbackTime } = useTimelineStore(state => ({
-    clips: state.clips,
-    playbackTime: state.playbackTime
-  }));
+  // Split selectors to prevent unnecessary re-renders
+  const timelineState = useTimelineStore(
+    state => ({
+      clips: state.clips,
+      playbackTime: state.playbackTime
+    }),
+    shallow
+  );
 
-  const { 
-    timelineTranscripts, 
-    getTimelineTranscript,
-    currentHighlight 
-  } = useTranscriptStore(state => ({
-    timelineTranscripts: state.timelineTranscripts,
-    getTimelineTranscript: state.getTimelineTranscript,
-    currentHighlight: state.currentHighlight
-  }));
+  const transcriptState = useTranscriptStore(
+    state => ({
+      timelineTranscripts: state.timelineTranscripts,
+      currentHighlight: state.searchState.currentHighlight
+    }),
+    shallow
+  );
+
+  const getTimelineTranscript = useTranscriptStore(
+    state => state.selectors.getTimelineTranscript
+  );
+
+  // Memoize rendering functions
+  const renderWord = useCallback((word, index, clipId) => {
+    const isCurrentWord = timelineState.playbackTime >= word.timelineStart && 
+                         timelineState.playbackTime <= word.timelineEnd;
+    const isHighlighted = transcriptState.currentHighlight?.word === word.word;
+
+    return (
+      <Box
+        component="span"
+        key={`${clipId}-word-${index}`}
+        sx={{
+          px: 0.5,
+          py: 0.25,
+          borderRadius: 0.5,
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          ...(isCurrentWord && {
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
+            fontWeight: 500
+          }),
+          ...(isHighlighted && {
+            bgcolor: 'secondary.main',
+            color: 'secondary.contrastText'
+          }),
+          '&:hover': {
+            bgcolor: 'action.hover'
+          }
+        }}
+      >
+        {word.word}{' '}
+      </Box>
+    );
+  }, [timelineState.playbackTime, transcriptState.currentHighlight]);
 
   const renderClipTranscript = useCallback((clip) => {
     const transcriptData = getTimelineTranscript(clip.id);
@@ -32,8 +74,8 @@ const TimelineTranscriptViewer = () => {
 
     return transcriptData.map((segment, segmentIndex) => {
       const isCurrentSegment = segment.words.some(word => 
-        playbackTime >= word.timelineStart && 
-        playbackTime <= word.timelineEnd
+        timelineState.playbackTime >= word.timelineStart && 
+        timelineState.playbackTime <= word.timelineEnd
       );
 
       return (
@@ -71,42 +113,17 @@ const TimelineTranscriptViewer = () => {
               transition: 'all 0.2s'
             }
           }}>
-            {segment.words.map((word, wordIndex) => (
-              <Box
-                component="span"
-                key={`${clip.id}-word-${wordIndex}`}
-                sx={{
-                  px: 0.5,
-                  py: 0.25,
-                  borderRadius: 0.5,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  ...(playbackTime >= word.timelineStart && 
-                     playbackTime <= word.timelineEnd && {
-                    bgcolor: 'primary.main',
-                    color: 'primary.contrastText',
-                    fontWeight: 500
-                  }),
-                  ...(currentHighlight?.word === word.word && {
-                    bgcolor: 'secondary.main',
-                    color: 'secondary.contrastText'
-                  }),
-                  '&:hover': {
-                    bgcolor: 'action.hover'
-                  }
-                }}
-              >
-                {word.word}{' '}
-              </Box>
-            ))}
+            {segment.words.map((word, wordIndex) => 
+              renderWord(word, wordIndex, clip.id)
+            )}
           </Box>
         </Box>
       );
     });
-  }, [getTimelineTranscript, playbackTime, currentHighlight]);
+  }, [timelineState.playbackTime, getTimelineTranscript, renderWord]);
 
   // Show loading state if no transcripts
-  if (!timelineTranscripts.size) {
+  if (!transcriptState.timelineTranscripts.size) {
     return (
       <Card sx={{ 
         height: '100%', 
@@ -136,7 +153,7 @@ const TimelineTranscriptViewer = () => {
         overflowY: 'auto',
         '&:last-child': { pb: 0 }
       }}>
-        {clips.length === 0 ? (
+        {!timelineState.clips.length ? (
           <Box sx={{ p: 2 }}>
             <Alert severity="info">
               No clips added to timeline yet
@@ -144,7 +161,7 @@ const TimelineTranscriptViewer = () => {
           </Box>
         ) : (
           <Box sx={{ p: 2 }}>
-            {clips.map((clip) => (
+            {timelineState.clips.map((clip) => (
               <Box 
                 key={clip.id} 
                 sx={{ 
@@ -187,4 +204,4 @@ const TimelineTranscriptViewer = () => {
   );
 };
 
-export default TimelineTranscriptViewer;
+export default React.memo(TimelineTranscriptViewer);

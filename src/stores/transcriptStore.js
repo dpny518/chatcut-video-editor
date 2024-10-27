@@ -1,201 +1,233 @@
-// src/stores/transcriptStore.js
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { shallow } from 'zustand/shallow';
+
+// Utility functions
+const createMap = (entries = []) => new Map(entries);
 
 const initialTranscriptState = {
   transcripts: new Map(),
   videoTranscriptMap: new Map(),
   timelineTranscripts: new Map(),
   activeTranscript: null,
-  searchQuery: '',
-  searchResults: [],
-  currentHighlight: null
+  searchState: {
+    query: '',
+    results: [],
+    currentHighlight: null
+  }
 };
 
-const useTranscriptStore = create(
-  persist(
-    (set, get) => ({
-      ...initialTranscriptState, // Spread the initial state here
+const createSelectors = (get) => ({
+  getTranscriptForVideo: (videoFilename) => {
+    if (!videoFilename) return null;
+    const transcriptFilename = get().videoTranscriptMap.get(videoFilename);
+    return transcriptFilename ? get().transcripts.get(transcriptFilename) : null;
+  },
 
-      // Transcript Management
-      addTranscript: (filename, transcriptData) => set((state) => {
-        const newTranscripts = new Map(state.transcripts);
-        newTranscripts.set(filename, transcriptData);
-        return { 
-          transcripts: newTranscripts,
-          searchResults: [] // Clear search when adding new transcript
-        };
+  getTimelineTranscript: (clipId) => 
+    get().timelineTranscripts.get(clipId)?.segments || null,
+
+  getWordAtTime: (time) => {
+    const { timelineTranscripts } = get();
+    for (const transcript of timelineTranscripts.values()) {
+      const word = transcript.segments
+        .flatMap(segment => segment.words)
+        .find(w => time >= w.timelineStart && time <= w.timelineEnd);
+      if (word) return word;
+    }
+    return null;
+  },
+
+  getAllSpeakers: () => {
+    const { timelineTranscripts } = get();
+    const speakers = new Set();
+    for (const { segments } of timelineTranscripts.values()) {
+      for (const { segment } of segments) {
+        if (segment.speaker) speakers.add(segment.speaker);
+      }
+    }
+    return Array.from(speakers);
+  }
+});
+
+const createActions = (set, get) => ({
+  addTranscript: (filename, transcriptData) => 
+    set(
+      state => ({
+        transcripts: createMap([...state.transcripts, [filename, transcriptData]]),
+        searchState: { ...state.searchState, results: [] }
       }),
+      false,
+      'addTranscript'
+    ),
 
-      removeTranscript: (filename) => set((state) => {
-        const newTranscripts = new Map(state.transcripts);
+  removeTranscript: (filename) => 
+    set(
+      state => {
+        const newTranscripts = createMap(state.transcripts);
         newTranscripts.delete(filename);
-        const newVideoMap = new Map(state.videoTranscriptMap);
-        for (const [video, transcript] of newVideoMap) {
-          if (transcript === filename) {
-            newVideoMap.delete(video);
-          }
-        }
+        
+        const newVideoMap = createMap(
+          Array.from(state.videoTranscriptMap.entries())
+            .filter(([_, transcript]) => transcript !== filename)
+        );
+        
         return { 
           transcripts: newTranscripts,
           videoTranscriptMap: newVideoMap
         };
-      }),
+      },
+      false,
+      'removeTranscript'
+    ),
 
-      // Video-Transcript Mapping
-      mapVideoToTranscript: (videoFilename, transcriptFilename) => set((state) => {
-        const newMap = new Map(state.videoTranscriptMap);
-        newMap.set(videoFilename, transcriptFilename);
-        return { videoTranscriptMap: newMap };
+  mapVideoToTranscript: (videoFilename, transcriptFilename) => 
+    set(
+      state => ({
+        videoTranscriptMap: createMap([
+          ...state.videoTranscriptMap,
+          [videoFilename, transcriptFilename]
+        ])
       }),
+      false,
+      'mapVideoToTranscript'
+    ),
 
-      unmapVideo: (videoFilename) => set((state) => {
-        const newMap = new Map(state.videoTranscriptMap);
-        newMap.delete(videoFilename);
-        return { videoTranscriptMap: newMap };
-      }),
+  processClipTranscript: (clip) => {
+    if (!clip?.id) return;
+    
+    const state = get();
+    const transcriptData = clip.transcriptData || 
+                         state.getTranscriptForVideo(clip.name);
+    
+    if (!transcriptData?.transcription) return;
 
-      // Timeline Transcript Management
-      addTimelineTranscript: (clipId, segments) => set((state) => {
-        const newTimelineTranscripts = new Map(state.timelineTranscripts);
-        newTimelineTranscripts.set(clipId, {
-          segments,
-          timestamp: Date.now()
-        });
-        return { timelineTranscripts: newTimelineTranscripts };
-      }),
+    const timelineStart = clip.metadata?.timeline?.start || 0;
+    const processedSegments = transcriptData.transcription
+      .reduce((acc, segment) => {
+        const filteredWords = segment.words
+          .filter(word => 
+            word.start >= clip.startTime && 
+            word.end <= clip.endTime
+          )
+          .map(word => ({
+            ...word,
+            timelineStart: timelineStart + (word.start - clip.startTime),
+            timelineEnd: timelineStart + (word.end - clip.startTime)
+          }));
 
-      clearTimelineTranscript: (clipId) => set((state) => {
-        const newTimelineTranscripts = new Map(state.timelineTranscripts);
-        newTimelineTranscripts.delete(clipId);
-        return { timelineTranscripts: newTimelineTranscripts };
-      }),
+        if (filteredWords.length > 0) {
+          acc.push({
+            ...segment,
+            words: filteredWords
+          });
+        }
+        return acc;
+      }, []);
 
-      // Function to clear all timeline transcripts
-      clearTimelineTranscripts: () => set(() => ({
+    if (processedSegments.length > 0) {
+      set(
+        state => ({
+          timelineTranscripts: createMap([
+            ...state.timelineTranscripts,
+            [clip.id, { segments: processedSegments, timestamp: Date.now() }]
+          ])
+        }),
+        false,
+        'processClipTranscript'
+      );
+    }
+  },
+
+  clearTimelineTranscripts: () => 
+    set(
+      () => ({
         timelineTranscripts: new Map(),
         activeTranscript: null
-      })),
+      }),
+      false,
+      'clearTimelineTranscripts'
+    ),
 
-      // Transcript Data Retrieval
-      getTranscriptForVideo: (videoFilename) => {
-        if (!videoFilename) return null;
-        const state = get();
-        const transcriptFilename = state.videoTranscriptMap.get(videoFilename);
-        return transcriptFilename ? state.transcripts.get(transcriptFilename) : null;
-      },
-
-      getTimelineTranscript: (clipId) => {
-        return get().timelineTranscripts.get(clipId)?.segments || null;
-      },
-
-      // Transcript Processing
-      processClipTranscript: (clip) => {
-        if (!clip) return null;
-        
-        const state = get();
-        const transcriptData = clip.transcriptData || 
-                             state.getTranscriptForVideo(clip.name);
-        
-        if (!transcriptData?.transcription) return null;
-
-        const timelineStart = clip.metadata?.timeline?.start || 0;
-        const timelineEnd = clip.metadata?.timeline?.end || clip.duration;
-
-        const relevantSegments = transcriptData.transcription
-          .map(segment => ({
-            ...segment,
-            words: segment.words.filter(word => 
-              word.start >= clip.startTime && 
-              word.end <= clip.endTime
-            ).map(word => ({
-              ...word,
-              timelineStart: timelineStart + (word.start - clip.startTime),
-              timelineEnd: timelineStart + (word.end - clip.startTime)
-            }))
-          }))
-          .filter(segment => segment.words.length > 0);
-
-        state.addTimelineTranscript(clip.id, relevantSegments);
-        return relevantSegments;
-      },
-
-      // Search functionality
-      setSearchQuery: (query) => set({ searchQuery: query }),
-
-      searchTranscripts: (query) => set((state) => {
+  updateSearch: (query) => 
+    set(
+      state => {
         if (!query.trim()) {
-          return { searchResults: [] };
+          return { 
+            searchState: { 
+              ...state.searchState, 
+              query, 
+              results: [] 
+            } 
+          };
         }
 
+        const searchQuery = query.toLowerCase();
         const results = [];
+        
         for (const [clipId, transcript] of state.timelineTranscripts) {
-          const matches = transcript.segments
-            .flatMap(segment => 
-              segment.words.filter(word => 
-                word.word.toLowerCase().includes(query.toLowerCase())
-              ).map(word => ({
-                clipId,
-                word: word.word,
-                timelineStart: word.timelineStart,
-                timelineEnd: word.timelineEnd,
-                speaker: segment.segment.speaker
-              }))
-            );
-          results.push(...matches);
-        }
-
-        return { 
-          searchResults: results.sort((a, b) => a.timelineStart - b.timelineStart)
-        };
-      }),
-
-      // Highlight management
-      setCurrentHighlight: (highlight) => set({ currentHighlight: highlight }),
-
-      clearHighlight: () => set({ currentHighlight: null }),
-
-      // Active transcript management
-      setActiveTranscript: (transcriptData) => set({ 
-        activeTranscript: transcriptData 
-      }),
-
-      // Utility functions
-      getWordAtTime: (time) => {
-        const state = get();
-        for (const transcript of state.timelineTranscripts.values()) {
           for (const segment of transcript.segments) {
-            const word = segment.words.find(w => 
-              time >= w.timelineStart && time <= w.timelineEnd
-            );
-            if (word) return word;
+            for (const word of segment.words) {
+              if (word.word.toLowerCase().includes(searchQuery)) {
+                results.push({
+                  clipId,
+                  word: word.word,
+                  timelineStart: word.timelineStart,
+                  timelineEnd: word.timelineEnd,
+                  speaker: segment.segment.speaker
+                });
+              }
+            }
           }
         }
-        return null;
-      },
 
-      getAllSpeakers: () => {
-        const state = get();
-        const speakers = new Set();
-        for (const transcript of state.timelineTranscripts.values()) {
-          transcript.segments.forEach(segment => 
-            speakers.add(segment.segment.speaker)
-          );
-        }
-        return Array.from(speakers);
-      },
+        results.sort((a, b) => a.timelineStart - b.timelineStart);
 
-      // Cleanup
-      clearState: () => set(initialTranscriptState) // Reset to initial state
+        return { 
+          searchState: { 
+            ...state.searchState,
+            query,
+            results,
+            currentHighlight: null 
+          }
+        };
+      },
+      false,
+      'updateSearch'
+    ),
+
+  setCurrentHighlight: (highlight) => 
+    set(
+      state => ({
+        searchState: { ...state.searchState, currentHighlight: highlight }
+      }),
+      false,
+      'setCurrentHighlight'
+    ),
+
+  clearState: () => set(initialTranscriptState, false, 'clearState')
+});
+
+const useTranscriptStore = create(
+  persist(
+    (set, get) => ({
+      ...initialTranscriptState,
+      ...createSelectors(get),
+      ...createActions(set, get)
     }),
     {
       name: 'transcript-storage',
-      getStorage: () => localStorage,
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        transcripts: Array.from(state.transcripts.entries()),
+        videoTranscriptMap: Array.from(state.videoTranscriptMap.entries()),
+        timelineTranscripts: Array.from(state.timelineTranscripts.entries())
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          state.transcripts = new Map(state.transcripts || []);
-          state.videoTranscriptMap = new Map(state.videoTranscriptMap || []);
-          state.timelineTranscripts = new Map(state.timelineTranscripts || []);
+          state.transcripts = createMap(state.transcripts);
+          state.videoTranscriptMap = createMap(state.videoTranscriptMap);
+          state.timelineTranscripts = createMap(state.timelineTranscripts);
         }
       }
     }
