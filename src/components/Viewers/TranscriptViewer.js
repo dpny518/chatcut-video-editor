@@ -5,32 +5,52 @@ import {
   CardContent, 
   Button, 
   Typography,
-  Paper
+  Paper,
+  Alert
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import useMediaStore from '../../stores/mediaStore';
 
-const TranscriptViewer = ({ 
-  selectedClip,  // Change this from videoFile to selectedClip
-  transcriptData, 
-  onAddToTimeline,
-  sx
-}) => {
+const TranscriptViewer = ({ sx }) => {
+  // Get state and actions from store
+  const {
+    selectedFile,
+    getTranscriptForFile,
+    addToTimeline,
+    setNotification
+  } = useMediaStore(state => ({
+    selectedFile: state.selectedFile,
+    getTranscriptForFile: state.getTranscriptForFile,
+    addToTimeline: state.addToTimeline,
+    setNotification: state.setNotification
+  }));
+
+  // Local state
   const [currentTime, setCurrentTime] = useState(0);
   const [selection, setSelection] = useState(null);
   const videoRef = useRef(null);
   const videoUrlRef = useRef(null);
+
+  // Get transcript data
+  const transcriptData = getTranscriptForFile(selectedFile?.name);
   
-  // Update useEffect to use selectedClip.file
+  // Handle video source
   useEffect(() => {
-    if (videoRef.current && selectedClip?.file) {
+    if (videoRef.current && selectedFile?.file) {
       if (videoUrlRef.current) {
         URL.revokeObjectURL(videoUrlRef.current);
       }
-      videoUrlRef.current = URL.createObjectURL(selectedClip.file);
+      videoUrlRef.current = URL.createObjectURL(selectedFile.file);
       videoRef.current.src = videoUrlRef.current;
     }
-  }, [selectedClip]);
 
+    return () => {
+      if (videoUrlRef.current) {
+        URL.revokeObjectURL(videoUrlRef.current);
+        videoUrlRef.current = null;
+      }
+    };
+  }, [selectedFile]);
 
   const handleWordClick = useCallback((time) => {
     if (videoRef.current) {
@@ -60,21 +80,19 @@ const TranscriptViewer = ({
   }, []);
 
   const handleAddToTimeline = useCallback(() => {
-    if (!selection || !selectedClip) {
-      console.warn('Missing required data for timeline clip', { selection, selectedClip });
+    if (!selection || !selectedFile) {
+      setNotification('Missing required data for timeline clip', 'error');
       return;
     }
   
-    // Create a video element to get duration
     const video = document.createElement('video');
-    video.src = URL.createObjectURL(selectedClip.file);
+    video.src = URL.createObjectURL(selectedFile.file);
   
-    // Wait for metadata to load to get duration
     video.addEventListener('loadedmetadata', () => {
       const clipData = {
         id: `clip-${Date.now()}`,
-        file: selectedClip.file,
-        name: selectedClip.file.name,
+        file: selectedFile.file,
+        name: selectedFile.name,
         startTime: selection.start,
         endTime: selection.end,
         duration: selection.end - selection.start,
@@ -83,33 +101,34 @@ const TranscriptViewer = ({
           endTime: video.duration,
           duration: video.duration
         },
-        transcript: selection.text
+        transcript: {
+          text: selection.text,
+          start: selection.start,
+          end: selection.end
+        }
       };
   
-      // Cleanup
       video.src = '';
       URL.revokeObjectURL(video.src);
   
-      console.log('Adding clip with data:', clipData);
-      onAddToTimeline?.(clipData);
+      addToTimeline(clipData);
+      setNotification('Clip added to timeline', 'success');
       setSelection(null);
     });
   
-  }, [selection, selectedClip, onAddToTimeline]);
+    video.addEventListener('error', () => {
+      setNotification('Error loading video metadata', 'error');
+    });
+  
+  }, [selection, selectedFile, addToTimeline, setNotification]);
 
-
-
-  const renderTranscript = () => {
+  const renderTranscript = useCallback(() => {
     if (!transcriptData?.transcription) {
       return (
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          height: '100%',
-          color: 'text.secondary' 
-        }}>
-          No transcript data available
+        <Box sx={{ p: 2 }}>
+          <Alert severity="info">
+            No transcript data available for this video
+          </Alert>
         </Box>
       );
     }
@@ -123,7 +142,13 @@ const TranscriptViewer = ({
         >
           Speaker {item.segment.speaker}
         </Typography>
-        <Box sx={{ fontSize: '0.875rem', lineHeight: 1.75 }}>
+        <Box 
+          sx={{ 
+            fontSize: '0.875rem', 
+            lineHeight: 1.75,
+            userSelect: 'text'  // Enable text selection
+          }}
+        >
           {item.words.map((word, wordIndex) => (
             <Box
               component="span"
@@ -135,7 +160,7 @@ const TranscriptViewer = ({
                 cursor: 'pointer',
                 px: 0.5,
                 borderRadius: 0.5,
-                transition: 'background-color 0.2s',
+                transition: 'all 0.2s',
                 bgcolor: currentTime >= word.start && currentTime < word.end 
                   ? 'primary.main' 
                   : 'transparent',
@@ -144,7 +169,11 @@ const TranscriptViewer = ({
                   : 'inherit',
                 '&:hover': {
                   bgcolor: 'action.hover'
-                }
+                },
+                ...(selection && word.start >= selection.start && word.end <= selection.end && {
+                  bgcolor: 'primary.light',
+                  color: 'primary.contrastText'
+                })
               }}
             >
               {word.word}{' '}
@@ -153,17 +182,32 @@ const TranscriptViewer = ({
         </Box>
       </Box>
     ));
-  };
+  }, [transcriptData, currentTime, selection, handleWordClick]);
 
   return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', ...sx }}>
-      <CardContent sx={{ p: 0, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+    <Card 
+      sx={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        border: 'none',
+        ...sx 
+      }}
+    >
+      <CardContent sx={{ 
+        p: 0, 
+        flexGrow: 1, 
+        display: 'flex', 
+        flexDirection: 'column',
+        '&:last-child': { pb: 0 }
+      }}>
         <Box 
           sx={{ 
             flexGrow: 1,
             height: 400,
             overflowY: 'auto',
-            p: 2
+            p: 2,
+            bgcolor: 'background.paper'
           }}
           onMouseUp={handleTextSelection}
         >
@@ -183,20 +227,35 @@ const TranscriptViewer = ({
               bgcolor: 'background.default'
             }}
           >
-            <Typography variant="body2">
-              <Box component="span" sx={{ fontWeight: 500 }}>Selected: </Box>
-              {selection.start.toFixed(2)}s - {selection.end.toFixed(2)}s
-            </Typography>
+            <Box>
+              <Typography variant="body2" color="primary" sx={{ fontWeight: 500 }}>
+                Selected Range
+              </Typography>
+              <Typography variant="body2">
+                {selection.start.toFixed(2)}s - {selection.end.toFixed(2)}s
+                <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                  ({(selection.end - selection.start).toFixed(2)}s)
+                </Typography>
+              </Typography>
+            </Box>
             <Button
               variant="contained"
               onClick={handleAddToTimeline}
               startIcon={<AddIcon />}
+              size="small"
             >
               Add to Timeline
             </Button>
           </Paper>
         )}
       </CardContent>
+
+      {/* Hidden video element for duration calculation */}
+      <video 
+        ref={videoRef} 
+        style={{ display: 'none' }} 
+        preload="metadata"
+      />
     </Card>
   );
 };

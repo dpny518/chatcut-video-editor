@@ -1,17 +1,28 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import ReactPlayer from 'react-player';
-import { Box, Typography, Slider, Alert, CircularProgress } from '@mui/material';
-// eslint-disable-next-line no-unused-vars
-import { Button } from '@mui/material';
+import { Box, Typography, Slider, Alert, CircularProgress, Button } from '@mui/material';
 import { debounce } from 'lodash';
+import useMediaStore from   '../../stores/mediaStore';
 
-// Constants
-const MIN_CLIP_DURATION = 1; // minimum clip duration in seconds
-const SEEK_DEBOUNCE_MS = 100; // debounce delay for seeking
-const PROGRESS_INTERVAL = 100; // progress update interval in ms
+const MIN_CLIP_DURATION = 1;
+const SEEK_DEBOUNCE_MS = 100;
+const PROGRESS_INTERVAL = 100;
 
-const BinViewer = ({ selectedClip, onAddToTimeline }) => {
-  // State management
+const BinViewer = () => {
+  // Get state and actions from store
+  const {
+    selectedFile,
+    addToTimeline,
+    setNotification,
+    getTranscriptForFile
+  } = useMediaStore(state => ({
+    selectedFile: state.selectedFile,
+    addToTimeline: state.addToTimeline,
+    setNotification: state.setNotification,
+    getTranscriptForFile: state.getTranscriptForFile
+  }));
+
+  // Local state
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -24,7 +35,6 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
   const playerRef = useRef(null);
   const urlRef = useRef(null);
 
-  // Cleanup function for URL objects
   const cleanupVideoUrl = useCallback(() => {
     if (urlRef.current) {
       URL.revokeObjectURL(urlRef.current);
@@ -32,34 +42,30 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
     }
   }, []);
 
-  // Handle video file changes
   useEffect(() => {
     setLoading(true);
     setError(null);
 
-    if (selectedClip?.file) {
+    if (selectedFile?.file) {
       try {
         cleanupVideoUrl();
-        urlRef.current = URL.createObjectURL(selectedClip.file);
+        urlRef.current = URL.createObjectURL(selectedFile.file);
         setVideoUrl(urlRef.current);
         setPlaying(false);
         setCurrentTime(0);
         setRange([0, 0]);
       } catch (err) {
         setError(`Failed to load video: ${err.message}`);
+        setNotification(`Failed to load video: ${err.message}`, 'error');
       }
     } else {
       setVideoUrl(null);
     }
 
     setLoading(false);
-
-    // Cleanup on unmount or clip change
     return cleanupVideoUrl;
-  }, [selectedClip, cleanupVideoUrl]);
+  }, [selectedFile, cleanupVideoUrl, setNotification]);
 
-  // Debounced seek function to improve performance
-  // eslint-disable-next-line
   const debouncedSeek = useCallback(
     debounce((time) => {
       if (playerRef.current) {
@@ -69,7 +75,6 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
     []
   );
 
-  // Handlers
   const handlePlayPause = () => {
     if (error) return;
     setPlaying(!playing);
@@ -84,7 +89,6 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
     state => {
       setCurrentTime(state.playedSeconds);
       
-      // Stop playback if we reach the end of the selected range
       if (state.playedSeconds >= range[1]) {
         setPlaying(false);
         debouncedSeek(range[0]);
@@ -96,7 +100,6 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
   const handleRangeChange = (event, newValue) => {
     const [start, end] = newValue;
     
-    // Validate range selection
     if (end - start < MIN_CLIP_DURATION) {
       return;
     }
@@ -107,30 +110,34 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
 
   const handleError = (error) => {
     console.error('Video playback error:', error);
-    setError('Failed to play video. Please try again or select a different file.');
+    const errorMessage = 'Failed to play video. Please try again or select a different file.';
+    setError(errorMessage);
+    setNotification(errorMessage, 'error');
     setPlaying(false);
   };
 
- const handleAddToTimeline = () => {
-    if (!selectedClip || error) return;
+  const handleAddToTimeline = useCallback(() => {
+    if (!selectedFile || error) return;
 
     const clipData = {
-      id: `clip-${Date.now()}`, // Generate unique ID
-      file: selectedClip.file,
-      name: selectedClip.file.name,
-      startTime: range[0],  // Start of trimmed section
-      endTime: range[1],    // End of trimmed section
-      duration: range[1] - range[0],  // Duration of trimmed section
+      id: `clip-${Date.now()}`,
+      file: selectedFile.file,
+      name: selectedFile.file.name,
+      startTime: range[0],
+      endTime: range[1],
+      duration: range[1] - range[0],
       source: {
         startTime: 0,
-        endTime: duration,        // Full video duration from ReactPlayer
-        duration: duration        // Full video duration
-      }
+        endTime: duration,
+        duration: duration
+      },
+      // Get matching transcript if exists
+      transcript: getTranscriptForFile(selectedFile.name)
     };
 
-    console.log('Adding clip with data:', clipData); // Let's see what we're passing
-    onAddToTimeline?.(clipData);
-  };
+    addToTimeline(clipData);
+    setNotification(`Added clip from ${formatTime(range[0])} to ${formatTime(range[1])}`, 'success');
+  }, [selectedFile, error, range, duration, addToTimeline, getTranscriptForFile, setNotification]);
 
   const formatTime = (time) => {
     const minutes = Math.floor(time / 60);
@@ -138,7 +145,6 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Loading state
   if (loading) {
     return (
       <Box sx={{ 
@@ -152,22 +158,24 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <Box sx={{ height: '100%', p: 2 }}>
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
-        <Button variant="contained" color="primary" onClick={() => setError(null)}>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => setError(null)}
+        >
           Try Again
         </Button>
       </Box>
     );
   }
 
-  // Empty state
-  if (!selectedClip) {
+  if (!selectedFile) {
     return (
       <Box sx={{ 
         height: '100%', 
@@ -194,7 +202,7 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
         overflow: 'hidden',
         whiteSpace: 'nowrap'
       }}>
-        {selectedClip.file.name}
+        {selectedFile.file.name}
       </Typography>
 
       <Box sx={{ 
@@ -244,25 +252,21 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
             }
           }}
         />
-        <Box
-          sx={{
-            position: 'relative',
-            mt: -4,
-            mb: 1,
-            height: 0
-          }}
-        >
-          <Box
-            sx={{
-              position: 'absolute',
-              left: `${(currentTime / duration) * 100}%`,
-              transform: 'translateX(-50%)',
-              width: '2px',
-              height: '16px',
-              bgcolor: 'error.main',
-              transition: 'left 0.1s linear'
-            }}
-          />
+        <Box sx={{
+          position: 'relative',
+          mt: -4,
+          mb: 1,
+          height: 0
+        }}>
+          <Box sx={{
+            position: 'absolute',
+            left: `${(currentTime / duration) * 100}%`,
+            transform: 'translateX(-50%)',
+            width: '2px',
+            height: '16px',
+            bgcolor: 'error.main',
+            transition: 'left 0.1s linear'
+          }} />
         </Box>
       </Box>
 

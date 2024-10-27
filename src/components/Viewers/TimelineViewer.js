@@ -1,12 +1,33 @@
+// src/components/Timeline/TimelineViewer.js
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Player } from 'video-react';
 import 'video-react/dist/video-react.css';
-import { Box, Button } from '@mui/material';
+import { Box, Button, Typography, Alert } from '@mui/material';
 import { PlayCircle, PauseCircle, SkipBack } from 'lucide-react';
+import useTimelineStore from '../../stores/timelineStore';
+import useMediaStore from '../../stores/mediaStore';
 
-const TimelineViewer = ({ clips = [] }) => {
-  const [timelineTime, setTimelineTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+const TimelineViewer = () => {
+  // Get state from stores
+  const {
+    clips,
+    playbackTime,
+    isPlaying,
+    setPlaybackTime,
+    setIsPlaying,
+    getCurrentClip
+  } = useTimelineStore(state => ({
+    clips: state.clips,
+    playbackTime: state.playbackTime,
+    isPlaying: state.isPlaying,
+    setPlaybackTime: state.setPlaybackTime,
+    setIsPlaying: state.setIsPlaying,
+    getCurrentClip: state.getCurrentClip
+  }));
+
+  const { setNotification } = useMediaStore();
+
+  // Refs for playback control
   const playerRef = useRef(null);
   const rafRef = useRef(null);
   const lastTimeRef = useRef(0);
@@ -48,10 +69,11 @@ const TimelineViewer = ({ clips = [] }) => {
       const delta = (now - lastTimeRef.current) / 1000;
       lastTimeRef.current = now;
 
-      setTimelineTime(prevTime => {
+      setPlaybackTime(prevTime => {
         const newTime = prevTime + delta;
         if (newTime >= duration) {
           setIsPlaying(false);
+          setNotification('Playback complete', 'info');
           return 0;
         }
         return newTime;
@@ -68,21 +90,22 @@ const TimelineViewer = ({ clips = [] }) => {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [isPlaying, duration]);
+  }, [isPlaying, duration, setPlaybackTime, setIsPlaying, setNotification]);
 
   // Handle video playback and seeking
   useEffect(() => {
     if (!playerRef.current) return;
 
-    const activeClip = getActiveClip(timelineTime);
+    const activeClip = getActiveClip(playbackTime);
     const player = playerRef.current;
     
     if (activeClip) {
       // Only seek if changing clips
       if (!currentClipRef.current || currentClipRef.current.clip.id !== activeClip.clip.id) {
-        console.log('Changing clip, seeking to:', activeClip.sourceTime);
+        console.log('Changing to clip:', activeClip.clip.id, 'at time:', activeClip.sourceTime);
         player.seek(activeClip.sourceTime);
         currentClipRef.current = activeClip;
+        setNotification(`Playing clip: ${activeClip.clip.name}`, 'info');
       }
 
       if (isPlaying && player.getState().player.paused) {
@@ -92,7 +115,7 @@ const TimelineViewer = ({ clips = [] }) => {
       player.pause();
       currentClipRef.current = null;
     }
-  }, [timelineTime, getActiveClip, isPlaying]);
+  }, [playbackTime, getActiveClip, isPlaying, setNotification]);
 
   // Monitor playback and handle clip transitions
   useEffect(() => {
@@ -113,35 +136,38 @@ const TimelineViewer = ({ clips = [] }) => {
           if (isPlaying) {
             playerRef.current.play();
           }
+          setNotification(`Playing next clip: ${nextClipInfo.clip.name}`, 'info');
         }
       }
     };
 
     playerRef.current.subscribeToStateChange(handleStateChange);
-  }, [isPlaying, getActiveClip]);
+  }, [isPlaying, getActiveClip, setNotification]);
 
-  const handlePlay = () => {
-    const activeClip = getActiveClip(timelineTime);
+  const handlePlay = useCallback(() => {
+    const activeClip = getActiveClip(playbackTime);
     if (activeClip) {
       if (!currentClipRef.current || currentClipRef.current.clip.id !== activeClip.clip.id) {
         playerRef.current.seek(activeClip.sourceTime);
         currentClipRef.current = activeClip;
       }
+      setIsPlaying(true);
+      setNotification('Playing timeline', 'info');
     }
-    setIsPlaying(true);
-  };
+  }, [playbackTime, getActiveClip, setIsPlaying, setNotification]);
 
-  const handlePause = () => {
+  const handlePause = useCallback(() => {
     setIsPlaying(false);
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
     }
     playerRef.current?.pause();
-  };
+    setNotification('Playback paused', 'info');
+  }, [setIsPlaying, setNotification]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setIsPlaying(false);
-    setTimelineTime(0);
+    setPlaybackTime(0);
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
     }
@@ -150,8 +176,9 @@ const TimelineViewer = ({ clips = [] }) => {
     if (firstClip) {
       currentClipRef.current = firstClip;
       playerRef.current?.seek(firstClip.sourceTime);
+      setNotification('Timeline reset to start', 'info');
     }
-  };
+  }, [setIsPlaying, setPlaybackTime, getActiveClip, setNotification]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -161,12 +188,19 @@ const TimelineViewer = ({ clips = [] }) => {
   };
 
   if (!clips.length) {
-    return <div>No clips loaded</div>;
+    return (
+      <Box sx={{ p: 2 }}>
+        <Alert severity="info">
+          Add clips to the timeline to start playback
+        </Alert>
+      </Box>
+    );
   }
 
   return (
     <Box sx={{ width: '100%', height: '100%' }}>
       <Box sx={{
+        position: 'relative',
         '& .video-react-control-bar': {
           display: 'none !important'
         }
@@ -182,39 +216,53 @@ const TimelineViewer = ({ clips = [] }) => {
         </Player>
       </Box>
 
-      <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ 
+        mt: 2, 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 2,
+        p: 2,
+        bgcolor: 'background.paper',
+        borderRadius: 1
+      }}>
         <Button 
+          variant="contained"
           onClick={isPlaying ? handlePause : handlePlay}
           startIcon={isPlaying ? <PauseCircle /> : <PlayCircle />}
+          size="small"
         >
           {isPlaying ? 'Pause' : 'Play'}
         </Button>
         
         <Button 
+          variant="outlined"
           onClick={handleReset}
           startIcon={<SkipBack />}
+          size="small"
         >
           Reset
         </Button>
 
-        <Box sx={{ flex: 1, p: 2, bgcolor: 'background.paper' }}>
-          Timeline: {formatTime(timelineTime)} / {formatTime(duration)}
-        </Box>
+        <Typography variant="body2" sx={{ ml: 2 }}>
+          {formatTime(playbackTime)} / {formatTime(duration)}
+        </Typography>
       </Box>
 
-      <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper' }}>
-        <pre>
-          {JSON.stringify({
-            timelineTime,
-            activeClip: getActiveClip(timelineTime) ? {
-              id: getActiveClip(timelineTime).clip.id,
-              timelineStart: getActiveClip(timelineTime).timelineStart,
-              timelineEnd: getActiveClip(timelineTime).timelineEnd,
-              sourceTime: getActiveClip(timelineTime).sourceTime
-            } : null
-          }, null, 2)}
-        </pre>
-      </Box>
+      {process.env.NODE_ENV === 'development' && (
+        <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+          <Typography variant="caption" component="pre" sx={{ m: 0 }}>
+            {JSON.stringify({
+              playbackTime,
+              activeClip: getActiveClip(playbackTime) ? {
+                id: getActiveClip(playbackTime).clip.id,
+                timelineStart: getActiveClip(playbackTime).timelineStart,
+                timelineEnd: getActiveClip(playbackTime).timelineEnd,
+                sourceTime: getActiveClip(playbackTime).sourceTime
+              } : null
+            }, null, 2)}
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 };

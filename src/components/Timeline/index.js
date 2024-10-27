@@ -2,364 +2,120 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { Timeline as ReactTimelineEditor } from '@xzdarcy/react-timeline-editor';
 import { Box, Typography, Menu, MenuItem } from '@mui/material';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import TimelineControls from './TimelineControls';
 import TimelineClip from './TimelineClip';
-import { useTimelineExport } from './TimelineExport';
-import { useTimelineZoom } from '../../hooks/useTimeline/useTimelineZoom';
-import { useTimelineData } from '../../hooks/useTimeline/useTimelineData';
+import TimelineViewerSection from '../Viewers/TimelineViewerSection';
 import { formatTime } from '../../utils/formatters';
 import { scrollbarStyles } from './styles/scrollbarStyles';
 import { timelineEditorStyles, customTimelineStyles } from './styles/timelineStyles';
+import useTimelineStore from '../../stores/timelineStore';
+import useMediaStore from '../../stores/mediaStore';
 
 const ROW_HEIGHT = 64;
 const MIN_ROWS = 10;
 
-const Timeline = ({ 
-  clips = [], 
-  onClipsChange,
-  selectedClipId,
-  onClipSelect,
-}) => {
-  const { scale, handleZoomIn, handleZoomOut } = useTimelineZoom();
-  const { editorData, effects, error } = useTimelineData(clips, onClipsChange);
+const Timeline = () => {
+  const {
+    clips,
+    selectedClipId,
+    scale,
+    effects,
+    error,
+    editorData,
+    setSelectedClipId,
+    updateEditorData,
+    moveClip,
+    resizeClip,
+    removeClip,
+    updateTimelineState,
+    getTimelineState
+  } = useTimelineStore();
 
-    // Add context menu state
-    const [contextMenu, setContextMenu] = useState(null);
-    const [selectedActionId, setSelectedActionId] = useState(null);
+  const { setNotification } = useMediaStore();
 
-// Log incoming clips
-useEffect(() => {
-  if (clips.length > 0) {
-    console.log('Timeline clips:', clips);
-    // Log the last added clip
-    const lastClip = clips[clips.length - 1];
-    console.log('Latest clip:', {
-      clipData: lastClip,
-      trimmedPortion: {
-        start: lastClip.startTime,
-        end: lastClip.endTime,
-        duration: lastClip.duration
-      },
-      sourceInfo: lastClip.source
-    });
-  }
-}, [clips]);
+  const [contextMenu, setContextMenu] = useState(null);
 
-  // Handle move start
-const handleMoveStart = useCallback(({ action, row }) => {
-  console.log('Move Start:', { action, row });
-  
-  // Store initial state like we do in resize
-  action.data = {
-    ...action.data,
-    initialStart: action.start,
-    initialEnd: action.end,
-    metadata: {
-      ...action.data.metadata,
-      timeline: {
-        start: action.start,
-        end: action.end,
-        duration: action.end - action.start
-      }
-    }
-  };
-  
-  onClipSelect?.(action.id);
-}, [onClipSelect]);
-  // Handle move
- // Handle move
-const handleMoving = useCallback(({ action, row, start, end }) => {
-  console.log('Moving:', { action, start, end });
-  
-  // Update both timeline and playback metadata during move
-  action.data = {
-    ...action.data,
-    metadata: {
-      ...action.data.metadata,
-      timeline: {
-        start,
-        end,
-        duration: end - start,
-        initialStart: action.data.metadata?.timeline?.initialStart
-      },
-      playback: {
-        start: action.data.metadata?.playback?.start || action.data.startTime,
-        end: action.data.metadata?.playback?.end || action.data.endTime,
-        duration: action.data.metadata?.playback?.duration || (action.data.endTime - action.data.startTime)
-      }
-    }
-  };
-  console.log('Moving clip:', {
-    timeline: { start, end, duration: end - start },
-    playback: { 
-      start: action.data.metadata?.playback?.start || action.data.startTime,
-      end: action.data.metadata?.playback?.end || action.data.endTime 
-    }
-  });
-  
-  return true;
-}, []);
+  const handleMoveStart = useCallback(({ action }) => {
+    setSelectedClipId(action.id);
+  }, [setSelectedClipId]);
 
- // Handle move end
-const handleMoveEnd = useCallback(({ action, row, start, end }) => {
-  console.log('Move End:', { action, start, end });
+  const handleMoving = useCallback(({ action, start, end }) => {
+    const clip = clips.find(c => c.id === action.id);
+    if (!clip) return false;
 
+    if (start < 0) return false;
 
-  const updatedClips = clips.map(clip => {
-    if (clip.id === action.id) {
-      const actionData = action.data || {};
-      const metadata = actionData.metadata || {};
-      const playback = metadata.playback || {};
-      return {
-        ...clip,
-        ...actionData,
-        startTime: playback.start || clip.startTime,
-        endTime: playback.end || clip.endTime,
-        metadata: {
-          ...metadata,
-          timeline: {
-            ...metadata.timeline,
-            start,
-            end,
-            duration: end - start
-          }
-        }
-      };
-    }
-    return clip;
-  });
+    moveClip(action.id, start, end);
+    return true;
+  }, [clips, moveClip]);
 
-  onClipsChange(updatedClips);
-}, [clips, onClipsChange]);
+  const handleResizeStart = useCallback(({ action, dir }) => {
+    setSelectedClipId(action.id);
+  }, [setSelectedClipId]);
 
+  const handleResizing = useCallback(({ action, start, end, dir }) => {
+    resizeClip(action.id, start, end, dir);
+    return true;
+  }, [resizeClip]);
 
-
-// Handle resize start
-const handleResizeStart = useCallback(({ action, row, dir }) => {
-  console.log('Resize Start:', { action, dir });
-  
-  // Update the action data with the resize direction
-  action.data = {
-    ...action.data,
-    resizeDir: dir
-  };
-  
-  onClipSelect?.(action.id);
-}, [onClipSelect]);
-
-
-// Handle resizing
-const handleResizing = useCallback(({ action, row, start, end, dir }) => {
-  console.log('Resizing:', { action, start, end, dir });
-
-  // Get source video bounds
-  const sourceStart = action.data.source.startTime; // 0
-  const sourceEnd = action.data.source.endTime;     // 42.944
-
-  // Check if resize would exceed bounds
-  if (dir === 'left' && start < sourceStart) {
-    return false; // Prevent resizing below source start
-  }
-  if (dir === 'right' && end > sourceEnd) {
-    return false; // Prevent resizing beyond source end
-  }
-
-  // Calculate new playback times based on resize direction
-  let playbackStart = action.data.metadata?.playback?.start || action.data.startTime;
-  let playbackEnd = action.data.metadata?.playback?.end || action.data.endTime;
-  const timelineDuration = end - start;
-
-  if (dir === 'left') {
-    playbackEnd = action.data.metadata?.playback?.end || action.data.endTime;
-    playbackStart = playbackEnd - timelineDuration;
-  } else if (dir === 'right') {
-    playbackStart = action.data.metadata?.playback?.start || action.data.startTime;
-    playbackEnd = playbackStart + timelineDuration;
-  }
-
-  // Ensure playback times stay within source bounds
-  playbackStart = Math.max(playbackStart, sourceStart);
-  playbackEnd = Math.min(playbackEnd, sourceEnd);
-
-  // Update action.data to reflect the resized clip
-  action.data = {
-    ...action.data,
-    resizeDir: dir,
-    metadata: {
-      ...action.data.metadata,
-      timeline: {
-        start,
-        end,
-        duration: end - start,
-      },
-      playback: {
-        start: playbackStart,
-        end: playbackEnd,
-        duration: playbackEnd - playbackStart
-      }
-    }
-  };
-
-  console.log('Updated clip timing:', {
-    timeline: { start, end, duration: end - start },
-    playback: { start: playbackStart, end: playbackEnd, duration: playbackEnd - playbackStart }
-  });
-
-  return true;
-}, []);
-
-
-// Handle resize end
-const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
-  console.log('Resize End:', { action, start, end, dir });
-
-  // Get source video bounds (optional, you can pass the clamped values from handleResizing)
-  const sourceStart = action.data.source.startTime;
-  const sourceEnd = action.data.source.endTime;
-
-  // Ensure the final start and end times are clamped within the source video bounds
-  start = Math.max(start, sourceStart);
-  end = Math.min(end, sourceEnd);
-
-  // Update the clips array with the final clamped values
-  const updatedClips = clips.map(clip => {
-    if (clip.id === action.id) {
-      const actionData = action.data || {};
-      const metadata = actionData.metadata || {};
-      const playback = metadata.playback || {};
-
-      return {
-        ...clip,
-        ...actionData,
-        startTime: playback.start || clip.startTime,
-        endTime: playback.end || clip.endTime,
-        metadata: {
-          ...metadata,
-          timeline: {
-            ...metadata.timeline,
-            start,
-            end, 
-            duration: end - start
-          }
-        }
-      };
-    }
-    return clip;
-  });
-  
-onClipsChange(updatedClips);
-}, [clips, onClipsChange]);
-
-  // Handle general changes
   const handleChange = useCallback((newEditorData) => {
-    console.log('Timeline Changed:', newEditorData);
-    
     if (!newEditorData?.actions) return;
-  
-    const updatedClips = clips.map(clip => {
-      const action = newEditorData.actions.find(a => a.id === clip.id);
-      if (!action) return clip;
-  
-      // Get the current metadata from the action data
-      const actionData = action.data || {};
-      const metadata = actionData.metadata || {};
-      const timeline = metadata.timeline || {};
-      const playback = metadata.playback || {};
-  
-      // Calculate the current duration based on timeline
-      const timelineDuration = action.end - action.start;
-  
-      return {
-        ...clip,
-        ...actionData, // Include all action data updates
-        startTime: playback.start || clip.startTime,
-        endTime: playback.end || clip.endTime,
-        metadata: {
-          ...metadata,
-          timeline: {
-            ...timeline,
-            start: action.start,
-            end: action.end,
-            duration: timelineDuration,
-          },
-          playback: {
-            start: playback.start || clip.startTime,
-            end: playback.end || clip.endTime,
-            duration: playback.duration || (playback.end - playback.start)
-          }
-        }
-      };
-    });
-  
-    onClipsChange(updatedClips);
-  }, [clips, onClipsChange]);
+    updateEditorData(newEditorData);
+  }, [updateEditorData]);
 
-  // Timeline state export functionality
-  const timelineState = {
-    clips: clips.map(clip => ({
-      ...clip,
-      timelinePosition: clip.metadata?.timeline || {}
-    })),
-    totalDuration: editorData.duration,
-    settings: { scale, effects }
-  };
-  
-  const { exportTimelineData } = useTimelineExport(timelineState);
-
-  // Enhanced debug handler
-  const handleDebug = useCallback(() => {
-    console.log('=== DEBUG TIMELINE STATE ===');
-    console.log('Current Clips:', clips);
-    console.log('Selected Clip ID:', selectedClipId);
-    console.log('Editor Data:', editorData);
-    console.log('Effects:', effects);
-    console.log('Scale:', scale);
-  }, [clips, selectedClipId, editorData, effects, scale]);
-
-  // Context menu handler with logging
   const handleContextMenu = useCallback((e, action) => {
-    console.log('=== CONTEXT MENU HANDLER ===');
-    console.log('Action:', action);
-    
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY });
-    setSelectedActionId(action.id);
-    onClipSelect?.(action.id);
-    
-    console.log('Context Menu State:', { position: { x: e.clientX, y: e.clientY }, selectedActionId: action.id });
-  }, [onClipSelect]);
+    setContextMenu({ 
+      x: e.clientX, 
+      y: e.clientY, 
+      clipId: action.id 
+    });
+    setSelectedClipId(action.id);
+  }, [setSelectedClipId]);
 
-  // Delete handler with logging
   const handleDelete = useCallback(() => {
-    console.log('=== DELETE HANDLER ===');
-    console.log('Selected Action ID:', selectedActionId);
-    
-    if (selectedActionId) {
-      const newClips = clips.filter(clip => clip.id !== selectedActionId);
-      console.log('Updated Clips:', newClips);
-      onClipsChange(newClips);
+    if (contextMenu?.clipId) {
+      removeClip(contextMenu.clipId);
+      setNotification('Clip removed from timeline', 'success');
       setContextMenu(null);
-      setSelectedActionId(null);
     }
-  }, [clips, selectedActionId, onClipsChange]);
+  }, [contextMenu, removeClip, setNotification]);
 
-  // Keyboard delete handler with logging
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipId) {
-        console.log('=== KEYBOARD DELETE HANDLER ===');
-        console.log('Key pressed:', e.key);
-        console.log('Selected Clip ID:', selectedClipId);
-        
-        const newClips = clips.filter(clip => clip.id !== selectedClipId);
-        console.log('Updated Clips:', newClips);
-        onClipsChange(newClips);
+        removeClip(selectedClipId);
+        setNotification('Clip removed from timeline', 'success');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clips, selectedClipId, onClipsChange]);
+  }, [selectedClipId, removeClip, setNotification]);
+
+  if (!clips.length) {
+    return (
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        p: 4,
+        textAlign: 'center',
+        color: 'text.secondary'
+      }}>
+        <TimelineIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+        <Typography variant="h6" gutterBottom>
+          No Clips in Timeline
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Upload media files and add clips to get started
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ 
@@ -376,12 +132,8 @@ onClipsChange(updatedClips);
     }}>
       <TimelineControls
         scale={scale}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        timelineState={timelineState} 
-        selectedClipId={selectedClipId} 
-        onDownloadState={exportTimelineData}
-        onDebugClips={handleDebug}
+        selectedClipId={selectedClipId}
+        timelineState={getTimelineState()}
       />
   
       {error && (
@@ -399,75 +151,41 @@ onClipsChange(updatedClips);
         minHeight: `${ROW_HEIGHT * MIN_ROWS}px`,
         overflow: 'scroll',
         position: 'relative',
-        borderBottom: '3px solid rgba(255,255,255,0.25)',
-        boxShadow: 'inset 0 -4px 6px -4px rgba(0,0,0,0.3)',
-        padding: '0 0 16px 0',
-        marginBottom: '16px',
-        ...scrollbarStyles,
-        '&::-webkit-scrollbar-track': {
-          ...scrollbarStyles['&::-webkit-scrollbar-track'],
-          margin: '4px',
-          boxShadow: 'inset 0 0 6px rgba(0,0,0,0.3)',
-        },
-        '&::-webkit-scrollbar-thumb': {
-          ...scrollbarStyles['&::-webkit-scrollbar-thumb'],
-          border: '4px solid #1a1a1a',
-          minHeight: '40px',
-        },
-        '&::-webkit-scrollbar-corner': {
-          ...scrollbarStyles['&::-webkit-scrollbar-corner'],
-          backgroundColor: '#1a1a1a',
-          borderTop: '1px solid rgba(255,255,255,0.15)',
-        }
+        ...scrollbarStyles
       }}>
         <ReactTimelineEditor
-        editorData={editorData}
-        effects={effects}
-        onChange={handleChange}
-        // Move handlers
-        onActionMoveStart={handleMoveStart}
-        onActionMoving={handleMoving}
-        onActionMoveEnd={handleMoveEnd}
-        // Resize handlers
-        onActionResizeStart={handleResizeStart}
-        onActionResizing={handleResizing}
-        onActionResizeEnd={handleResizeEnd}
-        // Other props
-        allowResizeStart={true}
-        allowResizeEnd={true}
-        resizeMin={0.1}
-        showResizeIndicator={true}
-        gridSnap={true}
-        dragLine={true}
-        autoScroll={true}
-        scaleWidth={160 * scale}
-        scale={1}
-        minScaleCount={20}
-        scaleSplitCount={10}
-        getActionRender={(action, row) => (
-          <Box onContextMenu={(e) => handleContextMenu(e, action)}>
-            <TimelineClip
-              clip={action.data || clips.find(c => c.id === action.id)}
-              action={action}
-              row={row}
-              isSelected={action.id === selectedClipId}
-              onSelect={onClipSelect}
-            />
-          </Box>
-        )}
-        getScaleRender={formatTime}
-          style={{
-            ...timelineEditorStyles,
-            paddingBottom: '20px',
-          }}
-          customStyle={{
-            ...customTimelineStyles,
-            containerStyle: {
-              ...customTimelineStyles.containerStyle,
-              borderBottom: '3px solid rgba(255,255,255,0.25)',
-              boxShadow: 'inset 0 -4px 6px -4px rgba(0,0,0,0.3)',
-            }
-          }}
+          editorData={editorData}
+          effects={effects}
+          onChange={handleChange}
+          onActionMoveStart={handleMoveStart}
+          onActionMoving={handleMoving}
+          onActionResizeStart={handleResizeStart}
+          onActionResizing={handleResizing}
+          allowResizeStart={true}
+          allowResizeEnd={true}
+          resizeMin={0.1}
+          showResizeIndicator={true}
+          gridSnap={true}
+          dragLine={true}
+          autoScroll={true}
+          scaleWidth={160 * scale}
+          scale={1}
+          minScaleCount={20}
+          scaleSplitCount={10}
+          getActionRender={(action, row) => (
+            <Box onContextMenu={(e) => handleContextMenu(e, action)}>
+              <TimelineClip
+                clip={action.data || clips.find(c => c.id === action.id)}
+                action={action}
+                row={row}
+                isSelected={action.id === selectedClipId}
+                onSelect={setSelectedClipId}
+              />
+            </Box>
+          )}
+          getScaleRender={formatTime}
+          style={timelineEditorStyles}
+          customStyle={customTimelineStyles}
           rowHeight={ROW_HEIGHT}
           allowVerticalDrag={true}
           verticalDragThreshold={10}
@@ -475,14 +193,27 @@ onClipsChange(updatedClips);
           dragRowHeight={ROW_HEIGHT}
           disableDragOverlay={true}
         />
+        
+        <TimelineViewerSection
+          currentClip={clips.find(clip => clip.id === selectedClipId)}
+          sx={{ 
+            height: 300,
+            mt: 2,
+            backgroundColor: 'background.paper',
+            borderRadius: 1
+          }}
+        />
       </Box>
 
-      {/* Context Menu */}
       <Menu
         open={!!contextMenu}
         onClose={() => setContextMenu(null)}
         anchorReference="anchorPosition"
-        anchorPosition={contextMenu ? { top: contextMenu.y, left: contextMenu.x } : null}
+        anchorPosition={
+          contextMenu ? 
+            { top: contextMenu.y, left: contextMenu.x } : 
+            undefined
+        }
       >
         <MenuItem onClick={handleDelete}>Delete Clip</MenuItem>
       </Menu>

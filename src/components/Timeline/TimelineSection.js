@@ -2,7 +2,8 @@
 import React from 'react';
 import { Box } from '@mui/material';
 import Timeline from './index';
-const TimelineSection = ({ clips, onClipsChange }) => {
+const TimelineSection = ({ clips, onClipsChange, transcripts }) => {
+  console.log('TimelineSection received transcripts:', transcripts);
   return (
     <Box sx={{ 
       width: '100%',
@@ -16,6 +17,7 @@ const TimelineSection = ({ clips, onClipsChange }) => {
       <Timeline 
         clips={clips}
         onClipsChange={onClipsChange}
+        transcripts={transcripts}
       />
     </Box>
   );
