@@ -101,12 +101,13 @@ function App() {
     setSelectedBinClip(selectedFile);
   };
 
-  const handleAddToTimeline = (clip) => {
-    const transcriptName = clip.file.name.replace(/\.[^/.]+$/, '.json');
+  const handleAddToTimeline = (clipData) => {
+    const transcriptName = clipData.name.replace(/\.[^/.]+$/, '.json');
     const transcriptData = transcripts.get(transcriptName);
     
+    // Enrich the clip data received from BinViewer with transcript
     const enrichedClip = {
-      ...clip,
+      ...clipData,  // Keep all the timing and file data from BinViewer
       transcript: transcriptData || null
     };
     
@@ -176,6 +177,7 @@ function App() {
                 />
               <TimelineViewerSection 
                 clips={timelineClips}
+                transcript={transcripts}
               />
             </Box>
 

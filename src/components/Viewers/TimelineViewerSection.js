@@ -5,7 +5,7 @@ import { FileVideo, FileText } from 'lucide-react';
 import TimelineViewer from './TimelineViewer';
 import TimelineTranscriptViewer from './TimelineTranscriptViewer';
 
-const TimelineViewerSection = ({ clips, currentClip }) => {
+const TimelineViewerSection = ({ clips, currentClip, transcript }) => {
   const [viewMode, setViewMode] = useState('video');
   
   return (
@@ -52,6 +52,7 @@ const TimelineViewerSection = ({ clips, currentClip }) => {
           <TimelineTranscriptViewer
             clips={clips}
             currentClip={currentClip}
+            transcriptData={transcript}
           />
         )}
       </Box>
