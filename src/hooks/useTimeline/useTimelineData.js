@@ -1,4 +1,3 @@
-//src/hooks/useTimeline/useTimelineData.js
 import { useMemo, useState } from 'react';
 
 const formatTime = (seconds) => {
@@ -39,105 +38,91 @@ export const useTimelineData = (clips = [], onClipsChange) => {
     try {
       let currentPosition = 0;
       const clipsState = [];
+      const actionsByRow = new Map();
       
-      const rows = clips.map((clip, index) => {
-        console.log('Clip object:', {
-          clip,
-          currentInOut: {
-            start: clip.startTime,
-            end: clip.endTime
-          },
-          source: clip.source,  // This should show the whole source object
-          duration: clip.duration,  // Duration of trimmed clip
-          fullVideo: {
-            duration: clip.source?.duration,  // Full video duration
-            start: clip.source?.startTime,    // Always 0
-            end: clip.source?.endTime         // Full video duration
-          }
-        });
+      clips.forEach((clip, index) => {
         // Calculate clip timings
         let timelineStart, timelineEnd, playbackStart, playbackEnd;
+        const rowIndex = clip.metadata?.timeline?.row ?? 0;
         
-        // Calculate initial positions for new clips
-          if (clip.metadata?.timeline && clip.metadata?.playback) {
-            // Use existing metadata if available
-            timelineStart = clip.metadata.timeline.start;
-            timelineEnd = clip.metadata.timeline.end;
-            playbackStart = clip.metadata.playback.start;
-            playbackEnd = clip.metadata.playback.end;
-          } else {
-            // Calculate initial positions for new clips
-            timelineStart = currentPosition;
-            timelineEnd = timelineStart + clip.duration;  // Use clip duration instead of source
-            playbackStart = clip.startTime;  // Use clip start time
-            playbackEnd = clip.endTime;      // Use clip end time
-            
-            if (!clip.hasBeenPositioned) {
-              currentPosition = timelineEnd + 0.1;
+        if (clip.metadata?.timeline && clip.metadata?.playback) {
+          timelineStart = clip.metadata.timeline.start;
+          timelineEnd = clip.metadata.timeline.end;
+          playbackStart = clip.metadata.playback.start;
+          playbackEnd = clip.metadata.playback.end;
+        } else {
+          timelineStart = currentPosition;
+          timelineEnd = timelineStart + clip.duration;
+          playbackStart = clip.startTime;
+          playbackEnd = clip.endTime;
+          
+          if (!clip.hasBeenPositioned) {
+            currentPosition = timelineEnd + 0.1;
+          }
+        }
+
+        const action = {
+          id: clip.id,
+          start: timelineStart,
+          end: timelineEnd,
+          effectId: 'default',
+          flexible: true,
+          movable: true,
+          data: {
+            ...clip,
+            hasBeenPositioned: true,
+            metadata: {
+              timeline: {
+                start: timelineStart,
+                end: timelineEnd,
+                duration: timelineEnd - timelineStart,
+                row: rowIndex
+              },
+              playback: {
+                start: playbackStart,
+                end: playbackEnd,
+                duration: playbackEnd - playbackStart
+              }
             }
           }
+        };
 
-        // Define min and max bounds based on source video duration
-            const minStart = clip.source?.startTime ?? 0;
-            const maxEnd = clip.source?.endTime ?? clip.duration ?? timelineEnd;
+        // Group actions by row
+        if (!actionsByRow.has(rowIndex)) {
+          actionsByRow.set(rowIndex, []);
+        }
+        actionsByRow.get(rowIndex).push(action);
 
-        // Store clip state information
         clipsState.push({
           id: clip.id,
           name: clip.name || `Clip ${index + 1}`,
           timelinePosition: formatTime(timelineStart),
-          currentInOut: {
-            in: formatTime(playbackStart),
-            out: formatTime(playbackEnd)
-          },
-          originalInOut: {
-            in: formatTime(clip.source?.startTime ?? 0),
-            out: formatTime(clip.source?.endTime ?? clip.duration ?? 0)
-          },
-          duration: {
-            current: formatTime(playbackEnd - playbackStart),
-            original: formatTime(clip.duration || 0)
-          }
+          row: rowIndex
         });
-
-        return {
-          id: String(index),
-          actions: [{
-            id: clip.id,
-            start: timelineStart,
-            end: timelineEnd,
-            effectId: 'default',
-            flexible: true,
-            movable: true,
-            minStart: minStart,
-            maxEnd: maxEnd,
-            data: {
-              ...clip,
-              hasBeenPositioned: true,
-              metadata: {
-                timeline: {
-                  start: timelineStart,
-                  end: timelineEnd,
-                  duration: timelineEnd - timelineStart
-                },
-                playback: {
-                  start: playbackStart,
-                  end: playbackEnd,
-                  duration: playbackEnd - playbackStart
-                }
-              }
-            }
-          }]
-        };
       });
 
-      // Add empty row at the end
+      // Convert Map to array of row objects
+      const rows = Array.from(actionsByRow.entries())
+        .sort(([a], [b]) => a - b) // Sort by row index
+        .map(([rowIndex, actions]) => ({
+          id: `row-${rowIndex}`,
+          actions
+        }));
+
+      // Always ensure at least one row exists
+      if (rows.length === 0) {
+        rows.push({
+          id: 'row-0',
+          actions: []
+        });
+      }
+
+      // Add empty row at the end for new clips
       rows.push({
-        id: String(clips.length),
+        id: `row-${rows.length}`,
         actions: []
       });
 
-      // Create timeline state object
       const timelineState = {
         totalDuration: formatTime(currentPosition),
         clips: clipsState,
@@ -149,7 +134,7 @@ export const useTimelineData = (clips = [], onClipsChange) => {
       };
 
       return {
-        editorData: rows,
+        editorData: rows, // Return array of rows directly
         timelineState
       };
     } catch (err) {
@@ -157,7 +142,7 @@ export const useTimelineData = (clips = [], onClipsChange) => {
       setError('Error processing timeline data: ' + err.message);
       return {
         editorData: [{
-          id: '0',
+          id: 'row-0',
           actions: []
         }],
         timelineState: {
@@ -174,7 +159,7 @@ export const useTimelineData = (clips = [], onClipsChange) => {
   }, [clips, effects]);
 
   return { 
-    editorData, 
+    editorData, // Now returns array directly
     effects, 
     error,
     timelineState

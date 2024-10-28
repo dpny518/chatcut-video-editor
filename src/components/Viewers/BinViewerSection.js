@@ -18,6 +18,26 @@ const BinViewerSection = ({
   onTranscriptUpload 
 }) => {
   const [viewMode, setViewMode] = useState(0);
+  const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
+
+  // Modified add to timeline handler to update timelineRows
+  const handleAddToTimeline = (clipData) => {
+    // Call the parent's onAddToTimeline
+    onAddToTimeline?.(clipData);
+    
+    // Update local timelineRows state if needed
+    setTimelineRows(prev => {
+      const rowIndex = clipData.metadata.timeline.row;
+      const updated = [...prev];
+      while (updated.length <= rowIndex) {
+        updated.push({ rowId: updated.length, clips: [], lastEnd: 0 });
+      }
+      const targetRow = updated[rowIndex];
+      targetRow.clips.push(clipData);
+      targetRow.lastEnd = Math.max(targetRow.lastEnd, clipData.metadata.timeline.end);
+      return updated;
+    });
+  };
 
   return (
     <Paper 
@@ -71,13 +91,17 @@ const BinViewerSection = ({
         {viewMode === 0 ? (
           <BinViewer
             selectedClip={selectedClip}
-            onAddToTimeline={onAddToTimeline}
+            onAddToTimeline={handleAddToTimeline}
+            timelineRows={timelineRows}
+            setTimelineRows={setTimelineRows}
           />
         ) : (
           <TranscriptViewer
             selectedClip={selectedClip}
             transcriptData={transcriptData}
-            onAddToTimeline={onAddToTimeline}
+            onAddToTimeline={handleAddToTimeline}
+            timelineRows={timelineRows}
+            setTimelineRows={setTimelineRows}
           />
         )}
       </Box>

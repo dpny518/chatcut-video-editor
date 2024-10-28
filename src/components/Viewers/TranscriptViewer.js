@@ -10,9 +10,11 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 
 const TranscriptViewer = ({ 
-  selectedClip,  // Change this from videoFile to selectedClip
+  selectedClip,
   transcriptData, 
   onAddToTimeline,
+  timelineRows,
+  setTimelineRows,
   sx
 }) => {
   const [currentTime, setCurrentTime] = useState(0);
@@ -42,6 +44,7 @@ const TranscriptViewer = ({
   }, []);
 
 
+
   const handleWordClick = useCallback((time) => {
     if (videoRef.current) {
       videoRef.current.currentTime = time;
@@ -59,23 +62,22 @@ const TranscriptViewer = ({
   
     if (startNode.hasAttribute('data-time') && endNode.hasAttribute('data-time')) {
       const startTime = parseFloat(startNode.getAttribute('data-time'));
-      const startEndTime = parseFloat(startNode.getAttribute('data-time-end'));
       const endTime = parseFloat(endNode.getAttribute('data-time-end'));
   
-      // Find the actual words from transcriptData
-      const startWord = transcriptData.transcription
+      // Find all words between start and end time
+      const allWords = transcriptData.transcription
         .flatMap(item => item.words)
-        .find(word => word.start === startTime && word.end === startEndTime);
-  
-      const endWord = transcriptData.transcription
-        .flatMap(item => item.words)
-        .find(word => word.end === endTime);
-  
-      if (startWord && endWord) {
+        .filter(word => word.start >= startTime && word.end <= endTime);
+
+      if (allWords.length > 0) {
+        const startWord = allWords[0];
+        const endWord = allWords[allWords.length - 1];
+        
         handleWordSelection(startWord, endWord, selection.toString());
       }
     }
   }, [transcriptData, handleWordSelection]);
+
 
   const handleAddToTimeline = useCallback(() => {
     if (!selection || !selectedClip) {
@@ -89,14 +91,45 @@ const TranscriptViewer = ({
   
     // Wait for metadata to load to get duration
     video.addEventListener('loadedmetadata', () => {
-      const timelineDuration = selection.end - selection.start;
+      const clipStart = selection.start;
+      const clipEnd = selection.end;
+      const timelineDuration = clipEnd - clipStart;
+      
+      // Find a suitable row for the new clip
+      const findSuitableRow = (startTime, endTime) => {
+        // First try to find an existing row where the clip can fit
+        let rowIndex = timelineRows.findIndex(row => {
+          // Check for overlaps with existing clips in this row
+          const hasOverlap = row.clips.some(clip => {
+            const clipTimelineStart = clip.metadata.timeline.start;
+            const clipTimelineEnd = clip.metadata.timeline.end;
+            return !(endTime <= clipTimelineStart || startTime >= clipTimelineEnd);
+          });
+          return !hasOverlap;
+        });
+    
+        // If no suitable row found, create a new one
+        if (rowIndex === -1) {
+          rowIndex = timelineRows.length;
+          setTimelineRows(prev => [...prev, { rowId: rowIndex, clips: [], lastEnd: 0 }]);
+        }
+    
+        return rowIndex;
+      };
+    
+      // Calculate where this clip should start in the timeline
+      const timelineStart = timelineRows[0]?.lastEnd || 0;
+      const timelineEnd = timelineStart + timelineDuration;
+      
+      // Find suitable row for the clip
+      const rowIndex = findSuitableRow(timelineStart, timelineEnd);
       
       const clipData = {
         id: `clip-${Date.now()}`,
         file: selectedClip.file,
         name: selectedClip.file.name,
-        startTime: selection.start,
-        endTime: selection.end,
+        startTime: clipStart,
+        endTime: clipEnd,
         duration: timelineDuration,
         source: {
           startTime: 0,
@@ -104,31 +137,38 @@ const TranscriptViewer = ({
           duration: video.duration
         },
         transcript: selection.text,
-        // Add initial metadata
         metadata: {
           timeline: {
-            start: 0, // This will be adjusted by App.js
-            end: timelineDuration, // This will be adjusted by App.js
+            start: timelineStart,
+            end: timelineEnd,
             duration: timelineDuration,
-            track: 0 // Default to first track
+            row: rowIndex // Include row information
           },
           playback: {
-            start: selection.start,
-            end: selection.end,
+            start: clipStart,
+            end: clipEnd,
             duration: timelineDuration
           }
         },
-        // Add selection info to help with transcript display
         selectionInfo: {
           text: selection.text,
           startWord: selection.startWord,
           endWord: selection.endWord,
           timeRange: {
-            start: selection.start,
-            end: selection.end
+            start: clipStart,
+            end: clipEnd
           }
         }
       };
+  
+      // Update the row's metadata
+      setTimelineRows(prev => {
+        const updated = [...prev];
+        const targetRow = updated[rowIndex];
+        targetRow.clips.push(clipData);
+        targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
+        return updated;
+      });
   
       // Cleanup
       video.src = '';
@@ -138,16 +178,15 @@ const TranscriptViewer = ({
         clipData,
         selection,
         timeline: clipData.metadata.timeline,
-        playback: clipData.metadata.playback
+        playback: clipData.metadata.playback,
+        rowIndex
       });
   
       onAddToTimeline?.(clipData);
       setSelection(null);
     });
   
-  }, [selection, selectedClip, onAddToTimeline]);
-  
-
+  }, [selection, selectedClip, onAddToTimeline, timelineRows, setTimelineRows]);
 
   const renderTranscript = () => {
     if (!transcriptData?.transcription) {
@@ -180,7 +219,6 @@ const TranscriptViewer = ({
               key={`word-${wordIndex}`}
               data-time={word.start}
               data-time-end={word.end}
-              data-word-data={JSON.stringify(word)} // Store full word data
               onClick={() => handleWordClick(word.start)}
               sx={{
                 cursor: 'pointer',

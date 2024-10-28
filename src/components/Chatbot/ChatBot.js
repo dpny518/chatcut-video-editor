@@ -8,7 +8,9 @@ const ChatBot = ({
   messages, 
   selectedBinClip, 
   transcriptData,
-  onAddToTimeline 
+  onAddToTimeline,
+  timelineRows,
+  setTimelineRows 
 }) => {
   const [input, setInput] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -63,26 +65,51 @@ const ChatBot = ({
         segments.push(currentSegment);
       }
   
-      // Create video element for metadata
       const video = document.createElement('video');
       video.src = URL.createObjectURL(selectedBinClip.file);
   
       video.addEventListener('loadedmetadata', () => {
-        // Keep track of timeline position for sequential placement
+        // Keep track of the last end time
         let currentTimelinePosition = 0;
-  
-        // Add each segment to timeline
+
+        // Find a suitable row for clips
+        const findSuitableRow = (startTime, endTime) => {
+          let rowIndex = timelineRows.findIndex(row => {
+            const hasOverlap = row.clips.some(clip => {
+              const clipTimelineStart = clip.metadata.timeline.start;
+              const clipTimelineEnd = clip.metadata.timeline.end;
+              return !(endTime <= clipTimelineStart || startTime >= clipTimelineEnd);
+            });
+            return !hasOverlap;
+          });
+      
+          if (rowIndex === -1) {
+            rowIndex = timelineRows.length;
+            setTimelineRows(prev => [...prev, { rowId: rowIndex, clips: [], lastEnd: 0 }]);
+          }
+      
+          return rowIndex;
+        };
+
+        // Process each segment
         segments.forEach((segment, index) => {
           const timelineDuration = segment[segment.length - 1].end - segment[0].start;
           const sourceStart = segment[0].start;
           const sourceEnd = segment[segment.length - 1].end;
           
+          // Calculate timeline placement using currentTimelinePosition
+          const timelineStart = currentTimelinePosition;
+          const timelineEnd = timelineStart + timelineDuration;
+          
+          // Find suitable row
+          const rowIndex = findSuitableRow(timelineStart, timelineEnd);
+          
           const clipData = {
             id: `clip-${Date.now()}-${index}`,
             file: selectedBinClip.file,
             name: selectedBinClip.file.name,
-            startTime: sourceStart,  // Original source timing
-            endTime: sourceEnd,      // Original source timing
+            startTime: sourceStart,
+            endTime: sourceEnd,
             duration: timelineDuration,
             source: {
               startTime: 0,
@@ -90,17 +117,16 @@ const ChatBot = ({
               duration: video.duration
             },
             transcript: segment.map(word => word.text).join(' '),
-            // Update metadata for sequential timeline placement
             metadata: {
               timeline: {
-                start: currentTimelinePosition,  // Sequential position
-                end: currentTimelinePosition + timelineDuration,  // Sequential end
+                start: timelineStart,
+                end: timelineEnd,
                 duration: timelineDuration,
-                track: 0
+                row: rowIndex
               },
               playback: {
-                start: sourceStart,  // Original timing for playback
-                end: sourceEnd,      // Original timing for playback
+                start: sourceStart,
+                end: sourceEnd,
                 duration: timelineDuration
               }
             },
@@ -114,10 +140,19 @@ const ChatBot = ({
             }
           };
   
+          // Update row metadata and current position
+          setTimelineRows(prev => {
+            const updated = [...prev];
+            const targetRow = updated[rowIndex];
+            targetRow.clips.push(clipData);
+            targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
+            return updated;
+          });
+
+          // Update the current position for the next clip
+          currentTimelinePosition = timelineEnd;
+
           onAddToTimeline?.(clipData);
-  
-          // Update timeline position for next clip
-          currentTimelinePosition += timelineDuration;
         });
   
         // Cleanup
@@ -125,8 +160,6 @@ const ChatBot = ({
         URL.revokeObjectURL(video.src);
       });
   
-  
-      // Success message
       onSendMessage({
         text: `Successfully added ${segments.length} clip${segments.length > 1 ? 's' : ''} to timeline`,
         sender: 'bot',
@@ -167,6 +200,7 @@ const ChatBot = ({
           input,
           'chat'
         );
+        console.log(llmResponse)
 
         // Process response and add to timeline
         await processAndAddToTimeline(llmResponse);

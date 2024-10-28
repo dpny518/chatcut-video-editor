@@ -19,6 +19,8 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
+  const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
+
 
   // Refs
   const playerRef = useRef(null);
@@ -111,49 +113,90 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
     setPlaying(false);
   };
 
+
+
   const handleAddToTimeline = () => {
     if (!selectedClip || error) return;
   
-    // Calculate initial timeline position (fallback to 0 if none exist)
-    const timelineStart = 0;  // This will be adjusted by App.js based on existing clips
-    const timelineDuration = range[1] - range[0];
-    const timelineEnd = timelineStart + timelineDuration;
+    const clipStart = range[0];
+    const clipEnd = range[1];
+    const timelineDuration = clipEnd - clipStart;
   
+    // Find a suitable row for the new clip
+    const findSuitableRow = (startTime, endTime) => {
+      // First try to find an existing row where the clip can fit
+      let rowIndex = timelineRows.findIndex(row => {
+        // Check for overlaps with existing clips in this row
+        const hasOverlap = row.clips.some(clip => {
+          const clipTimelineStart = clip.metadata.timeline.start;
+          const clipTimelineEnd = clip.metadata.timeline.end;
+          return !(endTime <= clipTimelineStart || startTime >= clipTimelineEnd);
+        });
+        return !hasOverlap;
+      });
+  
+      // If no suitable row found, create a new one
+      if (rowIndex === -1) {
+        rowIndex = timelineRows.length;
+        setTimelineRows(prev => [...prev, { rowId: rowIndex, clips: [], lastEnd: 0 }]);
+      }
+  
+      return rowIndex;
+    };
+  
+    // Calculate where this clip should start in the timeline
+    const timelineStart = timelineRows[0].lastEnd || 0;
+    const timelineEnd = timelineStart + timelineDuration;
+    
+    // Find suitable row for the clip
+    const rowIndex = findSuitableRow(timelineStart, timelineEnd);
+  
+    // Create clip data with timeline metadata
     const clipData = {
-      id: `clip-${Date.now()}`, // Generate unique ID
+      id: `clip-${Date.now()}`,
       file: selectedClip.file,
       name: selectedClip.file.name,
-      startTime: range[0],  // Start of trimmed section
-      endTime: range[1],    // End of trimmed section
-      duration: timelineDuration,  // Duration of trimmed section
+      startTime: clipStart,
+      endTime: clipEnd,
+      duration: timelineDuration,
       source: {
         startTime: 0,
-        endTime: duration,        // Full video duration from ReactPlayer
-        duration: duration        // Full video duration
+        endTime: duration,
+        duration: duration
       },
-      // Add initial metadata
       metadata: {
         timeline: {
           start: timelineStart,
           end: timelineEnd,
           duration: timelineDuration,
-          track: 0 // Default to first track
+          row: rowIndex // Include row information
         },
         playback: {
-          start: range[0],
-          end: range[1],
+          start: clipStart,
+          end: clipEnd,
           duration: timelineDuration
         }
       }
     };
   
+    // Update the row's metadata
+    setTimelineRows(prev => {
+      const updated = [...prev];
+      const targetRow = updated[rowIndex];
+      targetRow.clips.push(clipData);
+      targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
+      return updated;
+    });
+  
+    // Call the callback function to add clip to the main timeline
+    onAddToTimeline?.(clipData);
+    
     console.log('Adding clip with metadata:', {
       clip: clipData,
       timeline: clipData.metadata.timeline,
-      playback: clipData.metadata.playback
+      playback: clipData.metadata.playback,
+      rowIndex
     });
-    
-    onAddToTimeline?.(clipData);
   };
 
   const formatTime = (time) => {
