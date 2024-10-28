@@ -257,6 +257,7 @@ const handleChatMessage = (message) => {
   onSendMessage={handleChatMessage}
   selectedBinClip={selectedBinClip}
   transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
+  onAddToTimeline={handleAddToTimeline} 
 />
         </MainLayout>
 

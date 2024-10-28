@@ -1,47 +1,135 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Box, TextField, Button, Select, MenuItem, FormControl, CircularProgress } from '@mui/material';
 import { promptTemplates } from './promptTemplates';
 import { sendToLLM } from './Api';
 
-const ChatBot = ({ onSendMessage, messages, selectedBinClip, transcriptData }) => {
+const ChatBot = ({ 
+  onSendMessage, 
+  messages, 
+  selectedBinClip, 
+  transcriptData,
+  onAddToTimeline // Add this prop
+}) => {
   const [input, setInput] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selection, setSelection] = useState(null);
+
+  const handleTextSelection = useCallback(() => {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    const startNode = range.startContainer.parentNode;
+    const endNode = range.endContainer.parentNode;
+
+    if (startNode.hasAttribute('data-time') && endNode.hasAttribute('data-time')) {
+      const start = parseFloat(startNode.getAttribute('data-time'));
+      const end = parseFloat(endNode.getAttribute('data-time-end') || endNode.getAttribute('data-time'));
+      
+      setSelection({
+        start,
+        end,
+        text: selection.toString()
+      });
+    }
+  }, []);
+
+  const handleAddToTimeline = useCallback(() => {
+    if (!selection || !selectedBinClip) {
+      console.warn('Missing required data for timeline clip', { selection, selectedBinClip });
+      return;
+    }
+  
+    // Create a video element to get duration
+    const video = document.createElement('video');
+    video.src = URL.createObjectURL(selectedBinClip.file);
+  
+    video.addEventListener('loadedmetadata', () => {
+      const clipData = {
+        id: `clip-${Date.now()}`,
+        file: selectedBinClip.file,
+        name: selectedBinClip.file.name,
+        startTime: selection.start,
+        endTime: selection.end,
+        duration: selection.end - selection.start,
+        source: {
+          startTime: 0,
+          endTime: video.duration,
+          duration: video.duration
+        },
+        transcript: selection.text
+      };
+  
+      // Cleanup
+      video.src = '';
+      URL.revokeObjectURL(video.src);
+  
+      console.log('Adding clip with data:', clipData);
+      onAddToTimeline?.(clipData);
+      setSelection(null);
+    });
+  
+  }, [selection, selectedBinClip, onAddToTimeline]);
+
+  // Parse the LLM response to create selectable text spans
+  const createSelectableText = (text) => {
+    // Assuming response format is "word|start|end|speaker" separated by spaces
+    const words = text.split(' ');
+    return words.map((word, index) => {
+      const [text, start, end, speaker] = word.split('|');
+      if (!start || !end) return text + ' ';
+      
+      return (
+        <span
+          key={index}
+          data-time={start}
+          data-time-end={end}
+          data-speaker={speaker}
+          style={{ cursor: 'pointer' }}
+        >
+          {text + ' '}
+        </span>
+      );
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (input.trim() && selectedTemplate) {
       setIsLoading(true);
       try {
-        // First, add the user's message to the chat
         onSendMessage({
           text: input,
           sender: 'user',
           template: selectedTemplate
         });
 
-        // Prepare the word timing JSON from transcript data
-        const wordTimingJson = transcriptData ? JSON.stringify(transcriptData) : '';
+        const templateContent = promptTemplates.find(t => t.name === selectedTemplate)?.template;
+        if (!templateContent) {
+          throw new Error('Template not found');
+        }
 
-        // Send to LLM and get response
+        const wordTimingJson = transcriptData ? JSON.stringify(transcriptData) : '';
+        
         const llmResponse = await sendToLLM(
           wordTimingJson,
-          selectedTemplate,
+          templateContent,
           input,
-          'chat' // or any specific task identifier you want to use
+          'chat'
         );
 
-        // Add the LLM's response to the chat
+        // Add LLM response to chat with selectable text
         onSendMessage({
           text: llmResponse,
           sender: 'bot',
-          template: selectedTemplate
+          template: selectedTemplate,
+          isSelectable: true // Add flag to identify selectable messages
         });
 
-        // Clear the input
         setInput('');
       } catch (error) {
-        // Add error message to chat
+        console.error('Chat error:', error);
         onSendMessage({
           text: `Error: ${error.message}`,
           sender: 'bot',
@@ -86,12 +174,15 @@ const ChatBot = ({ onSendMessage, messages, selectedBinClip, transcriptData }) =
       </Box>
 
       {/* Messages Area */}
-      <Box sx={{ 
-        flex: 1,
-        overflow: 'auto',
-        p: 1,
-        backgroundColor: '#1e1e1e'
-      }}>
+      <Box 
+        sx={{ 
+          flex: 1,
+          overflow: 'auto',
+          p: 1,
+          backgroundColor: '#1e1e1e'
+        }}
+        onMouseUp={handleTextSelection}
+      >
         {messages.map((msg, index) => (
           <Box
             key={index}
@@ -112,10 +203,31 @@ const ChatBot = ({ onSendMessage, messages, selectedBinClip, transcriptData }) =
               })
             }}
           >
-            {msg.text}
+            {msg.isSelectable ? createSelectableText(msg.text) : msg.text}
           </Box>
         ))}
       </Box>
+
+      {/* Selection Actions */}
+      {selection && (
+        <Box sx={{ 
+          p: 1, 
+          borderTop: 1, 
+          borderColor: 'divider',
+          backgroundColor: 'background.paper',
+          display: 'flex',
+          gap: 1 
+        }}>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={handleAddToTimeline}
+            fullWidth
+          >
+            Add Selection to Timeline
+          </Button>
+        </Box>
+      )}
 
       {/* Input Area */}
       <Box 
