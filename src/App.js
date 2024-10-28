@@ -148,29 +148,25 @@ const handleChatMessage = (message) => {
   const handleAddToTimeline = (clipData) => {
     const transcriptName = clipData.name.replace(/\.[^/.]+$/, '.json');
     const transcriptData = transcripts.get(transcriptName);
-    
-    // Calculate where this clip should go
-    const timelineStart = timelineState.totalDuration;
-    const timelineDuration = clipData.metadata.timeline.duration;
-    const timelineEnd = timelineStart + timelineDuration;
-   
-    // Update the clip's timeline metadata
+
+    console.log("App.js handleAddToTimeline called with clipData:", clipData);
+
+    // Directly use the existing timeline metadata
     const enrichedClip = {
-      ...clipData,
-      transcript: transcriptData || null,
-      metadata: {
-        ...clipData.metadata,
-        timeline: {
-          ...clipData.metadata.timeline,
-          start: timelineStart,
-          end: timelineEnd,
-          track: 0 // Place all clips on track 0 for now
+        ...clipData,
+        transcript: transcriptData || null,
+        metadata: {
+            ...clipData.metadata,
+            timeline: {
+                ...clipData.metadata.timeline,
+                track: 0 // Still placing all clips on track 0 for now
+            }
         }
-      }
     };
-    
-    setTimelineClips(prevClips => [...prevClips, enrichedClip]);
-  };
+
+    // Add enriched clip to timelineClips state
+    setTimelineClips((prevClips) => [...prevClips, enrichedClip]);
+};
 
   const handleTimelineClipsChange = (newClips) => {
     setTimelineClips(newClips);
