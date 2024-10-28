@@ -7,6 +7,9 @@ import { Box, Snackbar, Alert } from '@mui/material';
 import MainLayout from './components/Layout/MainLayout';
 import EditorLayout from './components/Layout/EditorLayout';
 
+// Chabot
+import ChatBot from './components/Chatbot/ChatBot';
+
 // Viewer components
 import BinViewerSection from './components/Viewers/BinViewerSection';
 import TimelineViewerSection from './components/Viewers/TimelineViewerSection';
@@ -35,6 +38,15 @@ function App() {
   const [notification, setNotification] = useState(null);
   const [selectedTimelineProject, setSelectedTimelineProject] = useState(null);
   const [transcripts, setTranscripts] = useState(new Map());
+
+  const [chatMessages, setChatMessages] = useState([]);
+
+// Add this handler function:
+const handleChatMessage = (message) => {
+  setChatMessages(prev => [...prev, message]);
+};
+
+
 
   // Timeline metadata state
   const [timelineMetadata, setTimelineMetadata] = useState({
@@ -240,6 +252,12 @@ function App() {
               />
             </Box>
           </EditorLayout>
+          <ChatBot 
+  messages={chatMessages}
+  onSendMessage={handleChatMessage}
+  selectedBinClip={selectedBinClip}
+  transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
+/>
         </MainLayout>
 
         {/* Notifications */}
@@ -262,3 +280,6 @@ function App() {
 }
 
 export default App;
+
+
+
