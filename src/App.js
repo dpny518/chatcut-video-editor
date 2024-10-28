@@ -46,6 +46,22 @@ function App() {
     setNotification({ message, severity });
   };
 
+  const timelineState = {
+    clips: timelineClips.map(clip => ({
+      ...clip,
+      timelinePosition: clip.metadata?.timeline || {}
+    })),
+    totalDuration: timelineClips.reduce((max, clip) => {
+      const end = clip.metadata?.timeline?.end || 0;
+      return Math.max(max, end);
+    }, 0),
+    settings: { 
+      scale: timelineMetadata.scale, 
+      selectedClipId: timelineMetadata.selectedClipId 
+    }
+  };
+  
+
   // File handling
   const handleFileUpload = async (file) => {
     try {
@@ -178,6 +194,7 @@ function App() {
               <TimelineViewerSection 
                 clips={timelineClips}
                 transcript={transcripts}
+                timelineState={timelineState} 
               />
             </Box>
 
