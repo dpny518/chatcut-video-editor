@@ -251,48 +251,59 @@ onClipsChange(updatedClips);
 }, [clips, onClipsChange]);
 
   // Handle general changes
-  const handleChange = useCallback((newEditorData) => {
-    console.log('Timeline Changed:', newEditorData);
-    
-    if (!newEditorData?.actions) return;
+  // Update the handleChange callback in Timeline component
+const handleChange = useCallback((newEditorData) => {
+  console.log('Timeline Changed:', newEditorData);
   
-    const updatedClips = clips.map(clip => {
-      const action = newEditorData.actions.find(a => a.id === clip.id);
-      if (!action) return clip;
-  
-      // Get the current metadata from the action data
-      const actionData = action.data || {};
-      const metadata = actionData.metadata || {};
-      const timeline = metadata.timeline || {};
-      const playback = metadata.playback || {};
-  
-      // Calculate the current duration based on timeline
-      const timelineDuration = action.end - action.start;
-  
-      return {
-        ...clip,
-        ...actionData, // Include all action data updates
-        startTime: playback.start || clip.startTime,
-        endTime: playback.end || clip.endTime,
-        metadata: {
-          ...metadata,
-          timeline: {
-            ...timeline,
-            start: action.start,
-            end: action.end,
-            duration: timelineDuration,
-          },
-          playback: {
-            start: playback.start || clip.startTime,
-            end: playback.end || clip.endTime,
-            duration: playback.duration || (playback.end - playback.start)
-          }
+  if (!newEditorData?.actions) return;
+
+  const updatedClips = clips.map(clip => {
+    const action = newEditorData.actions.find(a => a.id === clip.id);
+    if (!action) return clip;
+
+    // Get the current metadata from the action data or initialize it
+    const actionData = action.data || {};
+    const metadata = actionData.metadata || {};
+    const timeline = metadata.timeline || {};
+    const playback = metadata.playback || {};
+
+    // Initialize timeline metadata if not present
+    const hasTimelineMetadata = Object.keys(timeline).length > 0;
+    const timelineStart = hasTimelineMetadata ? timeline.start : action.start;
+    const timelineEnd = hasTimelineMetadata ? timeline.end : action.end;
+    const timelineDuration = timelineEnd - timelineStart;
+
+    // Initialize playback metadata if not present
+    const hasPlaybackMetadata = Object.keys(playback).length > 0;
+    const playbackStart = hasPlaybackMetadata ? playback.start : clip.startTime;
+    const playbackEnd = hasPlaybackMetadata ? playback.end : clip.endTime;
+    const playbackDuration = playbackEnd - playbackStart;
+
+    return {
+      ...clip,
+      ...actionData,
+      startTime: playbackStart,
+      endTime: playbackEnd,
+      metadata: {
+        ...metadata,
+        timeline: {
+          start: timelineStart,
+          end: timelineEnd,
+          duration: timelineDuration,
+        },
+        playback: {
+          start: playbackStart,
+          end: playbackEnd,
+          duration: playbackDuration
         }
-      };
-    });
-  
-    onClipsChange(updatedClips);
-  }, [clips, onClipsChange]);
+      }
+    };
+  });
+
+  console.log('Updated clips with metadata:', updatedClips);
+  onClipsChange(updatedClips);
+}, [clips, onClipsChange]);
+
 
   // Timeline state export functionality
   const timelineState = {

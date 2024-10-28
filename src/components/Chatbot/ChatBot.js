@@ -19,7 +19,7 @@ const ChatBot = ({
       if (!selectedBinClip) {
         throw new Error('No video clip selected');
       }
-
+  
       // Parse and sort words chronologically
       const words = text.split(' ')
         .filter(w => w.includes('|'))
@@ -36,16 +36,16 @@ const ChatBot = ({
           };
         })
         .sort((a, b) => a.start - b.start);
-
+  
       if (words.length === 0) {
         throw new Error('No valid words found in response');
       }
-
+  
       // Group into segments
       const GAP_THRESHOLD = 0.5;
       let segments = [];
       let currentSegment = [words[0]];
-
+  
       for (let i = 1; i < words.length; i++) {
         const currentWord = words[i];
         const lastWord = currentSegment[currentSegment.length - 1];
@@ -62,44 +62,69 @@ const ChatBot = ({
       if (currentSegment.length > 0) {
         segments.push(currentSegment);
       }
-
+  
       // Create video element for metadata
       const video = document.createElement('video');
       video.src = URL.createObjectURL(selectedBinClip.file);
-
+  
       video.addEventListener('loadedmetadata', () => {
         // Add each segment to timeline
         segments.forEach((segment, index) => {
+          const timelineDuration = segment[segment.length - 1].end - segment[0].start;
+          
           const clipData = {
             id: `clip-${Date.now()}-${index}`,
             file: selectedBinClip.file,
             name: selectedBinClip.file.name,
             startTime: segment[0].start,
             endTime: segment[segment.length - 1].end,
-            duration: segment[segment.length - 1].end - segment[0].start,
+            duration: timelineDuration,
             source: {
               startTime: 0,
               endTime: video.duration,
               duration: video.duration
             },
-            transcript: segment.map(word => word.text).join(' ')
+            transcript: segment.map(word => word.text).join(' '),
+            // Add metadata
+            metadata: {
+              timeline: {
+                start: 0, // Will be adjusted by App.js
+                end: timelineDuration, // Will be adjusted by App.js
+                duration: timelineDuration,
+                track: 0
+              },
+              playback: {
+                start: segment[0].start,
+                end: segment[segment.length - 1].end,
+                duration: timelineDuration
+              }
+            },
+            // Add word timing info for transcript display
+            selectionInfo: {
+              words: segment,
+              timeRange: {
+                start: segment[0].start,
+                end: segment[segment.length - 1].end
+              },
+              text: segment.map(word => word.text).join(' ')
+            }
           };
-
+  
           onAddToTimeline?.(clipData);
         });
-
+  
         // Cleanup
         video.src = '';
         URL.revokeObjectURL(video.src);
       });
-
+  
       // Success message
       onSendMessage({
         text: `Successfully added ${segments.length} clip${segments.length > 1 ? 's' : ''} to timeline`,
         sender: 'bot',
         isSuccess: true
       });
-
+  
     } catch (error) {
       console.error('Error processing segments:', error);
       onSendMessage({

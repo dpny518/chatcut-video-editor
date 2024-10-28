@@ -111,24 +111,48 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
     setPlaying(false);
   };
 
- const handleAddToTimeline = () => {
+  const handleAddToTimeline = () => {
     if (!selectedClip || error) return;
-
+  
+    // Calculate initial timeline position (fallback to 0 if none exist)
+    const timelineStart = 0;  // This will be adjusted by App.js based on existing clips
+    const timelineDuration = range[1] - range[0];
+    const timelineEnd = timelineStart + timelineDuration;
+  
     const clipData = {
       id: `clip-${Date.now()}`, // Generate unique ID
       file: selectedClip.file,
       name: selectedClip.file.name,
       startTime: range[0],  // Start of trimmed section
       endTime: range[1],    // End of trimmed section
-      duration: range[1] - range[0],  // Duration of trimmed section
+      duration: timelineDuration,  // Duration of trimmed section
       source: {
         startTime: 0,
         endTime: duration,        // Full video duration from ReactPlayer
         duration: duration        // Full video duration
+      },
+      // Add initial metadata
+      metadata: {
+        timeline: {
+          start: timelineStart,
+          end: timelineEnd,
+          duration: timelineDuration,
+          track: 0 // Default to first track
+        },
+        playback: {
+          start: range[0],
+          end: range[1],
+          duration: timelineDuration
+        }
       }
     };
-
-    console.log('Adding clip with data:', clipData); // Let's see what we're passing
+  
+    console.log('Adding clip with metadata:', {
+      clip: clipData,
+      timeline: clipData.metadata.timeline,
+      playback: clipData.metadata.playback
+    });
+    
     onAddToTimeline?.(clipData);
   };
 

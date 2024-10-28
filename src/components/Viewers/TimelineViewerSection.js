@@ -50,6 +50,7 @@ const TimelineViewerSection = ({ clips, currentClip, transcript,timelineState })
           />
         ) : (
           <TimelineTranscriptViewer
+            key={clips.length} // Force refresh when clips array changes
             clips={clips}
             currentClip={currentClip}
             transcriptData={transcript}

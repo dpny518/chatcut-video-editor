@@ -150,11 +150,18 @@ const handleChatMessage = (message) => {
     const transcriptName = clipData.name.replace(/\.[^/.]+$/, '.json');
     const transcriptData = transcripts.get(transcriptName);
     
-    // Enrich the clip data received from BinViewer with transcript
+    // Just enrich with transcript data, preserve existing metadata
     const enrichedClip = {
-      ...clipData,  // Keep all the timing and file data from BinViewer
+      ...clipData,  // Keep all original data including metadata
       transcript: transcriptData || null
     };
+    
+    console.log('Adding clip to timeline:', {
+      original: clipData,
+      enriched: enrichedClip,
+      hasMetadata: !!clipData.metadata,
+      metadata: clipData.metadata
+    });
     
     setTimelineClips(prevClips => [...prevClips, enrichedClip]);
   };
