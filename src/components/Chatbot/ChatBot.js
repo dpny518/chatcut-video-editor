@@ -9,7 +9,8 @@ const ChatBot = ({
   selectedBinClip, 
   transcriptData,
   onAddToTimeline,
-  timelineRows,
+  timelineState,  // Make sure timelineState is being passed from App.js
+  timelineRows = [{ rowId: 0, clips: [], lastEnd: 0 }],  // Add default value
   setTimelineRows 
 }) => {
   const [input, setInput] = useState('');
@@ -22,7 +23,7 @@ const ChatBot = ({
         throw new Error('No video clip selected');
       }
   
-      // Parse and sort words chronologically
+      // Parse words maintaining original order
       const words = text.split(' ')
         .filter(w => w.includes('|'))
         .map(word => {
@@ -36,145 +37,115 @@ const ChatBot = ({
             end: parseFloat(end),
             speaker
           };
-        })
-        .sort((a, b) => a.start - b.start);
+        });
   
       if (words.length === 0) {
         throw new Error('No valid words found in response');
       }
   
-      // Group into segments
-      const GAP_THRESHOLD = 0.5;
-      let segments = [];
-      let currentSegment = [words[0]];
-  
-      for (let i = 1; i < words.length; i++) {
-        const currentWord = words[i];
-        const lastWord = currentSegment[currentSegment.length - 1];
-        const gap = currentWord.start - lastWord.end;
-        
-        if (gap > GAP_THRESHOLD) {
-          segments.push(currentSegment);
-          currentSegment = [currentWord];
-        } else {
-          currentSegment.push(currentWord);
-        }
-      }
-      
-      if (currentSegment.length > 0) {
-        segments.push(currentSegment);
-      }
-  
-      const video = document.createElement('video');
-      video.src = URL.createObjectURL(selectedBinClip.file);
-  
-      video.addEventListener('loadedmetadata', () => {
-        // Keep track of the last end time
-        let currentTimelinePosition = 0;
-
-        // Find a suitable row for clips
-        const findSuitableRow = (startTime, endTime) => {
-          let rowIndex = timelineRows.findIndex(row => {
-            const hasOverlap = row.clips.some(clip => {
-              const clipTimelineStart = clip.metadata.timeline.start;
-              const clipTimelineEnd = clip.metadata.timeline.end;
-              return !(endTime <= clipTimelineStart || startTime >= clipTimelineEnd);
-            });
-            return !hasOverlap;
-          });
-      
-          if (rowIndex === -1) {
-            rowIndex = timelineRows.length;
-            setTimelineRows(prev => [...prev, { rowId: rowIndex, clips: [], lastEnd: 0 }]);
-          }
-      
-          return rowIndex;
-        };
-
-        // Process each segment
-        segments.forEach((segment, index) => {
-          const timelineDuration = segment[segment.length - 1].end - segment[0].start;
-          const sourceStart = segment[0].start;
-          const sourceEnd = segment[segment.length - 1].end;
-          
-          // Calculate timeline placement using currentTimelinePosition
-          const timelineStart = currentTimelinePosition;
-          const timelineEnd = timelineStart + timelineDuration;
-          
-          // Find suitable row
-          const rowIndex = findSuitableRow(timelineStart, timelineEnd);
-          
-          const clipData = {
-            id: `clip-${Date.now()}-${index}`,
-            file: selectedBinClip.file,
-            name: selectedBinClip.file.name,
-            startTime: sourceStart,
-            endTime: sourceEnd,
-            duration: timelineDuration,
-            source: {
-              startTime: 0,
-              endTime: video.duration,
-              duration: video.duration
-            },
-            transcript: segment.map(word => word.text).join(' '),
-            metadata: {
-              timeline: {
-                start: timelineStart,
-                end: timelineEnd,
-                duration: timelineDuration,
-                row: rowIndex
-              },
-              playback: {
-                start: sourceStart,
-                end: sourceEnd,
-                duration: timelineDuration
-              }
-            },
-            selectionInfo: {
-              words: segment,
-              timeRange: {
-                start: sourceStart,
-                end: sourceEnd
-              },
-              text: segment.map(word => word.text).join(' ')
-            }
-          };
-  
-          // Update row metadata and current position
-          setTimelineRows(prev => {
-            const updated = [...prev];
-            const targetRow = updated[rowIndex];
-            targetRow.clips.push(clipData);
-            targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
-            return updated;
-          });
-
-          // Update the current position for the next clip
-          currentTimelinePosition = timelineEnd;
-
-          onAddToTimeline?.(clipData);
-        });
-  
-        // Cleanup
-        video.src = '';
-        URL.revokeObjectURL(video.src);
-      });
-  
-      onSendMessage({
-        text: `Successfully added ${segments.length} clip${segments.length > 1 ? 's' : ''} to timeline`,
-        sender: 'bot',
-        isSuccess: true
-      });
-  
-    } catch (error) {
-      console.error('Error processing segments:', error);
-      onSendMessage({
-        text: `Error: ${error.message}. Please try again with a different prompt.`,
-        sender: 'bot',
-        isError: true
-      });
-    }
-  };
+           // Group into segments by speaker
+           let segments = [];
+           let currentSegment = [words[0]];
+           let currentSpeaker = words[0].speaker;
+       
+           for (let i = 1; i < words.length; i++) {
+             const currentWord = words[i];
+             
+             if (currentWord.speaker !== currentSpeaker) {
+               segments.push(currentSegment);
+               currentSegment = [currentWord];
+               currentSpeaker = currentWord.speaker;
+             } else {
+               currentSegment.push(currentWord);
+             }
+           }
+           
+           if (currentSegment.length > 0) {
+             segments.push(currentSegment);
+           }
+       
+           const video = document.createElement('video');
+           video.src = URL.createObjectURL(selectedBinClip.file);
+       
+           video.addEventListener('loadedmetadata', () => {
+             // Process each segment using timelineState
+             segments.forEach((segment, index) => {
+               const segmentStart = Math.min(...segment.map(w => w.start));
+               const segmentEnd = Math.max(...segment.map(w => w.end));
+               const timelineDuration = segmentEnd - segmentStart;
+     
+               // Calculate timeline placement using timelineState
+               const timelineStart = timelineState.totalDuration;
+               const timelineEnd = timelineStart + timelineDuration;
+               
+               const clipData = {
+                 id: `clip-${Date.now()}-${index}`,
+                 file: selectedBinClip.file,
+                 name: selectedBinClip.file.name,
+                 startTime: segmentStart,
+                 endTime: segmentEnd,
+                 duration: timelineDuration,
+                 source: {
+                   startTime: 0,
+                   endTime: video.duration,
+                   duration: video.duration
+                 },
+                 transcript: segment.map(word => word.text).join(' '),
+                 metadata: {
+                   timeline: {
+                     start: timelineStart,
+                     end: timelineEnd,
+                     duration: timelineDuration,
+                     track: 0
+                   },
+                   playback: {
+                     start: segmentStart,
+                     end: segmentEnd,
+                     duration: timelineDuration
+                   }
+                 },
+                 selectionInfo: {
+                   words: segment,
+                   timeRange: {
+                     start: segmentStart,
+                     end: segmentEnd
+                   },
+                   text: segment.map(word => word.text).join(' '),
+                   speaker: segment[0].speaker
+                 }
+               };
+     
+               console.log(`Adding clip ${index + 1}:`, {
+                 text: segment.map(w => w.text).join(' '),
+                 timelineStart,
+                 timelineEnd,
+                 sourceStart: segmentStart,
+                 sourceEnd: segmentEnd,
+                 speaker: segment[0].speaker
+               });
+     
+               onAddToTimeline?.(clipData);
+             });
+       
+             video.src = '';
+             URL.revokeObjectURL(video.src);
+           });
+       
+           onSendMessage({
+             text: `Successfully added ${segments.length} clip${segments.length > 1 ? 's' : ''} to timeline`,
+             sender: 'bot',
+             isSuccess: true
+           });
+       
+         } catch (error) {
+           console.error('Error processing segments:', error);
+           onSendMessage({
+             text: `Error: ${error.message}. Please try again with a different prompt.`,
+             sender: 'bot',
+             isError: true
+           });
+         }
+       };
 
   const handleSubmit = async (e) => {
     e.preventDefault();

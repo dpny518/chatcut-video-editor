@@ -20,6 +20,8 @@ import TimelineDebug from './components/Timeline/TimelineDebug';
 import { useTimelineStateManager } from './hooks/useTimeline/useTimelineStateManager';
 
 
+
+
 const theme = createTheme({
   palette: {
     mode: 'dark',
@@ -43,13 +45,10 @@ function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
 
-
 // Add this handler function:
 const handleChatMessage = (message) => {
   setChatMessages(prev => [...prev, message]);
 };
-
-
 
   // Timeline metadata state
   const [timelineMetadata, setTimelineMetadata] = useState({
@@ -63,7 +62,6 @@ const handleChatMessage = (message) => {
 
   const timelineState = {
     clips: timelineClips.map(clip => {
-      // Get the stored metadata that was updated by TimelineClip
       const metadata = clip.metadata || {};
       const playback = metadata.playback || {};
       const timeline = metadata.timeline || {};
@@ -75,7 +73,6 @@ const handleChatMessage = (message) => {
           end: timeline.end,
           duration: timeline.duration,
           track: timeline.track || 0,
-          // Include playback info as well
           playbackStart: playback.start,
           playbackEnd: playback.end,
           playbackDuration: playback.duration
@@ -91,7 +88,6 @@ const handleChatMessage = (message) => {
       selectedClipId: timelineMetadata.selectedClipId 
     }
   };
-  
   
 
   // File handling
@@ -153,35 +149,28 @@ const handleChatMessage = (message) => {
     const transcriptName = clipData.name.replace(/\.[^/.]+$/, '.json');
     const transcriptData = transcripts.get(transcriptName);
     
-    // Just enrich with transcript data, preserve existing metadata
+    // Calculate where this clip should go
+    const timelineStart = timelineState.totalDuration;
+    const timelineDuration = clipData.metadata.timeline.duration;
+    const timelineEnd = timelineStart + timelineDuration;
+   
+    // Update the clip's timeline metadata
     const enrichedClip = {
-      ...clipData,  // Keep all original data including metadata
-      transcript: transcriptData || null
+      ...clipData,
+      transcript: transcriptData || null,
+      metadata: {
+        ...clipData.metadata,
+        timeline: {
+          ...clipData.metadata.timeline,
+          start: timelineStart,
+          end: timelineEnd,
+          track: 0 // Place all clips on track 0 for now
+        }
+      }
     };
     
-    console.log('Adding clip to timeline:', {
-      original: clipData,
-      enriched: enrichedClip,
-      hasMetadata: !!clipData.metadata,
-      metadata: clipData.metadata
-    });
-    
-    // Update timeline rows if the clip has row metadata
-  if (clipData.metadata?.timeline?.row !== undefined) {
-    setTimelineRows(prev => {
-      const updated = [...prev];
-      while (updated.length <= clipData.metadata.timeline.row) {
-        updated.push({ rowId: updated.length, clips: [], lastEnd: 0 });
-      }
-      const targetRow = updated[clipData.metadata.timeline.row];
-      targetRow.clips.push(enrichedClip);
-      targetRow.lastEnd = Math.max(targetRow.lastEnd, clipData.metadata.timeline.end);
-      return updated;
-    });
-  }
-  
-  setTimelineClips(prevClips => [...prevClips, enrichedClip]);
-};
+    setTimelineClips(prevClips => [...prevClips, enrichedClip]);
+  };
 
   const handleTimelineClipsChange = (newClips) => {
     setTimelineClips(newClips);
@@ -240,11 +229,10 @@ const handleChatMessage = (message) => {
             {/* Main Content Area */}
             <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
             <BinViewerSection
-                  selectedClip={selectedBinClip}
-                  onAddToTimeline={handleAddToTimeline}
-                  transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
-                  timelineRows={timelineRows}
-                  setTimelineRows={setTimelineRows}
+            selectedClip={selectedBinClip}
+            onAddToTimeline={handleAddToTimeline}
+            transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
+            timelineState={timelineState}
                 />
               <TimelineViewerSection 
                 clips={timelineClips}
@@ -269,10 +257,9 @@ const handleChatMessage = (message) => {
               }
             }}>
               <TimelineSection
-              clips={timelineClips}
-              onClipsChange={handleTimelineClipsChange}
-              timelineRows={timelineRows}
-              setTimelineRows={setTimelineRows}
+             clips={timelineClips}
+             onClipsChange={handleTimelineClipsChange}
+             timelineState={timelineState}
                 />
               <TimelineDebug
                 timelineClips={timelineClips}
@@ -281,13 +268,14 @@ const handleChatMessage = (message) => {
             </Box>
           </EditorLayout>
           <ChatBot 
-            messages={chatMessages}
-            onSendMessage={handleChatMessage}
-            selectedBinClip={selectedBinClip}
-            transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
-            onAddToTimeline={handleAddToTimeline}
-            timelineRows={timelineRows}
-            setTimelineRows={setTimelineRows}
+          messages={chatMessages}
+          onSendMessage={handleChatMessage}
+          selectedBinClip={selectedBinClip}
+          transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
+          onAddToTimeline={handleAddToTimeline}
+          timelineState={timelineState}
+          timelineRows={timelineRows}
+          setTimelineRows={setTimelineRows}
           />
         </MainLayout>
 
