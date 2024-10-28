@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Box, TextField, Button, Select, MenuItem, FormControl, CircularProgress } from '@mui/material';
 import { promptTemplates } from './promptTemplates';
 import { sendToLLM } from './Api';
@@ -8,90 +8,106 @@ const ChatBot = ({
   messages, 
   selectedBinClip, 
   transcriptData,
-  onAddToTimeline // Add this prop
+  onAddToTimeline 
 }) => {
   const [input, setInput] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selection, setSelection] = useState(null);
 
-  const handleTextSelection = useCallback(() => {
-    const selection = window.getSelection();
-    if (!selection.rangeCount) return;
+  const processAndAddToTimeline = async (text) => {
+    try {
+      if (!selectedBinClip) {
+        throw new Error('No video clip selected');
+      }
 
-    const range = selection.getRangeAt(0);
-    const startNode = range.startContainer.parentNode;
-    const endNode = range.endContainer.parentNode;
+      // Parse and sort words chronologically
+      const words = text.split(' ')
+        .filter(w => w.includes('|'))
+        .map(word => {
+          const [text, start, end, speaker] = word.split('|');
+          if (!start || !end || isNaN(parseFloat(start)) || isNaN(parseFloat(end))) {
+            throw new Error('Invalid word timing format');
+          }
+          return {
+            text,
+            start: parseFloat(start),
+            end: parseFloat(end),
+            speaker
+          };
+        })
+        .sort((a, b) => a.start - b.start);
 
-    if (startNode.hasAttribute('data-time') && endNode.hasAttribute('data-time')) {
-      const start = parseFloat(startNode.getAttribute('data-time'));
-      const end = parseFloat(endNode.getAttribute('data-time-end') || endNode.getAttribute('data-time'));
+      if (words.length === 0) {
+        throw new Error('No valid words found in response');
+      }
+
+      // Group into segments
+      const GAP_THRESHOLD = 0.5;
+      let segments = [];
+      let currentSegment = [words[0]];
+
+      for (let i = 1; i < words.length; i++) {
+        const currentWord = words[i];
+        const lastWord = currentSegment[currentSegment.length - 1];
+        const gap = currentWord.start - lastWord.end;
+        
+        if (gap > GAP_THRESHOLD) {
+          segments.push(currentSegment);
+          currentSegment = [currentWord];
+        } else {
+          currentSegment.push(currentWord);
+        }
+      }
       
-      setSelection({
-        start,
-        end,
-        text: selection.toString()
+      if (currentSegment.length > 0) {
+        segments.push(currentSegment);
+      }
+
+      // Create video element for metadata
+      const video = document.createElement('video');
+      video.src = URL.createObjectURL(selectedBinClip.file);
+
+      video.addEventListener('loadedmetadata', () => {
+        // Add each segment to timeline
+        segments.forEach((segment, index) => {
+          const clipData = {
+            id: `clip-${Date.now()}-${index}`,
+            file: selectedBinClip.file,
+            name: selectedBinClip.file.name,
+            startTime: segment[0].start,
+            endTime: segment[segment.length - 1].end,
+            duration: segment[segment.length - 1].end - segment[0].start,
+            source: {
+              startTime: 0,
+              endTime: video.duration,
+              duration: video.duration
+            },
+            transcript: segment.map(word => word.text).join(' ')
+          };
+
+          onAddToTimeline?.(clipData);
+        });
+
+        // Cleanup
+        video.src = '';
+        URL.revokeObjectURL(video.src);
+      });
+
+      // Success message
+      onSendMessage({
+        text: `Successfully added ${segments.length} clip${segments.length > 1 ? 's' : ''} to timeline`,
+        sender: 'bot',
+        isSuccess: true
+      });
+
+    } catch (error) {
+      console.error('Error processing segments:', error);
+      onSendMessage({
+        text: `Error: ${error.message}. Please try again with a different prompt.`,
+        sender: 'bot',
+        isError: true
       });
     }
-  }, []);
-
-  const handleAddToTimeline = useCallback(() => {
-    if (!selection || !selectedBinClip) {
-      console.warn('Missing required data for timeline clip', { selection, selectedBinClip });
-      return;
-    }
-  
-    // Create a video element to get duration
-    const video = document.createElement('video');
-    video.src = URL.createObjectURL(selectedBinClip.file);
-  
-    video.addEventListener('loadedmetadata', () => {
-      const clipData = {
-        id: `clip-${Date.now()}`,
-        file: selectedBinClip.file,
-        name: selectedBinClip.file.name,
-        startTime: selection.start,
-        endTime: selection.end,
-        duration: selection.end - selection.start,
-        source: {
-          startTime: 0,
-          endTime: video.duration,
-          duration: video.duration
-        },
-        transcript: selection.text
-      };
-  
-      // Cleanup
-      video.src = '';
-      URL.revokeObjectURL(video.src);
-  
-      console.log('Adding clip with data:', clipData);
-      onAddToTimeline?.(clipData);
-      setSelection(null);
-    });
-  
-  }, [selection, selectedBinClip, onAddToTimeline]);
-
-  // Parse the LLM response to create selectable text spans
-  const createSelectableText = (text) => {
-    // Assuming response format is "word|start|end|speaker" separated by spaces
-    const words = text.split(' ');
-    return words.map((word, index) => {
-      const [text, start, end, speaker] = word.split('|');
-      if (!start || !end) return text + ' ';
-      
-      return (
-        <span
-          key={index}
-          data-time={start}
-          data-time-end={end}
-          data-speaker={speaker}
-          style={{ cursor: 'pointer' }}
-        >
-          {text + ' '}
-        </span>
-      );
-    });
   };
 
   const handleSubmit = async (e) => {
@@ -119,21 +135,15 @@ const ChatBot = ({
           'chat'
         );
 
-        // Add LLM response to chat with selectable text
-        onSendMessage({
-          text: llmResponse,
-          sender: 'bot',
-          template: selectedTemplate,
-          isSelectable: true // Add flag to identify selectable messages
-        });
+        // Process response and add to timeline
+        await processAndAddToTimeline(llmResponse);
 
         setInput('');
       } catch (error) {
         console.error('Chat error:', error);
         onSendMessage({
-          text: `Error: ${error.message}`,
+          text: `Error: ${error.message}. Please try a different prompt.`,
           sender: 'bot',
-          template: selectedTemplate,
           isError: true
         });
       } finally {
@@ -181,7 +191,6 @@ const ChatBot = ({
           p: 1,
           backgroundColor: '#1e1e1e'
         }}
-        onMouseUp={handleTextSelection}
       >
         {messages.map((msg, index) => (
           <Box
@@ -198,36 +207,16 @@ const ChatBot = ({
                 color: 'white',
               } : {
                 mr: 'auto',
-                backgroundColor: msg.isError ? '#ef4444' : '#2d2d2d',
+                backgroundColor: msg.isError ? '#ef4444' : 
+                               msg.isSuccess ? '#22c55e' : '#2d2d2d',
                 color: 'white',
               })
             }}
           >
-            {msg.isSelectable ? createSelectableText(msg.text) : msg.text}
+            {msg.text}
           </Box>
         ))}
       </Box>
-
-      {/* Selection Actions */}
-      {selection && (
-        <Box sx={{ 
-          p: 1, 
-          borderTop: 1, 
-          borderColor: 'divider',
-          backgroundColor: 'background.paper',
-          display: 'flex',
-          gap: 1 
-        }}>
-          <Button 
-            variant="contained" 
-            color="primary"
-            onClick={handleAddToTimeline}
-            fullWidth
-          >
-            Add Selection to Timeline
-          </Button>
-        </Box>
-      )}
 
       {/* Input Area */}
       <Box 
