@@ -68,16 +68,21 @@ const ChatBot = ({
       video.src = URL.createObjectURL(selectedBinClip.file);
   
       video.addEventListener('loadedmetadata', () => {
+        // Keep track of timeline position for sequential placement
+        let currentTimelinePosition = 0;
+  
         // Add each segment to timeline
         segments.forEach((segment, index) => {
           const timelineDuration = segment[segment.length - 1].end - segment[0].start;
+          const sourceStart = segment[0].start;
+          const sourceEnd = segment[segment.length - 1].end;
           
           const clipData = {
             id: `clip-${Date.now()}-${index}`,
             file: selectedBinClip.file,
             name: selectedBinClip.file.name,
-            startTime: segment[0].start,
-            endTime: segment[segment.length - 1].end,
+            startTime: sourceStart,  // Original source timing
+            endTime: sourceEnd,      // Original source timing
             duration: timelineDuration,
             source: {
               startTime: 0,
@@ -85,38 +90,41 @@ const ChatBot = ({
               duration: video.duration
             },
             transcript: segment.map(word => word.text).join(' '),
-            // Add metadata
+            // Update metadata for sequential timeline placement
             metadata: {
               timeline: {
-                start: 0, // Will be adjusted by App.js
-                end: timelineDuration, // Will be adjusted by App.js
+                start: currentTimelinePosition,  // Sequential position
+                end: currentTimelinePosition + timelineDuration,  // Sequential end
                 duration: timelineDuration,
                 track: 0
               },
               playback: {
-                start: segment[0].start,
-                end: segment[segment.length - 1].end,
+                start: sourceStart,  // Original timing for playback
+                end: sourceEnd,      // Original timing for playback
                 duration: timelineDuration
               }
             },
-            // Add word timing info for transcript display
             selectionInfo: {
               words: segment,
               timeRange: {
-                start: segment[0].start,
-                end: segment[segment.length - 1].end
+                start: sourceStart,
+                end: sourceEnd
               },
               text: segment.map(word => word.text).join(' ')
             }
           };
   
           onAddToTimeline?.(clipData);
+  
+          // Update timeline position for next clip
+          currentTimelinePosition += timelineDuration;
         });
   
         // Cleanup
         video.src = '';
         URL.revokeObjectURL(video.src);
       });
+  
   
       // Success message
       onSendMessage({
