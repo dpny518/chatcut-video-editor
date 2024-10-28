@@ -14,30 +14,26 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 
 const generateDistinctColors = (count) => {
-    const colors = [];
-    const saturation = 65; // Keep saturation constant for consistency
-    
-    for (let i = 0; i < count; i++) {
-      // Use golden ratio to spread hues evenly
-      const hue = (i * 137.508) % 360; // Golden angle in degrees
-      
-      // Create two shades for each color: light and dark
-      colors.push({
-        light: `hsl(${hue}, ${saturation}%, 60%)`,
-        dark: `hsl(${hue}, ${saturation}%, 45%)`,
-        // Add text colors that ensure readability
-        textLight: `hsl(${hue}, ${saturation}%, 95%)`,
-        textDark: `hsl(${hue}, ${saturation}%, 15%)`
-      });
-    }
-    return colors;
-  };
+  const colors = [];
+  const saturation = 65;
+  
+  for (let i = 0; i < count; i++) {
+    const hue = (i * 137.508) % 360;
+    colors.push({
+      light: `hsl(${hue}, ${saturation}%, 60%)`,
+      dark: `hsl(${hue}, ${saturation}%, 45%)`,
+      textLight: `hsl(${hue}, ${saturation}%, 95%)`,
+      textDark: `hsl(${hue}, ${saturation}%, 15%)`
+    });
+  }
+  return colors;
+};
 
 const TimelineTranscriptViewer = ({ 
   clips,
   transcriptData, 
   viewMode,
-  timelineState // Add timelineState prop
+  timelineState
 }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -46,25 +42,20 @@ const TimelineTranscriptViewer = ({
   const videoRef = useRef(null);
   const videoUrlRef = useRef(null);
 
-    // Generate colors based on number of clips
-    const clipColors = React.useMemo(() => 
-        generateDistinctColors(timelineState.clips.length), 
-        [timelineState.clips.length]
-      );
+  // Generate colors based on number of clips
+  const clipColors = React.useMemo(() => 
+    generateDistinctColors(timelineState.clips.length),
+    [timelineState.clips.length]
+  );
 
   // Sort clips by timeline position
-  const sortedClips = [...clips].sort((a, b) => {
-    const aStart = a.metadata?.timeline?.start || 0;
-    const bStart = b.metadata?.timeline?.start || 0;
-    return aStart - bStart;
-  });
-
-  console.log('TimelineTranscriptViewer received:', {
-    clips: sortedClips,
-    transcriptData,
-    viewMode,
-    timelineState
-  });
+  const sortedClips = React.useMemo(() => {
+    return [...timelineState.clips].sort((a, b) => {
+      const aStart = a.metadata?.timeline?.start || 0;
+      const bStart = b.metadata?.timeline?.start || 0;
+      return aStart - bStart;
+    });
+  }, [timelineState.clips]);
 
   useEffect(() => {
     return () => {
@@ -110,20 +101,11 @@ const TimelineTranscriptViewer = ({
     }
   }, []);
 
-  const handleWordClick = useCallback((time) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-      setCurrentTime(time);
-      setSelection({
-        start: time,
-        end: time + 0.5
-      });
-    }
-  }, []);
-
   const renderClipsList = () => (
     <List sx={{ borderBottom: 1, borderColor: 'divider' }}>
-      {timelineState.clips.map((clip, index) => {
+      {sortedClips.map((clip, index) => {
+        const timeline = clip.metadata?.timeline || {};
+        const playback = clip.metadata?.playback || {};
         return (
           <ListItem 
             key={clip.id}
@@ -133,117 +115,109 @@ const TimelineTranscriptViewer = ({
           >
             <ListItemText
               primary={`Clip ${index + 1}`}
-              secondary={`Timeline: ${clip.startTime?.toFixed(1)}s - ${clip.endTime?.toFixed(1)}s | Playback: ${clip.startTime?.toFixed(1)}s - ${clip.endTime?.toFixed(1)}s`}
+              secondary={`Timeline: ${timeline.start?.toFixed(1)}s - ${timeline.end?.toFixed(1)}s | Source: ${playback.start?.toFixed(1)}s - ${playback.end?.toFixed(1)}s`}
             />
           </ListItem>
         );
       })}
     </List>
   );
-  
-  // Update the renderTranscript function's word mapping section
-const renderTranscript = () => {
-  if (!transcriptData || !(transcriptData instanceof Map)) {
+
+  const renderTranscript = () => {
+    if (!transcriptData || !(transcriptData instanceof Map)) {
+      return <Typography>No transcript data available</Typography>;
+    }
+
+    const transcriptEntry = Array.from(transcriptData.values())[0];
+    if (!transcriptEntry?.transcription) return null;
+
     return (
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        height: '100%', 
-        p: 2 
-      }}>
-        <Typography variant="body2" color="text.secondary">
-          No transcript data available
-        </Typography>
-      </Box>
-    );
-  }
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {sortedClips.map((clip, clipIndex) => {
+          const timeline = clip.metadata?.timeline || {};
+          const playback = clip.metadata?.playback || {};
+          const clipColor = clipColors[clipIndex];
+          const isCurrentClip = clipIndex === currentClipIndex;
 
-  // Get transcript data from any clip since they're all from the same video
-  const transcriptEntries = Array.from(transcriptData.values());
-  const transcriptEntry = transcriptEntries[0];
-  
-  if (!transcriptEntry?.transcription) {
-    return (
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        height: '100%', 
-        p: 2 
-      }}>
-        <Typography variant="body2" color="text.secondary">
-          No transcript data available
-        </Typography>
-      </Box>
-    );
-  }
+          // Filter words that belong to this clip's playback range
+          const clipWords = {};
+          transcriptEntry.transcription.forEach(segment => {
+            const speakerWords = segment.words.filter(word => 
+              word.start >= playback.start && word.end <= playback.end
+            );
+            
+            if (speakerWords.length > 0) {
+              if (!clipWords[segment.segment.speaker]) {
+                clipWords[segment.segment.speaker] = [];
+              }
+              clipWords[segment.segment.speaker].push(...speakerWords);
+            }
+          });
 
-  // Function to check if word is in any clip's range
-  const getClipIndex = (word) => {
-    return timelineState.clips.findIndex(clip => 
-      word.start >= clip.startTime && word.end <= clip.endTime
-    );
-  };
-
-  return transcriptEntry.transcription.map((item, index) => (
-    <Box key={`segment-${index}`} sx={{ mb: 2 }}>
-      <Typography 
-        variant="subtitle2" 
-        color="primary" 
-        sx={{ mb: 0.5, fontWeight: 500 }}
-      >
-        Speaker {item.segment.speaker}
-      </Typography>
-      <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
-        {item.words.map((word, wordIndex) => {
-          const clipIndex = getClipIndex(word);
-          const isInAnyClip = clipIndex !== -1;
-          const clipColor = isInAnyClip ? clipColors[clipIndex] : null;
-          const isInCurrentClip = clipIndex === currentClipIndex;
-          
-          const currentClip = timelineState.clips[currentClipIndex];
-          const adjustedStart = isInCurrentClip ? word.start - currentClip.startTime : word.start;
-          const adjustedEnd = isInCurrentClip ? word.end - currentClip.startTime : word.end;
+          if (Object.keys(clipWords).length === 0) return null;
 
           return (
-            <Box
-              component="span"
-              key={`word-${wordIndex}`}
-              onClick={() => isInAnyClip && handleWordClick(word.start)}
+            <Paper
+              key={clip.id}
+              elevation={2}
               sx={{
-                cursor: isInAnyClip ? 'pointer' : 'not-allowed',
-                px: 0.5,
-                py: 0.25,
-                mx: 0.25,
-                borderRadius: 1,
-                transition: 'all 0.2s ease',
-                bgcolor: isInAnyClip 
-                  ? (isInCurrentClip && currentTime >= adjustedStart && currentTime < adjustedEnd
-                      ? clipColor.dark 
-                      : clipColor.light)
-                  : 'transparent',
-                color: isInAnyClip 
-                  ? (isInCurrentClip && currentTime >= adjustedStart && currentTime < adjustedEnd
-                      ? clipColor.textLight
-                      : clipColor.textDark)
-                  : 'text.secondary',
-                '&:hover': {
-                  bgcolor: isInAnyClip 
-                    ? clipColor.dark
-                    : 'transparent',
-                  color: isInAnyClip ? clipColor.textLight : 'text.secondary'
-                }
+                p: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                borderLeft: 4,
+                borderLeftColor: clipColor.light
               }}
             >
-              {word.word}{' '}
-            </Box>
+              <Typography variant="subtitle2" sx={{ mb: 1, opacity: 0.7 }}>
+                Clip {clipIndex + 1}: Timeline [{timeline.start?.toFixed(1)}s - {timeline.end?.toFixed(1)}s]
+                {' '}| Source [{playback.start?.toFixed(1)}s - {playback.end?.toFixed(1)}s]
+              </Typography>
+
+              {Object.entries(clipWords).map(([speaker, words]) => (
+                <Box key={`${clip.id}-${speaker}`} sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" color="primary" sx={{ mb: 0.5 }}>
+                    Speaker {speaker}
+                  </Typography>
+                  <Typography variant="body2" sx={{ lineHeight: 1.8 }}>
+                    {words.map((word, wordIndex) => {
+                      const adjustedTime = word.start - playback.start;
+                      const isCurrentWord = isCurrentClip && 
+                        currentTime >= adjustedTime && 
+                        currentTime < (adjustedTime + (word.end - word.start));
+
+                      return (
+                        <Box
+                          component="span"
+                          key={`${word.word}-${wordIndex}`}
+                          onClick={() => videoRef.current && (videoRef.current.currentTime = word.start)}
+                          sx={{
+                            cursor: 'pointer',
+                            px: 0.5,
+                            py: 0.25,
+                            mx: 0.25,
+                            borderRadius: 1,
+                            transition: 'all 0.2s ease',
+                            bgcolor: isCurrentWord ? clipColor.dark : clipColor.light,
+                            color: isCurrentWord ? clipColor.textLight : clipColor.textDark,
+                            '&:hover': {
+                              bgcolor: clipColor.dark,
+                              color: clipColor.textLight
+                            }
+                          }}
+                        >
+                          {word.word}{' '}
+                        </Box>
+                      );
+                    })}
+                  </Typography>
+                </Box>
+              ))}
+            </Paper>
           );
         })}
-      </Typography>
-    </Box>
-  ));
-};
+      </Box>
+    );
+  };
 
   const renderContent = () => {
     if (viewMode === 'video') {
@@ -272,30 +246,16 @@ const renderTranscript = () => {
               </IconButton>
             </>
           ) : (
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              height: '100%', 
-              p: 2 
-            }}>
-              <Typography variant="body2" color="text.secondary">
-                No clip selected
-              </Typography>
-            </Box>
+            <Typography variant="body2" color="text.secondary">
+              No clip selected
+            </Typography>
           )}
         </Box>
       );
     }
     
     return (
-      <Box 
-        sx={{ 
-          flexGrow: 1,
-          overflowY: 'auto',
-          p: 2
-        }}
-      >
+      <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
         {renderTranscript()}
       </Box>
     );

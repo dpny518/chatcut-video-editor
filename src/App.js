@@ -47,10 +47,26 @@ function App() {
   };
 
   const timelineState = {
-    clips: timelineClips.map(clip => ({
-      ...clip,
-      timelinePosition: clip.metadata?.timeline || {}
-    })),
+    clips: timelineClips.map(clip => {
+      // Get the stored metadata that was updated by TimelineClip
+      const metadata = clip.metadata || {};
+      const playback = metadata.playback || {};
+      const timeline = metadata.timeline || {};
+  
+      return {
+        ...clip,
+        timelinePosition: {
+          start: timeline.start,
+          end: timeline.end,
+          duration: timeline.duration,
+          track: timeline.track || 0,
+          // Include playback info as well
+          playbackStart: playback.start,
+          playbackEnd: playback.end,
+          playbackDuration: playback.duration
+        }
+      };
+    }),
     totalDuration: timelineClips.reduce((max, clip) => {
       const end = clip.metadata?.timeline?.end || 0;
       return Math.max(max, end);
@@ -60,6 +76,7 @@ function App() {
       selectedClipId: timelineMetadata.selectedClipId 
     }
   };
+  
   
 
   // File handling
