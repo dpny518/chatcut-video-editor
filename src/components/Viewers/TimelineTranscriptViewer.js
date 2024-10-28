@@ -11,20 +11,23 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 
 const TimelineTranscriptViewer = ({ 
-clips,
+  clips,
   transcriptData, 
-  viewMode // Now controlled by parent
+  viewMode
 }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [selection, setSelection] = useState(null); // Add selection state
   const videoRef = useRef(null);
   const videoUrlRef = useRef(null);
-  const selectedClip = clips[0]
+  const selectedClip = clips[0];
+
   console.log('TimelineTranscriptViewer received:', {
     selectedClip,
     transcriptData,
     viewMode
   });
+
   useEffect(() => {
     return () => {
       if (videoUrlRef.current) {
@@ -64,11 +67,32 @@ clips,
     if (videoRef.current) {
       videoRef.current.currentTime = time;
       setCurrentTime(time);
+      // Update selection when clicking a word
+      setSelection({
+        start: time,
+        end: time + 0.5 // Set a small selection window
+      });
     }
   }, []);
 
+  // Add handlers for selection
+  const handleSelectionStart = useCallback((time) => {
+    setSelection({
+      start: time,
+      end: time
+    });
+  }, []);
+
+  const handleSelectionEnd = useCallback((time) => {
+    if (selection) {
+      setSelection(prev => ({
+        ...prev,
+        end: time
+      }));
+    }
+  }, [selection]);
+
   const renderTranscript = () => {
-    // First, check if we have a Map with data
     if (!transcriptData || !(transcriptData instanceof Map)) {
       return (
         <Box sx={{ 
@@ -85,7 +109,6 @@ clips,
       );
     }
 
-    // Get the first transcript value from the Map
     const transcriptEntry = transcriptData.values().next().value;
     
     if (!transcriptEntry?.transcription) {
@@ -121,15 +144,19 @@ clips,
               data-time={word.start}
               data-time-end={word.end}
               onClick={() => handleWordClick(word.start)}
+              onMouseDown={() => handleSelectionStart(word.start)}
+              onMouseUp={() => handleSelectionEnd(word.end)}
               sx={{
                 cursor: 'pointer',
                 px: 0.5,
                 borderRadius: 0.5,
                 transition: 'background-color 0.2s',
-                bgcolor: currentTime >= word.start && currentTime < word.end 
+                bgcolor: (currentTime >= word.start && currentTime < word.end) || 
+                  (selection && word.start >= selection.start && word.end <= selection.end)
                   ? 'primary.main' 
                   : 'transparent',
-                color: currentTime >= word.start && currentTime < word.end 
+                color: (currentTime >= word.start && currentTime < word.end) ||
+                  (selection && word.start >= selection.start && word.end <= selection.end)
                   ? 'primary.contrastText' 
                   : 'inherit',
                 '&:hover': {
