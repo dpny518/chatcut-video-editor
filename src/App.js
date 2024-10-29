@@ -225,10 +225,12 @@ const handleChatMessage = (message) => {
             {/* Main Content Area */}
             <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
             <BinViewerSection
+            clips={timelineClips}
             selectedClip={selectedBinClip}
             onAddToTimeline={handleAddToTimeline}
             transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
             timelineState={timelineState}
+            setTimelineRows={setTimelineRows}
                 />
               <TimelineViewerSection 
                 clips={timelineClips}
@@ -256,6 +258,8 @@ const handleChatMessage = (message) => {
              clips={timelineClips}
              onClipsChange={handleTimelineClipsChange}
              timelineState={timelineState}
+             timelineRows={timelineRows}
+             setTimelineRows={setTimelineRows}
                 />
               <TimelineDebug
                 timelineClips={timelineClips}
@@ -264,6 +268,7 @@ const handleChatMessage = (message) => {
             </Box>
           </EditorLayout>
           <ChatBot 
+          clips={timelineClips}
           messages={chatMessages}
           onSendMessage={handleChatMessage}
           selectedBinClip={selectedBinClip}

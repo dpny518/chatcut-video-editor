@@ -2,7 +2,7 @@
 import React from 'react';
 import { Box } from '@mui/material';
 import Timeline from './index';
-const TimelineSection = ({ clips, onClipsChange }) => {
+const TimelineSection = ({ clips, onClipsChange,timelineRows,setTimelineRows }) => {
   return (
     <Box sx={{ 
       width: '100%',
@@ -16,6 +16,8 @@ const TimelineSection = ({ clips, onClipsChange }) => {
       <Timeline 
         clips={clips}
         onClipsChange={onClipsChange}
+        timelineRows={timelineRows}
+        setTimelineRows={setTimelineRows}
       />
     </Box>
   );

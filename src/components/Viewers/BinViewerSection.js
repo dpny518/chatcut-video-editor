@@ -8,14 +8,16 @@ import {
 } from '@mui/material';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
-import BinViewer from './BinViewer';
-import TranscriptViewer from './TranscriptViewer';
+import BinViewer from './BinViewer';import TranscriptViewer from './TranscriptViewer';
+
 
 const BinViewerSection = ({ 
+  clips,
   selectedClip, 
   onAddToTimeline,
   transcriptData,
-  onTranscriptUpload 
+  timelineState,
+  onTranscriptUpload,
 }) => {
   const [viewMode, setViewMode] = useState(0);
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
@@ -90,6 +92,7 @@ const BinViewerSection = ({
       }}>
         {viewMode === 0 ? (
           <BinViewer
+            clips={clips}
             selectedClip={selectedClip}
             onAddToTimeline={handleAddToTimeline}
             timelineRows={timelineRows}
@@ -97,6 +100,7 @@ const BinViewerSection = ({
           />
         ) : (
           <TranscriptViewer
+            clips={clips}
             selectedClip={selectedClip}
             transcriptData={transcriptData}
             onAddToTimeline={handleAddToTimeline}

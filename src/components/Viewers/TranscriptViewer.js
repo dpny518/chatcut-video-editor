@@ -10,6 +10,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 
 const TranscriptViewer = ({ 
+  clips,
   selectedClip,
   transcriptData, 
   onAddToTimeline,
@@ -94,35 +95,16 @@ const TranscriptViewer = ({
       const clipStart = selection.start;
       const clipEnd = selection.end;
       const timelineDuration = clipEnd - clipStart;
-      
-      // Find a suitable row for the new clip
-      const findSuitableRow = (startTime, endTime) => {
-        // First try to find an existing row where the clip can fit
-        let rowIndex = timelineRows.findIndex(row => {
-          // Check for overlaps with existing clips in this row
-          const hasOverlap = row.clips.some(clip => {
-            const clipTimelineStart = clip.metadata.timeline.start;
-            const clipTimelineEnd = clip.metadata.timeline.end;
-            return !(endTime <= clipTimelineStart || startTime >= clipTimelineEnd);
-          });
-          return !hasOverlap;
-        });
-    
-        // If no suitable row found, create a new one
-        if (rowIndex === -1) {
-          rowIndex = timelineRows.length;
-          setTimelineRows(prev => [...prev, { rowId: rowIndex, clips: [], lastEnd: 0 }]);
-        }
-    
-        return rowIndex;
+  
+      // Find the end position of the last clip in the timeline
+      const findTimelineEndPosition = (clips) => {
+        if (!clips.length) return 0;
+        return Math.max(...clips.map(clip => clip.metadata.timeline.end));
       };
-    
+  
       // Calculate where this clip should start in the timeline
-      const timelineStart = timelineRows[0]?.lastEnd || 0;
+      const timelineStart = findTimelineEndPosition(clips); // Using clips from props/state
       const timelineEnd = timelineStart + timelineDuration;
-      
-      // Find suitable row for the clip
-      const rowIndex = findSuitableRow(timelineStart, timelineEnd);
       
       const clipData = {
         id: `clip-${Date.now()}`,
@@ -142,7 +124,7 @@ const TranscriptViewer = ({
             start: timelineStart,
             end: timelineEnd,
             duration: timelineDuration,
-            row: rowIndex // Include row information
+            row: 0 // Always use row 0 as before
           },
           playback: {
             start: clipStart,
@@ -161,15 +143,6 @@ const TranscriptViewer = ({
         }
       };
   
-      // Update the row's metadata
-      setTimelineRows(prev => {
-        const updated = [...prev];
-        const targetRow = updated[rowIndex];
-        targetRow.clips.push(clipData);
-        targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
-        return updated;
-      });
-  
       // Cleanup
       video.src = '';
       URL.revokeObjectURL(video.src);
@@ -179,14 +152,14 @@ const TranscriptViewer = ({
         selection,
         timeline: clipData.metadata.timeline,
         playback: clipData.metadata.playback,
-        rowIndex
+        rowIndex: 0
       });
   
       onAddToTimeline?.(clipData);
       setSelection(null);
     });
   
-  }, [selection, selectedClip, onAddToTimeline, timelineRows, setTimelineRows]);
+  }, [selection, selectedClip, onAddToTimeline, clips]);
 
   const renderTranscript = () => {
     if (!transcriptData?.transcription) {
