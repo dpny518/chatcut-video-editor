@@ -4,9 +4,10 @@ import 'video-react/dist/video-react.css';
 import { Box, Button } from '@mui/material';
 import { PlayCircle, PauseCircle, SkipBack } from 'lucide-react';
 
-const TimelineViewer = ({ clips = [] }) => {
+const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
   const [timelineTime, setTimelineTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentSourceTime, setCurrentSourceTime] = useState(0);
   const playerRef = useRef(null);
   const rafRef = useRef(null);
   const lastTimeRef = useRef(0);
@@ -26,7 +27,7 @@ const TimelineViewer = ({ clips = [] }) => {
       
       if (time >= timelineStart && time <= timelineEnd) {
         const clipProgress = (time - timelineStart) / (timelineEnd - timelineStart);
-        const sourceTime = clip.startTime + (clipProgress * (clip.endTime - clip.startTime));
+        const sourceTime = clip.startTime + (clipProgress * clip.duration);
         
         return {
           clip,
@@ -38,6 +39,31 @@ const TimelineViewer = ({ clips = [] }) => {
     }
     return null;
   }, [clips]);
+
+  // Get current words from transcript
+  const getCurrentWords = useCallback(() => {
+    if (!transcriptData || !(transcriptData instanceof Map)) return [];
+    
+    const activeClip = getActiveClip(timelineTime);
+    if (!activeClip) return [];
+
+    const transcriptEntry = Array.from(transcriptData.values())[0];
+    if (!transcriptEntry?.transcription) return [];
+
+    const currentWords = [];
+    transcriptEntry.transcription.forEach(segment => {
+      segment.words.forEach(word => {
+        if (word.start <= currentSourceTime && word.end > currentSourceTime) {
+          currentWords.push({
+            ...word,
+            speaker: segment.segment.speaker
+          });
+        }
+      });
+    });
+
+    return currentWords;
+  }, [transcriptData, timelineTime, currentSourceTime, getActiveClip]);
 
   // Handle timeline playback
   useEffect(() => {
@@ -80,7 +106,6 @@ const TimelineViewer = ({ clips = [] }) => {
     if (activeClip) {
       // Only seek if changing clips
       if (!currentClipRef.current || currentClipRef.current.clip.id !== activeClip.clip.id) {
-        console.log('Changing clip, seeking to:', activeClip.sourceTime);
         player.seek(activeClip.sourceTime);
         currentClipRef.current = activeClip;
       }
@@ -94,11 +119,13 @@ const TimelineViewer = ({ clips = [] }) => {
     }
   }, [timelineTime, getActiveClip, isPlaying]);
 
-  // Monitor playback and handle clip transitions
+  // Update current source time for transcript sync
   useEffect(() => {
     if (!playerRef.current) return;
 
     const handleStateChange = (state) => {
+      setCurrentSourceTime(state.currentTime);
+      
       if (!currentClipRef.current) return;
 
       const activeClip = currentClipRef.current;
@@ -160,14 +187,15 @@ const TimelineViewer = ({ clips = [] }) => {
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
 
+  const currentWords = getCurrentWords();
+
   if (!clips.length) {
     return <div>No clips loaded</div>;
   }
 
   return (
-    <Box sx={{ width: '100%', height: '100%' }}>
-      {/* Add a wrapper div with CSS to hide video-react controls */}
-      <div className="video-player-wrapper">
+    <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
+      <div className="video-player-wrapper" style={{ position: 'relative' }}>
         <style>
           {`
             .video-player-wrapper .video-react-control-bar {
@@ -175,6 +203,22 @@ const TimelineViewer = ({ clips = [] }) => {
             }
             .video-player-wrapper .video-react-big-play-button {
               display: none !important;
+            }
+            .video-react {
+              position: relative;
+            }
+            .subtitle-overlay {
+              position: absolute;
+              bottom: 80px;
+              left: 50%;
+              transform: translateX(-50%);
+              z-index: 1;
+              background-color: rgba(0, 0, 0, 0.7);
+              padding: 8px 16px;
+              border-radius: 4px;
+              text-align: center;
+              min-width: 200px;
+              max-width: 80%;
             }
           `}
         </style>
@@ -187,6 +231,24 @@ const TimelineViewer = ({ clips = [] }) => {
         >
           <source src={URL.createObjectURL(clips[0].file)} />
         </Player>
+        
+        {currentWords.length > 0 && (
+          <div className="subtitle-overlay">
+            <span style={{ color: 'white', fontSize: '1.2em', lineHeight: '1.4' }}>
+              {currentWords.map((word, index) => (
+                <span 
+                  key={index}
+                  style={{ 
+                    marginLeft: '4px',
+                    marginRight: '4px'
+                  }}
+                >
+                  {word.word}
+                </span>
+              ))}
+            </span>
+          </div>
+        )}
       </div>
 
       <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -209,19 +271,30 @@ const TimelineViewer = ({ clips = [] }) => {
         </Box>
       </Box>
 
-      <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper' }}>
-        <pre>
-          {JSON.stringify({
-            timelineTime,
-            activeClip: getActiveClip(timelineTime) ? {
-              id: getActiveClip(timelineTime).clip.id,
-              timelineStart: getActiveClip(timelineTime).timelineStart,
-              timelineEnd: getActiveClip(timelineTime).timelineEnd,
-              sourceTime: getActiveClip(timelineTime).sourceTime
-            } : null
-          }, null, 2)}
-        </pre>
-      </Box>
+      {/* Debug box - commented out for future use
+      {process.env.NODE_ENV === 'development' && (
+        <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper' }}>
+          <pre>
+            {JSON.stringify({
+              timelineTime,
+              currentSourceTime,
+              activeClip: getActiveClip(timelineTime) ? {
+                id: getActiveClip(timelineTime).clip.id,
+                timelineStart: getActiveClip(timelineTime).timelineStart,
+                timelineEnd: getActiveClip(timelineTime).timelineEnd,
+                sourceTime: getActiveClip(timelineTime).sourceTime
+              } : null,
+              currentWords: currentWords.map(w => ({
+                word: w.word,
+                start: w.start,
+                end: w.end,
+                speaker: w.speaker
+              }))
+            }, null, 2)}
+          </pre>
+        </Box>
+      )}
+      */}
     </Box>
   );
 };
