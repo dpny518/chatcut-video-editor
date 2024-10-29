@@ -166,11 +166,18 @@ const TimelineViewer = ({ clips = [] }) => {
 
   return (
     <Box sx={{ width: '100%', height: '100%' }}>
-      <Box sx={{
-        '& .video-react-control-bar': {
-          display: 'none !important'
-        }
-      }}>
+      {/* Add a wrapper div with CSS to hide video-react controls */}
+      <div className="video-player-wrapper">
+        <style>
+          {`
+            .video-player-wrapper .video-react-control-bar {
+              display: none !important;
+            }
+            .video-player-wrapper .video-react-big-play-button {
+              display: none !important;
+            }
+          `}
+        </style>
         <Player
           ref={playerRef}
           autoPlay={false}
@@ -180,7 +187,7 @@ const TimelineViewer = ({ clips = [] }) => {
         >
           <source src={URL.createObjectURL(clips[0].file)} />
         </Player>
-      </Box>
+      </div>
 
       <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Button 
