@@ -114,28 +114,28 @@ useEffect(() => {
     };
     
 
-  // Handle move start
+
+// Handle move start
 const handleMoveStart = useCallback(({ action, row }) => {
   console.log('Move Start:', { action, row });
   
-  // Store initial state like we do in resize
+  // Store the original constraints
   action.data = {
     ...action.data,
-    initialStart: action.start,
-    initialEnd: action.end,
-    metadata: {
-      ...action.data.metadata,
-      timeline: {
-        start: action.start,
-        end: action.end,
-        duration: action.end - action.start
-      }
+    originalConstraints: {
+      minStart: action.minStart,
+      maxEnd: action.maxEnd
     }
   };
   
+  // Clear constraints for free movement
+  action.minStart = undefined;
+  action.maxEnd = undefined;
+  
   onClipSelect?.(action.id);
 }, [onClipSelect]);
-  // Handle move
+
+
  // Handle move
 const handleMoving = useCallback(({ action, row, start, end }) => {
   console.log('Moving:', { action, start, end });
@@ -173,24 +173,23 @@ const handleMoving = useCallback(({ action, row, start, end }) => {
 const handleMoveEnd = useCallback(({ action, row, start, end }) => {
   console.log('Move End:', { action, start, end });
 
+  // Restore original constraints
+  if (action.data?.originalConstraints) {
+    action.minStart = action.data.originalConstraints.minStart;
+    action.maxEnd = action.data.originalConstraints.maxEnd;
+  }
 
   const updatedClips = clips.map(clip => {
     if (clip.id === action.id) {
-      const actionData = action.data || {};
-      const metadata = actionData.metadata || {};
-      const playback = metadata.playback || {};
       return {
         ...clip,
-        ...actionData,
-        startTime: playback.start || clip.startTime,
-        endTime: playback.end || clip.endTime,
         metadata: {
-          ...metadata,
+          ...clip.metadata,
           timeline: {
-            ...metadata.timeline,
             start,
             end,
-            duration: end - start
+            duration: end - start,
+            row: clip.metadata?.timeline?.row || 0
           }
         }
       };

@@ -65,6 +65,8 @@ export const useTimelineData = (clips = [], onClipsChange) => {
           id: clip.id,
           start: timelineStart,
           end: timelineEnd,
+          minStart: timelineStart-playbackStart,
+          maxEnd: clip.source.duration - playbackEnd + timelineEnd ,
           effectId: 'default',
           flexible: true,
           movable: true,
