@@ -8,18 +8,17 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
   const [timelineTime, setTimelineTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSourceTime, setCurrentSourceTime] = useState(0);
+  const [hasEnded, setHasEnded] = useState(false);
   const playerRef = useRef(null);
   const rafRef = useRef(null);
   const lastTimeRef = useRef(0);
   const currentClipRef = useRef(null);
 
-  // Calculate total timeline duration
   const duration = clips.reduce((max, clip) => {
     const end = clip.metadata?.timeline?.end || (clip.startTime + clip.duration);
     return Math.max(max, end);
   }, 0);
 
-  // Get active clip and source time for current timeline position
   const getActiveClip = useCallback((time) => {
     for (const clip of clips) {
       const timelineStart = clip.metadata?.timeline?.start || 0;
@@ -40,7 +39,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
     return null;
   }, [clips]);
 
-  // Get current words from transcript
   const getCurrentWords = useCallback(() => {
     if (!transcriptData || !(transcriptData instanceof Map)) return [];
     
@@ -65,7 +63,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
     return currentWords;
   }, [transcriptData, timelineTime, currentSourceTime, getActiveClip]);
 
-  // Handle timeline playback
   useEffect(() => {
     if (!isPlaying) return;
 
@@ -78,6 +75,12 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
         const newTime = prevTime + delta;
         if (newTime >= duration) {
           setIsPlaying(false);
+          setHasEnded(true);
+          setTimelineTime(0);
+          if (playerRef.current) {
+            playerRef.current.pause();
+            playerRef.current.seek(0);
+          }
           return 0;
         }
         return newTime;
@@ -96,7 +99,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
     };
   }, [isPlaying, duration]);
 
-  // Handle video playback and seeking
   useEffect(() => {
     if (!playerRef.current) return;
 
@@ -104,7 +106,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
     const player = playerRef.current;
     
     if (activeClip) {
-      // Only seek if changing clips
       if (!currentClipRef.current || currentClipRef.current.clip.id !== activeClip.clip.id) {
         player.seek(activeClip.sourceTime);
         currentClipRef.current = activeClip;
@@ -119,7 +120,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
     }
   }, [timelineTime, getActiveClip, isPlaying]);
 
-  // Update current source time for transcript sync
   useEffect(() => {
     if (!playerRef.current) return;
 
@@ -132,9 +132,8 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
       if (state.currentTime >= activeClip.clip.endTime) {
         playerRef.current.pause();
         
-        // Find next clip if available
         const nextClipInfo = getActiveClip(activeClip.timelineEnd + 0.1);
-        if (nextClipInfo) {
+        if (nextClipInfo && !hasEnded) {
           playerRef.current.seek(nextClipInfo.sourceTime);
           currentClipRef.current = nextClipInfo;
           if (isPlaying) {
@@ -145,15 +144,17 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
     };
 
     playerRef.current.subscribeToStateChange(handleStateChange);
-  }, [isPlaying, getActiveClip]);
+  }, [isPlaying, getActiveClip, hasEnded]);
 
   const handlePlay = () => {
+    setHasEnded(false);
     const activeClip = getActiveClip(timelineTime);
     if (activeClip) {
       if (!currentClipRef.current || currentClipRef.current.clip.id !== activeClip.clip.id) {
         playerRef.current.seek(activeClip.sourceTime);
         currentClipRef.current = activeClip;
       }
+      playerRef.current.play();
     }
     setIsPlaying(true);
   };
@@ -169,6 +170,7 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
   const handleReset = () => {
     setIsPlaying(false);
     setTimelineTime(0);
+    setHasEnded(false);
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
     }
@@ -270,31 +272,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
           Timeline: {formatTime(timelineTime)} / {formatTime(duration)}
         </Box>
       </Box>
-
-      {/* Debug box - commented out for future use
-      {process.env.NODE_ENV === 'development' && (
-        <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper' }}>
-          <pre>
-            {JSON.stringify({
-              timelineTime,
-              currentSourceTime,
-              activeClip: getActiveClip(timelineTime) ? {
-                id: getActiveClip(timelineTime).clip.id,
-                timelineStart: getActiveClip(timelineTime).timelineStart,
-                timelineEnd: getActiveClip(timelineTime).timelineEnd,
-                sourceTime: getActiveClip(timelineTime).sourceTime
-              } : null,
-              currentWords: currentWords.map(w => ({
-                word: w.word,
-                start: w.start,
-                end: w.end,
-                speaker: w.speaker
-              }))
-            }, null, 2)}
-          </pre>
-        </Box>
-      )}
-      */}
     </Box>
   );
 };
