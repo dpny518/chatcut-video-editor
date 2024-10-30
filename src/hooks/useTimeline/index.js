@@ -1,12 +1,33 @@
-export { useTimelineData } from './useTimelineData';
-export { useTimelineEffects } from './useTimelineEffects';
-export { useTimelineStateManager } from './useTimelineStateManager';
-export { useTimelineTransition } from './useTimelineTransition';
+// src/hooks/useTimeline/index.js
+import { useTimelineData } from './useTimelineData';
+import { useTimelineEffects } from './useTimelineEffects';
+import { useTimelineStateManager } from './useTimelineStateManager';
+import { useTimelineTransition } from './useTimelineTransition';
+import { useTimelineContextMenu } from './useTimelineContextMenu';
+import { useTimelineHandlers } from './useTimelineHandlers';
+import { useTimelineResize } from './useTimelineResize';
+import { useTimelineZoom } from './useTimelineZoom';
 
-// You can also bundle them into an object if you want to namespace them
+// Individual exports
+export { 
+  useTimelineData,
+  useTimelineEffects, 
+  useTimelineStateManager,
+  useTimelineTransition,
+  useTimelineContextMenu,
+  useTimelineHandlers,
+  useTimelineResize,
+  useTimelineZoom
+};
+
+// Namespaced exports
 export const useTimeline = {
   data: useTimelineData,
   effects: useTimelineEffects,
   stateManager: useTimelineStateManager,
-  transition: useTimelineTransition
+  transition: useTimelineTransition,
+  contextMenu: useTimelineContextMenu,
+  handlers: useTimelineHandlers,
+  resize: useTimelineResize,
+  zoom: useTimelineZoom
 };
