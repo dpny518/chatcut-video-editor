@@ -1,4 +1,3 @@
-//src/hookes/useTimeline/useTimelineHanders.js
 import { useCallback } from 'react';
 
 export const useTimelineHandlers = (clips, onClipsChange, onClipSelect) => {
@@ -37,6 +36,7 @@ export const useTimelineHandlers = (clips, onClipsChange, onClipSelect) => {
             start: timelineStart,
             end: timelineEnd,
             duration: timelineDuration,
+            row: action.row || timeline.row || 0  // Add this
           },
           playback: {
             start: playbackStart,
@@ -67,7 +67,7 @@ export const useTimelineHandlers = (clips, onClipsChange, onClipSelect) => {
     onClipSelect?.(action.id);
   }, [onClipSelect]);
 
-  const handleMoving = useCallback(({ action, row, start, end }) => {
+  const handleMoving = useCallback(({ action, start, end }) => {  // Remove row from destructuring
     console.log('Moving:', { action, start, end });
     
     action.data = {
@@ -92,7 +92,7 @@ export const useTimelineHandlers = (clips, onClipsChange, onClipSelect) => {
   }, []);
 
   const handleMoveEnd = useCallback(({ action, row, start, end }) => {
-    console.log('Move End:', { action, start, end });
+    console.log('Move End:', { action, row, start, end });
 
     if (action.data?.originalConstraints) {
       action.minStart = action.data.originalConstraints.minStart;
@@ -109,7 +109,7 @@ export const useTimelineHandlers = (clips, onClipsChange, onClipSelect) => {
               start,
               end,
               duration: end - start,
-              row: clip.metadata?.timeline?.row || 0
+              row: row  // Update row on move end
             }
           }
         };
@@ -120,10 +120,35 @@ export const useTimelineHandlers = (clips, onClipsChange, onClipSelect) => {
     onClipsChange(updatedClips);
   }, [clips, onClipsChange]);
 
+  // Add this new handler
+  const handleRowChange = useCallback(({ action, fromRow, toRow }) => {
+    console.log('Row Change:', { action, fromRow, toRow });
+    
+    const updatedClips = clips.map(clip => {
+      if (clip.id === action.id) {
+        return {
+          ...clip,
+          metadata: {
+            ...clip.metadata,
+            timeline: {
+              ...clip.metadata.timeline,
+              row: toRow
+            }
+          }
+        };
+      }
+      return clip;
+    });
+
+    onClipsChange(updatedClips);
+    return true;
+  }, [clips, onClipsChange]);
+
   return {
     handleChange,
     handleMoveStart,
     handleMoving,
-    handleMoveEnd
+    handleMoveEnd,
+    handleRowChange  // Export the new handler
   };
 };

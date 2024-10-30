@@ -20,7 +20,7 @@ const BinViewerSection = ({
   onTranscriptUpload,
 }) => {
   const [viewMode, setViewMode] = useState(0);
-  const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
+  const [timelineRows, setTimelineRows] = useState([{ rowId: 3, clips: [], lastEnd: 0 }]);
 
   // Modified add to timeline handler to update timelineRows
   const handleAddToTimeline = (clipData) => {

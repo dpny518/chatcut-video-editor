@@ -124,7 +124,7 @@ const TranscriptViewer = ({
             start: timelineStart,
             end: timelineEnd,
             duration: timelineDuration,
-            row: 0 // Always use row 0 as before
+            row: 3 // Always use row 0 as before
           },
           playback: {
             start: clipStart,
@@ -152,7 +152,7 @@ const TranscriptViewer = ({
         selection,
         timeline: clipData.metadata.timeline,
         playback: clipData.metadata.playback,
-        rowIndex: 0
+        rowIndex: 3
       });
   
       onAddToTimeline?.(clipData);

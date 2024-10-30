@@ -19,13 +19,18 @@ import { timelineEditorStyles, customTimelineStyles } from './styles/timelineSty
 
 const ROW_HEIGHT = 64;
 const MIN_ROWS = 10;
+const INITIAL_ROWS = 6;  // or however many rows you want to start with
 
 const Timeline = ({ 
   clips = [], 
   onClipsChange,
   selectedClipId,
   onClipSelect,
-  timelineRows,
+  timelineRows = Array.from({ length: INITIAL_ROWS }, (_, index) => ({
+    rowId: index,
+    clips: [],
+    lastEnd: 0
+  })),
   setTimelineRows,
 }) => {
   const { scale, handleZoomIn, handleZoomOut } = useTimelineZoom();
@@ -34,7 +39,8 @@ const Timeline = ({
     handleChange,
     handleMoveStart,
     handleMoving,
-    handleMoveEnd 
+    handleMoveEnd,
+    handleRowChange  // Add this
   } = useTimelineHandlers(clips, onClipsChange, onClipSelect);
   const {
     handleResizeStart,
@@ -222,6 +228,7 @@ const Timeline = ({
               boxShadow: 'inset 0 -4px 6px -4px rgba(0,0,0,0.3)',
             }
           }}
+          onRowChange={handleRowChange}
           rowHeight={ROW_HEIGHT}
           allowVerticalDrag={true}
           verticalDragThreshold={10}

@@ -111,7 +111,7 @@ const ChatBot = ({
                 start: timelineStart,
                 end: timelineEnd,
                 duration: timelineDuration,
-                track: 0  // Always use track 0
+                row: 3  // Always use track 0
               },
               playback: {
                 start: segmentStart,

@@ -146,7 +146,7 @@ const BinViewer = ({ clips, selectedClip, onAddToTimeline, setTimelineRows}) => 
           start: timelineStart,
           end: timelineEnd,
           duration: timelineDuration,
-          row: 0 // Always use row 0 as before
+          row: 3 // Always use row 0 as before
         },
         playback: {
           start: clipStart,
