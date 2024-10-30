@@ -198,6 +198,7 @@ const Timeline = ({
           minScaleCount={20}
           scaleSplitCount={10}
           snapThreshold={5}
+          hideCursor={true}
           getActionRender={(action, row) => (
             <Box onContextMenu={(e) => handleContextMenu(e, action)}>
               <TimelineClip
