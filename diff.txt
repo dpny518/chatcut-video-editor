@@ -1,0 +1,179 @@
+diff --git a/src/components/Timeline/index.js b/src/components/Timeline/index.js
+index e6814cb..bb44d5b 100644
+--- a/src/components/Timeline/index.js
++++ b/src/components/Timeline/index.js
+@@ -134,110 +134,71 @@ const handleMoveStart = useCallback(({ action, row }) => {
+   onClipSelect?.(action.id);
+ }, [onClipSelect]);
+   // Handle move
+-  const handleMoving = useCallback(({ action, row, start, end }) => {
+-    console.log('Moving:', { action, row, start, end });
+-    
+-    // Find the current row in editorData
+-    const currentRow = editorData.find(r => r.id === row.id);
+-    if (!currentRow) return true;
+-    
+-    // Sort clips by start time
+-    const sortedClips = [...currentRow.actions].sort((a, b) => a.start - b.start);
+-    
+-    // Find the index of the moving clip
+-    const movingClipIndex = sortedClips.findIndex(clip => clip.id === action.id);
+-    const duration = end - start;
+-    const moveOffset = start - action.start;
+-    
+-    // Update positions of all clips
+-    const updatedClips = sortedClips.map((clip, index) => {
+-      if (clip.id === action.id) {
+-        // Update moving clip
+-        return {
+-          ...clip,
+-          start,
+-          end,
+-          data: {
+-            ...clip.data,
+-            metadata: {
+-              ...clip.data?.metadata,
+-              timeline: {
+-                ...clip.data?.metadata?.timeline,
+-                start,
+-                end,
+-                duration
+-              }
+-            }
+-          }
+-        };
+-      } else if (index > movingClipIndex && moveOffset < 0) {
+-        // Push clips after the moving clip when moving left
+-        const newStart = Math.max(0, clip.start + moveOffset);
+-        const newEnd = newStart + (clip.end - clip.start);
+-        return {
+-          ...clip,
+-          start: newStart,
+-          end: newEnd,
+-          data: {
+-            ...clip.data,
+-            metadata: {
+-              ...clip.data?.metadata,
+-              timeline: {
+-                ...clip.data?.metadata?.timeline,
+-                start: newStart,
+-                end: newEnd,
+-                duration: newEnd - newStart
+-              }
+-            }
+-          }
+-        };
+-      }
+-      return clip;
+-    });
++ // Handle move
++const handleMoving = useCallback(({ action, row, start, end }) => {
++  console.log('Moving:', { action, start, end });
+   
+-    // Create updated editorData
+-    const updatedEditorData = editorData.map(r => {
+-      if (r.id === row.id) {
+-        return {
+-          ...r,
+-          actions: updatedClips
+-        };
++  // Update both timeline and playback metadata during move
++  action.data = {
++    ...action.data,
++    metadata: {
++      ...action.data.metadata,
++      timeline: {
++        start,
++        end,
++        duration: end - start,
++        initialStart: action.data.metadata?.timeline?.initialStart
++      },
++      playback: {
++        start: action.data.metadata?.playback?.start || action.data.startTime,
++        end: action.data.metadata?.playback?.end || action.data.endTime,
++        duration: action.data.metadata?.playback?.duration || (action.data.endTime - action.data.startTime)
+       }
+-      return r;
+-    });
+-  
+-    // Call handleChange with the updated editor data
+-    handleChange(updatedEditorData);
+-  
+-    return true;
+-  }, [editorData, handleChange]);
+-  
+-  const handleMoveEnd = useCallback(({ action, row, start, end }) => {
+-    console.log('Move End:', { action, start, end });
+-  
+-    const updatedClips = clips.map(clip => {
+-      // Find the corresponding action for this clip
+-      const rowClips = editorData[row.id]?.actions || [];
+-      const updatedAction = rowClips.find(a => a.id === clip.id);
+-      
+-      if (!updatedAction) return clip;
++    }
++  };
++  console.log('Moving clip:', {
++    timeline: { start, end, duration: end - start },
++    playback: { 
++      start: action.data.metadata?.playback?.start || action.data.startTime,
++      end: action.data.metadata?.playback?.end || action.data.endTime 
++    }
++  });
+   
++  return true;
++}, []);
++
++ // Handle move end
++const handleMoveEnd = useCallback(({ action, row, start, end }) => {
++  console.log('Move End:', { action, start, end });
++
++
++  const updatedClips = clips.map(clip => {
++    if (clip.id === action.id) {
++      const actionData = action.data || {};
++      const metadata = actionData.metadata || {};
++      const playback = metadata.playback || {};
+       return {
+         ...clip,
++        ...actionData,
++        startTime: playback.start || clip.startTime,
++        endTime: playback.end || clip.endTime,
+         metadata: {
+-          ...clip.metadata,
++          ...metadata,
+           timeline: {
+-            ...clip.metadata?.timeline,
+-            start: updatedAction.start,
+-            end: updatedAction.end,
+-            duration: updatedAction.end - updatedAction.start
++            ...metadata.timeline,
++            start,
++            end,
++            duration: end - start
+           }
+         }
+       };
+-    });
+-  
+-    onClipsChange(updatedClips);
+-  }, [clips, editorData, onClipsChange]);
++    }
++    return clip;
++  });
++
++  onClipsChange(updatedClips);
++}, [clips, onClipsChange]);
++
+   
+ 
+ 
+@@ -512,7 +473,7 @@ const handleResizeEnd = useCallback(({ action, row, start, end, dir }) => {
+         onActionMoving={handleMoving}
+         onActionMoveEnd={handleMoveEnd}
+         // Add collision detection properties
+-        allowOverlap={false} // Prevent clips from overlapping
++        allowOverlap={true} // Prevent clips from overlapping
+         pushOnOverlap={true} // Push clips when they collide
+         // Resize handlers
+         onActionResizeStart={handleResizeStart}

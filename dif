@@ -1,0 +1,422 @@
+diff --git a/src/components/Timeline/TimelineClip.js b/src/components/Timeline/TimelineClip.js
+index baf431a..494558b 100644
+--- a/src/components/Timeline/TimelineClip.js
++++ b/src/components/Timeline/TimelineClip.js
+@@ -86,34 +86,34 @@ const timingValues = useMemo(() => ({
+           }
+         }
+       });
+-
++  
+       return {
+         timelinePosition: formatTime(timingValues.actionStart),
+-        originalStart: formatTime(originalValues.current.startTime),  // Use ref values
+-        originalEnd: formatTime(originalValues.current.endTime),      // Use ref values
++        originalStart: formatTime(originalValues.current.startTime),
++        originalEnd: formatTime(originalValues.current.endTime),
+         currentStart: formatTime(timingValues.startTime),
+         currentEnd: formatTime(timingValues.endTime),
+         duration: formatTime(timingValues.endTime - timingValues.startTime),
+-        originalDuration: formatTime(originalValues.current.duration) // Use ref value
++        originalDuration: formatTime(originalValues.current.duration)
+       };
+     }
+-
+-    let currentStart = timingValues.startTime;
+-    let currentEnd = timingValues.endTime;
+-
++  
++    // Get current values based on metadata or resize operation
++    let currentStart = timingValues.metadata.playback.start;
++    let currentEnd = timingValues.metadata.playback.end;
++  
+     if (timingValues.resizeDir === 'left') {
+-      currentEnd = timingValues.endTime;
+       const newDuration = timingValues.actionEnd - timingValues.actionStart;
+-      currentStart = timingValues.endTime - newDuration;
++      currentStart = currentEnd - newDuration;
+     } else if (timingValues.resizeDir === 'right') {
+-      currentStart = timingValues.startTime;
+       const newDuration = timingValues.actionEnd - timingValues.actionStart;
+-      currentEnd = timingValues.startTime + newDuration;
++      currentEnd = currentStart + newDuration;
+     }
+     
++    // Ensure we stay within source bounds
+     currentEnd = Math.min(currentEnd, timingValues.sourceEndTime);
+     currentStart = Math.max(currentStart, timingValues.sourceStartTime);
+-
++  
+     timingValues.updateData({
+       ...timingValues.clipData,
+       startTime: currentStart,
+@@ -132,17 +132,18 @@ const timingValues = useMemo(() => ({
+         }
+       }
+     });
+-
++  
++    // Always use the metadata for display
+     return {
+-      timelinePosition: formatTime(timingValues.actionStart),
+-      originalStart: formatTime(originalValues.current.startTime),  // Use ref values
+-      originalEnd: formatTime(originalValues.current.endTime),      // Use ref values
+-      currentStart: formatTime(currentStart),
+-      currentEnd: formatTime(currentEnd),
+-      duration: formatTime(currentEnd - currentStart),
+-      originalDuration: formatTime(originalValues.current.duration) // Use ref value
++      timelinePosition: formatTime(timingValues.metadata.timeline.start),
++      originalStart: formatTime(originalValues.current.startTime),
++      originalEnd: formatTime(originalValues.current.endTime),
++      currentStart: formatTime(timingValues.metadata.playback.start),
++      currentEnd: formatTime(timingValues.metadata.playback.end),
++      duration: formatTime(timingValues.metadata.playback.duration),
++      originalDuration: formatTime(originalValues.current.duration)
+     };
+-  }, [timingValues]); 
++  }, [timingValues]);
+ 
+   const thumbnailParams = useMemo(() => {
+     const timingInfo = calculateCurrentTimes();
+diff --git a/src/components/Viewers/BinViewer.js b/src/components/Viewers/BinViewer.js
+index bd79bc2..21c436a 100644
+--- a/src/components/Viewers/BinViewer.js
++++ b/src/components/Viewers/BinViewer.js
+@@ -4,13 +4,30 @@ import { Box, Typography, Slider, Alert, CircularProgress } from '@mui/material'
+ // eslint-disable-next-line no-unused-vars
+ import { Button } from '@mui/material';
+ import { debounce } from 'lodash';
++import { addClipToTimeline } from './TimelineHelpers';
++
+ 
+ // Constants
+ const MIN_CLIP_DURATION = 1; // minimum clip duration in seconds
+ const SEEK_DEBOUNCE_MS = 100; // debounce delay for seeking
+ const PROGRESS_INTERVAL = 100; // progress update interval in ms
+ 
+-const BinViewer = ({ selectedClip, onAddToTimeline }) => {
++const BinViewer = ({ 
++  selectedClip, 
++  onAddToTimeline, 
++  timelineState, // Add timelineState prop
++  timelineRows,
++  setTimelineRows 
++}) => {
++  // Add logging when timelineState changes
++  useEffect(() => {
++    console.log('BinViewer - Timeline State Updated:', {
++      timelineState,
++      currentClips: timelineState?.clips || [],
++      totalDuration: timelineState?.totalDuration,
++      settings: timelineState?.settings
++    });
++  }, [timelineState]);
+   // State management
+   const [playing, setPlaying] = useState(false);
+   const [duration, setDuration] = useState(0);
+@@ -19,7 +36,7 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState(null);
+   const [videoUrl, setVideoUrl] = useState(null);
+-  const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
++ 
+ 
+ 
+   // Refs
+@@ -118,84 +135,14 @@ const BinViewer = ({ selectedClip, onAddToTimeline }) => {
+   const handleAddToTimeline = () => {
+     if (!selectedClip || error) return;
+   
+-    const clipStart = range[0];
+-    const clipEnd = range[1];
+-    const timelineDuration = clipEnd - clipStart;
+-  
+-    // Find a suitable row for the new clip
+-    const findSuitableRow = (startTime, endTime) => {
+-      // First try to find an existing row where the clip can fit
+-      let rowIndex = timelineRows.findIndex(row => {
+-        // Check for overlaps with existing clips in this row
+-        const hasOverlap = row.clips.some(clip => {
+-          const clipTimelineStart = clip.metadata.timeline.start;
+-          const clipTimelineEnd = clip.metadata.timeline.end;
+-          return !(endTime <= clipTimelineStart || startTime >= clipTimelineEnd);
+-        });
+-        return !hasOverlap;
+-      });
+-  
+-      // If no suitable row found, create a new one
+-      if (rowIndex === -1) {
+-        rowIndex = timelineRows.length;
+-        setTimelineRows(prev => [...prev, { rowId: rowIndex, clips: [], lastEnd: 0 }]);
+-      }
+-  
+-      return rowIndex;
+-    };
+-  
+-    // Calculate where this clip should start in the timeline
+-    const timelineStart = timelineRows[0].lastEnd || 0;
+-    const timelineEnd = timelineStart + timelineDuration;
+-    
+-    // Find suitable row for the clip
+-    const rowIndex = findSuitableRow(timelineStart, timelineEnd);
+-  
+-    // Create clip data with timeline metadata
+-    const clipData = {
+-      id: `clip-${Date.now()}`,
+-      file: selectedClip.file,
+-      name: selectedClip.file.name,
+-      startTime: clipStart,
+-      endTime: clipEnd,
+-      duration: timelineDuration,
+-      source: {
+-        startTime: 0,
+-        endTime: duration,
+-        duration: duration
+-      },
+-      metadata: {
+-        timeline: {
+-          start: timelineStart,
+-          end: timelineEnd,
+-          duration: timelineDuration,
+-          row: rowIndex // Include row information
+-        },
+-        playback: {
+-          start: clipStart,
+-          end: clipEnd,
+-          duration: timelineDuration
+-        }
+-      }
+-    };
+-  
+-    // Update the row's metadata
+-    setTimelineRows(prev => {
+-      const updated = [...prev];
+-      const targetRow = updated[rowIndex];
+-      targetRow.clips.push(clipData);
+-      targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
+-      return updated;
+-    });
+-  
+-    // Call the callback function to add clip to the main timeline
+-    onAddToTimeline?.(clipData);
+-    
+-    console.log('Adding clip with metadata:', {
+-      clip: clipData,
+-      timeline: clipData.metadata.timeline,
+-      playback: clipData.metadata.playback,
+-      rowIndex
++    addClipToTimeline({
++      selectedClip,
++      timelineRows,
++      setTimelineRows,
++      onAddToTimeline,
++      timelineState,
++      clipStart: range[0],
++      clipEnd: range[1]
+     });
+   };
+ 
+diff --git a/src/components/Viewers/BinViewerSection.js b/src/components/Viewers/BinViewerSection.js
+index 97bfd49..8bbb4c9 100644
+--- a/src/components/Viewers/BinViewerSection.js
++++ b/src/components/Viewers/BinViewerSection.js
+@@ -15,7 +15,8 @@ const BinViewerSection = ({
+   selectedClip, 
+   onAddToTimeline,
+   transcriptData,
+-  onTranscriptUpload 
++  onTranscriptUpload,
++  timelineState 
+ }) => {
+   const [viewMode, setViewMode] = useState(0);
+   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
+@@ -94,6 +95,7 @@ const BinViewerSection = ({
+             onAddToTimeline={handleAddToTimeline}
+             timelineRows={timelineRows}
+             setTimelineRows={setTimelineRows}
++            timelineState={timelineState}
+           />
+         ) : (
+           <TranscriptViewer
+@@ -102,6 +104,7 @@ const BinViewerSection = ({
+             onAddToTimeline={handleAddToTimeline}
+             timelineRows={timelineRows}
+             setTimelineRows={setTimelineRows}
++            timelineState={timelineState}
+           />
+         )}
+       </Box>
+diff --git a/src/components/Viewers/TranscriptViewer.js b/src/components/Viewers/TranscriptViewer.js
+index b25210d..7db18a2 100644
+--- a/src/components/Viewers/TranscriptViewer.js
++++ b/src/components/Viewers/TranscriptViewer.js
+@@ -8,6 +8,7 @@ import {
+   Paper
+ } from '@mui/material';
+ import AddIcon from '@mui/icons-material/Add';
++import { addClipToTimeline } from './TimelineHelpers';
+ 
+ const TranscriptViewer = ({ 
+   selectedClip,
+@@ -15,12 +16,31 @@ const TranscriptViewer = ({
+   onAddToTimeline,
+   timelineRows,
+   setTimelineRows,
+-  sx
++  sx,
++  timelineState
+ }) => {
+   const [currentTime, setCurrentTime] = useState(0);
+   const [selection, setSelection] = useState(null);
+   const videoRef = useRef(null);
+   const videoUrlRef = useRef(null);
++  useEffect(() => {
++    console.log('TranscriptViewer - Timeline State:', {
++      timelineState,
++      currentClips: timelineState?.clips || [],
++      totalDuration: timelineState?.totalDuration,
++      settings: timelineState?.settings
++    });
++  }, [timelineState]);
++
++  useEffect(() => {
++    if (selection) {
++      console.log('TranscriptViewer - Current Selection:', {
++        selection,
++        timelineState,
++        currentTime
++      });
++    }
++  }, [selection, timelineState, currentTime]);
+   
+   // Update useEffect to use selectedClip.file
+   useEffect(() => {
+@@ -80,113 +100,32 @@ const TranscriptViewer = ({
+ 
+ 
+   const handleAddToTimeline = useCallback(() => {
+-    if (!selection || !selectedClip) {
+-      console.warn('Missing required data for timeline clip', { selection, selectedClip });
+-      return;
+-    }
++    if (!selection || !selectedClip) return;
+   
+-    // Create a video element to get duration
+-    const video = document.createElement('video');
+-    video.src = URL.createObjectURL(selectedClip.file);
+-  
+-    // Wait for metadata to load to get duration
+-    video.addEventListener('loadedmetadata', () => {
+-      const clipStart = selection.start;
+-      const clipEnd = selection.end;
+-      const timelineDuration = clipEnd - clipStart;
+-      
+-      // Find a suitable row for the new clip
+-      const findSuitableRow = (startTime, endTime) => {
+-        // First try to find an existing row where the clip can fit
+-        let rowIndex = timelineRows.findIndex(row => {
+-          // Check for overlaps with existing clips in this row
+-          const hasOverlap = row.clips.some(clip => {
+-            const clipTimelineStart = clip.metadata.timeline.start;
+-            const clipTimelineEnd = clip.metadata.timeline.end;
+-            return !(endTime <= clipTimelineStart || startTime >= clipTimelineEnd);
+-          });
+-          return !hasOverlap;
+-        });
+-    
+-        // If no suitable row found, create a new one
+-        if (rowIndex === -1) {
+-          rowIndex = timelineRows.length;
+-          setTimelineRows(prev => [...prev, { rowId: rowIndex, clips: [], lastEnd: 0 }]);
+-        }
+-    
+-        return rowIndex;
+-      };
+-    
+-      // Calculate where this clip should start in the timeline
+-      const timelineStart = timelineRows[0]?.lastEnd || 0;
+-      const timelineEnd = timelineStart + timelineDuration;
+-      
+-      // Find suitable row for the clip
+-      const rowIndex = findSuitableRow(timelineStart, timelineEnd);
+-      
+-      const clipData = {
+-        id: `clip-${Date.now()}`,
+-        file: selectedClip.file,
+-        name: selectedClip.file.name,
+-        startTime: clipStart,
+-        endTime: clipEnd,
+-        duration: timelineDuration,
+-        source: {
+-          startTime: 0,
+-          endTime: video.duration,
+-          duration: video.duration
+-        },
++    addClipToTimeline({
++      selectedClip,
++      timelineRows,
++      setTimelineRows,
++      onAddToTimeline,
++      timelineState,
++      clipStart: selection.start,
++      clipEnd: selection.end,
++      additionalMetadata: {
+         transcript: selection.text,
+-        metadata: {
+-          timeline: {
+-            start: timelineStart,
+-            end: timelineEnd,
+-            duration: timelineDuration,
+-            row: rowIndex // Include row information
+-          },
+-          playback: {
+-            start: clipStart,
+-            end: clipEnd,
+-            duration: timelineDuration
+-          }
+-        },
+         selectionInfo: {
+           text: selection.text,
+           startWord: selection.startWord,
+           endWord: selection.endWord,
+           timeRange: {
+-            start: clipStart,
+-            end: clipEnd
++            start: selection.start,
++            end: selection.end
+           }
+         }
+-      };
+-  
+-      // Update the row's metadata
+-      setTimelineRows(prev => {
+-        const updated = [...prev];
+-        const targetRow = updated[rowIndex];
+-        targetRow.clips.push(clipData);
+-        targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
+-        return updated;
+-      });
+-  
+-      // Cleanup
+-      video.src = '';
+-      URL.revokeObjectURL(video.src);
+-  
+-      console.log('Adding clip from transcript selection:', {
+-        clipData,
+-        selection,
+-        timeline: clipData.metadata.timeline,
+-        playback: clipData.metadata.playback,
+-        rowIndex
+-      });
+-  
+-      onAddToTimeline?.(clipData);
+-      setSelection(null);
++      }
+     });
+   
+-  }, [selection, selectedClip, onAddToTimeline, timelineRows, setTimelineRows]);
++    setSelection(null);
++  }, [selection, selectedClip, timelineRows, setTimelineRows, onAddToTimeline, timelineState]);
+ 
+   const renderTranscript = () => {
+     if (!transcriptData?.transcription) {
