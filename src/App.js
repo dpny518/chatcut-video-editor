@@ -277,6 +277,7 @@ const handleChatMessage = (message) => {
           timelineState={timelineState}
           timelineRows={timelineRows}
           setTimelineRows={setTimelineRows}
+          onClipsChange={handleTimelineClipsChange}
           />
         </MainLayout>
 

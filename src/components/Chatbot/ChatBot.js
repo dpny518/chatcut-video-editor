@@ -9,25 +9,38 @@ const ChatBot = ({
   selectedBinClip, 
   transcriptData,
   onAddToTimeline,
-  timelineState,  // Make sure timelineState is being passed from App.js
-  timelineRows = [{ rowId: 0, clips: [], lastEnd: 0 }],  // Add default value
-  setTimelineRows 
+  timelineState,
+  timelineRows = [{ rowId: 0, clips: [], lastEnd: 0 }],
+  setTimelineRows,
+  onClipsChange  // Add this prop to handle clearing clips
 }) => {
   const [input, setInput] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const clearExistingClips = () => {
+    // Clear the timeline rows
+    setTimelineRows(prev => {
+      const updated = [...prev];
+      updated[0] = { ...updated[0], clips: [], lastEnd: 0 };
+      return updated;
+    });
+
+    // Clear the main clips array
+    onClipsChange([]);
+  };
 
   const processAndAddToTimeline = async (text) => {
     try {
       if (!selectedBinClip) {
         throw new Error('No video clip selected');
       }
-      console.log('Current timeline state:', {
-        totalDuration: timelineState.totalDuration,
-        existingClips: timelineState.clips.length,
-        timelineRows: timelineRows
-      });
-  
+
+      // Clear existing clips before adding new ones
+      clearExistingClips();
+      
+      console.log('Timeline cleared, adding new clips...');
+
       // Parse words maintaining original order
       const words = text.split(' ')
         .filter(w => w.includes('|'))
@@ -73,15 +86,8 @@ const ChatBot = ({
       video.src = URL.createObjectURL(selectedBinClip.file);
   
       video.addEventListener('loadedmetadata', () => {
-        // Find the end position of the last existing clip
+        // Start from position 0 since we cleared existing clips
         let timelinePosition = 0;
-        if (timelineState.clips.length > 0) {
-          timelinePosition = Math.max(
-            ...timelineState.clips.map(clip => clip.metadata.timeline.end)
-          );
-          // Add a small gap after the last existing clip
-          timelinePosition += 0.1;
-        }
   
         // Process each segment
         segments.forEach((segment, index) => {
@@ -89,7 +95,6 @@ const ChatBot = ({
           const segmentEnd = Math.max(...segment.map(w => w.end));
           const timelineDuration = segmentEnd - segmentStart;
   
-          // Position this clip after the previous one
           const timelineStart = timelinePosition;
           const timelineEnd = timelineStart + timelineDuration;
   
@@ -111,7 +116,7 @@ const ChatBot = ({
                 start: timelineStart,
                 end: timelineEnd,
                 duration: timelineDuration,
-                track: 0  // Always use track 0
+                track: 0
               },
               playback: {
                 start: segmentStart,
@@ -140,17 +145,15 @@ const ChatBot = ({
             sourceEnd: segmentEnd
           });
   
-          // Update timeline rows for monitoring
           setTimelineRows(prev => {
             const updated = [...prev];
-            const targetRow = updated[0]; // Always use row 0
+            const targetRow = updated[0];
             targetRow.clips.push(clipData);
             targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
             return updated;
           });
   
-          // Move position to end of this clip plus small gap for next iteration
-          timelinePosition = timelineEnd + 0.1;
+          timelinePosition = timelineEnd + 0.0;
   
           onAddToTimeline?.(clipData);
         });
@@ -160,7 +163,7 @@ const ChatBot = ({
       });
   
       onSendMessage({
-        text: `Successfully added ${segments.length} clip${segments.length > 1 ? 's' : ''} to timeline`,
+        text: `Successfully cleared timeline and added ${segments.length} new clip${segments.length > 1 ? 's' : ''}`,
         sender: 'bot',
         isSuccess: true
       });
@@ -175,6 +178,7 @@ const ChatBot = ({
     }
   };
 
+  // Rest of the component remains the same...
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (input.trim() && selectedTemplate) {
@@ -201,7 +205,6 @@ const ChatBot = ({
         );
         console.log(llmResponse)
 
-        // Process response and add to timeline
         await processAndAddToTimeline(llmResponse);
 
         setInput('');
@@ -218,6 +221,7 @@ const ChatBot = ({
     }
   };
 
+  // Return JSX remains the same...
   return (
     <Box sx={{
       position: 'fixed',
