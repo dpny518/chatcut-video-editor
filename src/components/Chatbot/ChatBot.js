@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, TextField, Button, Select, MenuItem, FormControl, CircularProgress } from '@mui/material';
 import { promptTemplates } from './promptTemplates';
-import { sendToLLM } from './Api';
+import { sendToLLM, sendToLlama } from './Api';
 
 const ChatBot = ({ 
   onSendMessage, 
@@ -179,7 +179,7 @@ const ChatBot = ({
   };
 
   // Rest of the component remains the same...
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, useGPT = true) => {
     e.preventDefault();
     if (input.trim() && selectedTemplate) {
       setIsLoading(true);
@@ -197,16 +197,25 @@ const ChatBot = ({
 
         const wordTimingJson = transcriptData ? JSON.stringify(transcriptData) : '';
         
-        const llmResponse = await sendToLLM(
-          wordTimingJson,
-          templateContent,
-          input,
-          'chat'
-        );
-        console.log(llmResponse)
-
-        await processAndAddToTimeline(llmResponse);
-
+        let response;
+        if (useGPT) {
+          response = await sendToLLM(
+            wordTimingJson,
+            templateContent,
+            input,
+            'chat'
+          );
+        } else {
+          response = await sendToLlama(
+            wordTimingJson,
+            templateContent,
+            input,
+            'chat'
+          );
+        }
+        
+        console.log(response);
+        await processAndAddToTimeline(response);
         setInput('');
       } catch (error) {
         console.error('Chat error:', error);
@@ -221,7 +230,6 @@ const ChatBot = ({
     }
   };
 
-  // Return JSX remains the same...
   return (
     <Box sx={{
       position: 'fixed',
@@ -291,7 +299,7 @@ const ChatBot = ({
       {/* Input Area */}
       <Box 
         component="form" 
-        onSubmit={handleSubmit}
+        onSubmit={(e) => handleSubmit(e, true)}
         sx={{
           p: 1,
           display: 'flex',
@@ -327,34 +335,44 @@ const ChatBot = ({
           </Select>
         </FormControl>
         
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <TextField
-            size="small"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
-            disabled={isLoading}
-            fullWidth
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: '#2d2d2d',
-                '& fieldset': {
-                  borderColor: '#404040',
-                },
-                '&:hover fieldset': {
-                  borderColor: '#505050',
-                },
+        <TextField
+          size="small"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Type your message..."
+          disabled={isLoading}
+          fullWidth
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              backgroundColor: '#2d2d2d',
+              '& fieldset': {
+                borderColor: '#404040',
               },
-            }}
-          />
+              '&:hover fieldset': {
+                borderColor: '#505050',
+              },
+            },
+          }}
+        />
+        
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <Button 
-            type="submit"
+            onClick={(e) => handleSubmit(e, true)}
             variant="contained" 
             color="primary"
             disabled={!input.trim() || !selectedTemplate || isLoading}
-            sx={{ minWidth: '60px' }}
+            sx={{ flex: 1 }}
           >
-            Send
+            Send to GPT
+          </Button>
+          <Button 
+            onClick={(e) => handleSubmit(e, false)}
+            variant="contained" 
+            color="secondary"
+            disabled={!input.trim() || !selectedTemplate || isLoading}
+            sx={{ flex: 1 }}
+          >
+            Send to Llama
           </Button>
         </Box>
       </Box>
