@@ -50,7 +50,7 @@ const BinViewer = ({ clips, selectedClip, onAddToTimeline, setTimelineRows}) => 
       }
     } else {
       setVideoUrl(null);
-    }
+    } 
 
     setLoading(false);
 

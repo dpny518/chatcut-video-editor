@@ -27,7 +27,7 @@ const ChatBot = ({
         existingClips: timelineState.clips.length,
         timelineRows: timelineRows
       });
-
+  
       // Parse words maintaining original order
       const words = text.split(' ')
         .filter(w => w.includes('|'))
@@ -48,44 +48,51 @@ const ChatBot = ({
         throw new Error('No valid words found in response');
       }
   
-        // Group into segments by speaker
-        let segments = [];
-        let currentSegment = [words[0]];
-        let currentSpeaker = words[0].speaker;
+      // Group into segments by speaker
+      let segments = [];
+      let currentSegment = [words[0]];
+      let currentSpeaker = words[0].speaker;
     
-        for (let i = 1; i < words.length; i++) {
-          const currentWord = words[i];
-          
-          if (currentWord.speaker !== currentSpeaker) {
-            segments.push(currentSegment);
-            currentSegment = [currentWord];
-            currentSpeaker = currentWord.speaker;
-          } else {
-            currentSegment.push(currentWord);
-          }
-        }
+      for (let i = 1; i < words.length; i++) {
+        const currentWord = words[i];
         
-        if (currentSegment.length > 0) {
+        if (currentWord.speaker !== currentSpeaker) {
           segments.push(currentSegment);
+          currentSegment = [currentWord];
+          currentSpeaker = currentWord.speaker;
+        } else {
+          currentSegment.push(currentWord);
         }
-    
-       const video = document.createElement('video');
+      }
+      
+      if (currentSegment.length > 0) {
+        segments.push(currentSegment);
+      }
+  
+      const video = document.createElement('video');
       video.src = URL.createObjectURL(selectedBinClip.file);
   
       video.addEventListener('loadedmetadata', () => {
-        // Keep track of where we are in the timeline
+        // Find the end position of the last existing clip
         let timelinePosition = 0;
-
+        if (timelineState.clips.length > 0) {
+          timelinePosition = Math.max(
+            ...timelineState.clips.map(clip => clip.metadata.timeline.end)
+          );
+          // Add a small gap after the last existing clip
+          timelinePosition += 0.1;
+        }
+  
         // Process each segment
         segments.forEach((segment, index) => {
           const segmentStart = Math.min(...segment.map(w => w.start));
           const segmentEnd = Math.max(...segment.map(w => w.end));
           const timelineDuration = segmentEnd - segmentStart;
-
-          // Simple math: start at current position, end = start + duration
+  
+          // Position this clip after the previous one
           const timelineStart = timelinePosition;
           const timelineEnd = timelineStart + timelineDuration;
-
+  
           const clipData = {
             id: `clip-${Date.now()}-${index}`,
             file: selectedBinClip.file,
@@ -122,7 +129,7 @@ const ChatBot = ({
               speaker: segment[0].speaker
             }
           };
-
+  
           console.log(`Adding clip ${index + 1}:`, {
             text: clipData.transcript,
             speaker: segment[0].speaker,
@@ -132,7 +139,7 @@ const ChatBot = ({
             sourceStart: segmentStart,
             sourceEnd: segmentEnd
           });
-
+  
           // Update timeline rows for monitoring
           setTimelineRows(prev => {
             const updated = [...prev];
@@ -141,10 +148,10 @@ const ChatBot = ({
             targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
             return updated;
           });
-
-          // Move position to end of this clip for next iteration
-          timelinePosition = timelineEnd;
-
+  
+          // Move position to end of this clip plus small gap for next iteration
+          timelinePosition = timelineEnd + 0.1;
+  
           onAddToTimeline?.(clipData);
         });
   
