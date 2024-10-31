@@ -4,7 +4,7 @@ import MediaSidebar from '../Media/MediaSidebar';
 
 const MainLayout = ({ 
   mediaFiles, 
-  selectedBinClip,
+  selectedFiles,
   onFileUpload, 
   onFileSelect,
   timelineProjects, // Make sure this prop is being passed
@@ -16,7 +16,7 @@ const MainLayout = ({
         files={mediaFiles}
         onFileUpload={onFileUpload}
         onFileSelect={onFileSelect}
-        selectedFile={selectedBinClip}
+        selectedFiles={selectedFiles}
         timelineProjects={{
           selected: timelineProjects?.selected,
           onSave: timelineProjects?.onSave,

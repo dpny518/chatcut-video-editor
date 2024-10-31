@@ -14,7 +14,7 @@ import TranscriptViewerSection from './TranscriptViewerSection';
 
 const BinViewerSection = ({ 
   clips,
-  selectedClip, 
+  selectedClips, 
   onAddToTimeline,
   transcriptData,
   timelineState,
@@ -22,6 +22,14 @@ const BinViewerSection = ({
 }) => {
   const [viewMode, setViewMode] = useState(0);
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
+  console.log("BinViewerSection received selectedClips:", selectedClips);
+
+  const getHeaderText = () => {
+    if (!selectedClips?.length) return "No clips selected";
+    if (selectedClips.length === 1) return selectedClips[0].name;
+    return `${selectedClips.length} clips selected`;
+  };
+
 
   // Modified add to timeline handler to update timelineRows
   const handleAddToTimeline = (clipData) => {
@@ -94,7 +102,7 @@ const BinViewerSection = ({
         {viewMode === 0 ? (
           <BinViewer
             clips={clips}
-            selectedClip={selectedClip}
+            selectedClips={selectedClips}
             onAddToTimeline={handleAddToTimeline}
             timelineRows={timelineRows}
             setTimelineRows={setTimelineRows}
@@ -102,7 +110,7 @@ const BinViewerSection = ({
         ) : (
           <TranscriptViewerSection
             clips={clips}
-            selectedClip={selectedClip}
+            selectedClip={selectedClips[0]}
             transcriptData={transcriptData}
             onAddToTimeline={handleAddToTimeline}
             timelineRows={timelineRows}

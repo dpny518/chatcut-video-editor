@@ -36,7 +36,7 @@ const theme = createTheme({
 function App() {
   // State
   const [mediaFiles, setMediaFiles] = useState([]);
-  const [selectedBinClip, setSelectedBinClip] = useState(null);
+  const [selectedBinClips, setSelectedBinClips] = useState([]);
   const [timelineClips, setTimelineClips] = useState([]);
   const [notification, setNotification] = useState(null);
   const [selectedTimelineProject, setSelectedTimelineProject] = useState(null);
@@ -44,6 +44,8 @@ function App() {
 
   const [chatMessages, setChatMessages] = useState([]);
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
+
+ 
 
 // Add this handler function:
 const handleChatMessage = (message) => {
@@ -141,8 +143,8 @@ const handleChatMessage = (message) => {
     }
   };
 
-  const handleFileSelect = (selectedFile) => {
-    setSelectedBinClip(selectedFile);
+  const handleFileSelect = (selectedFiles) => {  // Changed to handle array
+    setSelectedBinClips(selectedFiles);
   };
 
   const handleAddToTimeline = (clipData) => {
@@ -211,7 +213,7 @@ const handleChatMessage = (message) => {
         <CssBaseline />
         <MainLayout
           mediaFiles={mediaFiles}
-          selectedBinClip={selectedBinClip}
+          selectedFiles={selectedBinClips}
           onFileUpload={handleFileUpload}
           onFileSelect={handleFileSelect}
           timelineProjects={{
@@ -226,9 +228,13 @@ const handleChatMessage = (message) => {
             <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
             <BinViewerSection
             clips={timelineClips}
-            selectedClip={selectedBinClip}
+            selectedClips={selectedBinClips}
             onAddToTimeline={handleAddToTimeline}
-            transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
+            transcriptData={
+              selectedBinClips.length === 1 
+                ? transcripts.get(selectedBinClips[0].name.replace(/\.[^/.]+$/, '.json')) 
+                : null
+            }
             timelineState={timelineState}
             setTimelineRows={setTimelineRows}
                 />
@@ -261,18 +267,22 @@ const handleChatMessage = (message) => {
              timelineRows={timelineRows}
              setTimelineRows={setTimelineRows}
                 />
-              <TimelineDebug
-                timelineClips={timelineClips}
-                selectedBinClip={selectedBinClip}
-              />
+           <TimelineDebug
+              timelineClips={timelineClips}
+              selectedBinClip={selectedBinClips.length === 1 ? selectedBinClips[0] : null}  // Pass single clip if one is selected
+            />
             </Box>
           </EditorLayout>
           <ChatBot 
           clips={timelineClips}
           messages={chatMessages}
           onSendMessage={handleChatMessage}
-          selectedBinClip={selectedBinClip}
-          transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
+          selectedClips={selectedBinClips}
+          transcriptData={
+            selectedBinClips.length === 1 
+              ? transcripts.get(selectedBinClips[0].name.replace(/\.[^/.]+$/, '.json')) 
+              : null
+          }
           onAddToTimeline={handleAddToTimeline}
           timelineState={timelineState}
           timelineRows={timelineRows}

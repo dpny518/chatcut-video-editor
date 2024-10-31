@@ -33,14 +33,23 @@ const onUpdateData = useCallback((newData) => {
   action.data = newData;
 }, [action]);
 
+// New state/refs for handling multiple sources
+const sourceVideosRef = useRef(new Map());
+const sourceUrlsRef = useRef(new Map());
+
 const timingValues = useMemo(() => ({
   startTime: clip.startTime,
   endTime: clip.endTime,
   actionStart: action.start,
   actionEnd: action.end,
   resizeDir: clip.resizeDir,
-  sourceStartTime: clip.source?.startTime || 0,
-  sourceEndTime: clip.source?.endTime,
+  // Modified to handle multiple sources
+  sourceClips: clip.source?.clips || [{ 
+    file: clip.file,
+    startTime: clip.source?.startTime || 0,
+    endTime: clip.source?.endTime,
+    duration: clip.source?.duration
+  }],
   clipId: clip.id,
   metadata: clip.metadata,
   hasMetadata: Boolean(clip.metadata?.timeline),
@@ -65,89 +74,10 @@ const timingValues = useMemo(() => ({
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
 
-  const calculateCurrentTimes = useCallback(() => {
-    if (!isInitialized.current || !timingValues.hasMetadata) {
-      isInitialized.current = true;
-      initialTimelineStart.current = timingValues.actionStart;
-      
-      timingValues.updateData({
-        ...timingValues.clipData,
-        metadata: {
-          timeline: {
-            start: timingValues.actionStart,
-            end: timingValues.actionEnd,
-            duration: timingValues.actionEnd - timingValues.actionStart,
-            initialStart: timingValues.actionStart
-          },
-          playback: {
-            start: timingValues.startTime,
-            end: timingValues.endTime,
-            duration: timingValues.endTime - timingValues.startTime
-          }
-        }
-      });
-
-      return {
-        timelinePosition: formatTime(timingValues.actionStart),
-        originalStart: formatTime(originalValues.current.startTime),  // Use ref values
-        originalEnd: formatTime(originalValues.current.endTime),      // Use ref values
-        currentStart: formatTime(timingValues.startTime),
-        currentEnd: formatTime(timingValues.endTime),
-        duration: formatTime(timingValues.endTime - timingValues.startTime),
-        originalDuration: formatTime(originalValues.current.duration) // Use ref value
-      };
-    }
-
-    let currentStart = timingValues.startTime;
-    let currentEnd = timingValues.endTime;
-
-    if (timingValues.resizeDir === 'left') {
-      currentEnd = timingValues.endTime;
-      const newDuration = timingValues.actionEnd - timingValues.actionStart;
-      currentStart = timingValues.endTime - newDuration;
-    } else if (timingValues.resizeDir === 'right') {
-      currentStart = timingValues.startTime;
-      const newDuration = timingValues.actionEnd - timingValues.actionStart;
-      currentEnd = timingValues.startTime + newDuration;
-    }
-    
-    currentEnd = Math.min(currentEnd, timingValues.sourceEndTime);
-    currentStart = Math.max(currentStart, timingValues.sourceStartTime);
-
-    timingValues.updateData({
-      ...timingValues.clipData,
-      startTime: currentStart,
-      endTime: currentEnd,
-      metadata: {
-        timeline: {
-          start: timingValues.actionStart,
-          end: timingValues.actionEnd,
-          duration: timingValues.actionEnd - timingValues.actionStart,
-          initialStart: timingValues.metadata?.timeline?.initialStart || initialTimelineStart.current
-        },
-        playback: {
-          start: currentStart,
-          end: currentEnd,
-          duration: currentEnd - currentStart
-        }
-      }
-    });
-
-    return {
-      timelinePosition: formatTime(timingValues.actionStart),
-      originalStart: formatTime(originalValues.current.startTime),  // Use ref values
-      originalEnd: formatTime(originalValues.current.endTime),      // Use ref values
-      currentStart: formatTime(currentStart),
-      currentEnd: formatTime(currentEnd),
-      duration: formatTime(currentEnd - currentStart),
-      originalDuration: formatTime(originalValues.current.duration) // Use ref value
-    };
-  }, [timingValues]); 
-
   const thumbnailParams = useMemo(() => {
     const timingInfo = calculateCurrentTimes();
     if (!timingInfo) return null;
-
+  
     return {
       clipId: timingValues.clipId,
       currentStart: parseFloat(timingInfo.currentStart.split(':').pop()),
@@ -155,14 +85,108 @@ const timingValues = useMemo(() => ({
       width: containerWidth.current
     };
   }, [calculateCurrentTimes, timingValues.clipId]);
+  
+ // Update calculateCurrentTimes to handle multiple sources
+const calculateCurrentTimes = useCallback(() => {
+  if (!isInitialized.current || !timingValues.hasMetadata) {
+    // ... initialization code remains the same ...
+  }
 
+  let currentStart = timingValues.startTime;
+  let currentEnd = timingValues.endTime;
+
+  if (timingValues.resizeDir === 'left') {
+    currentEnd = timingValues.endTime;
+    const newDuration = timingValues.actionEnd - timingValues.actionStart;
+    currentStart = timingValues.endTime - newDuration;
+  } else if (timingValues.resizeDir === 'right') {
+    currentStart = timingValues.startTime;
+    const newDuration = timingValues.actionEnd - timingValues.actionStart;
+    currentEnd = timingValues.startTime + newDuration;
+  }
+  
+  // Calculate total duration of all source clips
+  const totalSourceDuration = timingValues.sourceClips.reduce((total, source) => 
+    total + (source.endTime - source.startTime), 0
+  );
+  
+  // Clamp to total source duration
+  currentEnd = Math.min(currentEnd, totalSourceDuration);
+  currentStart = Math.max(currentStart, 0);
+
+  timingValues.updateData({
+    ...timingValues.clipData,
+    startTime: currentStart,
+    endTime: currentEnd,
+    metadata: {
+      timeline: {
+        start: timingValues.actionStart,
+        end: timingValues.actionEnd,
+        duration: timingValues.actionEnd - timingValues.actionStart,
+        initialStart: timingValues.metadata?.timeline?.initialStart || initialTimelineStart.current
+      },
+      playback: {
+        start: currentStart,
+        end: currentEnd,
+        duration: currentEnd - currentStart,
+        sourceClips: timingValues.sourceClips.map(source => ({
+          id: source.id,
+          inPoint: source.startTime,
+          outPoint: source.endTime
+        }))
+      }
+    }
+  });
+
+  return {
+    timelinePosition: formatTime(timingValues.actionStart),
+    originalStart: formatTime(originalValues.current.startTime),
+    originalEnd: formatTime(originalValues.current.endTime),
+    currentStart: formatTime(currentStart),
+    currentEnd: formatTime(currentEnd),
+    duration: formatTime(currentEnd - currentStart),
+    originalDuration: formatTime(originalValues.current.duration)
+  };
+}, [timingValues]);
+
+  // Function to get the correct source video for a given time
+  const getSourceForTime = useCallback((globalTime) => {
+    if (!timingValues.sourceClips || timingValues.sourceClips.length === 1) {
+      return {
+        video: videoRef.current,
+        time: globalTime,
+        source: timingValues.sourceClips[0]
+      };
+    }
+
+    let accumulatedTime = 0;
+    for (const source of timingValues.sourceClips) {
+      const clipDuration = source.endTime - source.startTime;
+      if (globalTime >= accumulatedTime && globalTime < accumulatedTime + clipDuration) {
+        return {
+          video: sourceVideosRef.current.get(source.id),
+          time: source.startTime + (globalTime - accumulatedTime),
+          source
+        };
+      }
+      accumulatedTime += clipDuration;
+    }
+
+    // Default to first source if time not found
+    return {
+      video: sourceVideosRef.current.get(timingValues.sourceClips[0].id),
+      time: timingValues.sourceClips[0].startTime,
+      source: timingValues.sourceClips[0]
+    };
+  }, [timingValues.sourceClips]);
+
+  // Modified thumbnail generation to handle multiple sources
   const generateThumbnails = useCallback(async () => {
-    if (!videoRef.current || !clip.file || !thumbnailParams) return;
+    if (!thumbnailParams) return;
     
     const { clipId, currentStart, currentEnd, width } = thumbnailParams;
     const cacheKey = `${clipId}-${currentStart}-${currentEnd}-${width}`;
 
-    // Skip if we're already showing these thumbnails
     if (lastThumbnailKey.current === cacheKey) return;
     
     if (thumbnailCacheByClip.has(cacheKey)) {
@@ -176,29 +200,32 @@ const timingValues = useMemo(() => ({
     setError(null);
 
     try {
-      const video = videoRef.current;
       const newThumbnails = [];
-      
-      await new Promise((resolve, reject) => {
-        const handleLoad = () => resolve();
-        const handleError = (e) => reject(new Error(`Video load failed: ${e.message}`));
-        
-        if (video.readyState >= 2) resolve();
-        else {
-          video.addEventListener('loadeddata', handleLoad, { once: true });
-          video.addEventListener('error', handleError, { once: true });
-        }
-      });
-
       const thumbnailCount = getThumbnailCount();
       const duration = currentEnd - currentStart;
-      
+
+      // Wait for all videos to be loaded
+      await Promise.all(timingValues.sourceClips.map(source => 
+        new Promise((resolve, reject) => {
+          const video = sourceVideosRef.current.get(source.id);
+          if (!video) reject(new Error('Video not found'));
+          if (video.readyState >= 2) resolve();
+          else {
+            video.addEventListener('loadeddata', resolve, { once: true });
+            video.addEventListener('error', (e) => reject(new Error(`Video load failed: ${e.message}`)), { once: true });
+          }
+        })
+      ));
+
       for (let i = 0; i < thumbnailCount; i++) {
         const progress = i / (thumbnailCount - 1);
         const timeOffset = progress * duration;
-        const sourceTime = currentStart + timeOffset;
+        const globalTime = currentStart + timeOffset;
         
-        video.currentTime = sourceTime;
+        // Get correct source video for this time
+        const { video, time } = getSourceForTime(globalTime);
+        
+        video.currentTime = time;
         
         await new Promise((resolve) => {
           video.addEventListener('seeked', resolve, { once: true });
@@ -224,7 +251,7 @@ const timingValues = useMemo(() => ({
     } finally {
       setLoading(false);
     }
-  }, [clip.file, getThumbnailCount, thumbnailParams]);
+  }, [thumbnailParams, getThumbnailCount, timingValues.sourceClips, getSourceForTime]);
 
   // Initialize container width
   useEffect(() => {
@@ -235,23 +262,34 @@ const timingValues = useMemo(() => ({
 
   // Handle video source
   useEffect(() => {
-    if (videoRef.current && clip.file) {
-      if (videoUrlRef.current) {
-        URL.revokeObjectURL(videoUrlRef.current);
+    // Cleanup old URLs
+    sourceUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    sourceUrlsRef.current.clear();
+    
+    // Create video elements and URLs for each source
+    timingValues.sourceClips.forEach(source => {
+      if (source.file) {
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+        
+        const url = URL.createObjectURL(source.file);
+        video.src = url;
+        
+        sourceVideosRef.current.set(source.id, video);
+        sourceUrlsRef.current.set(source.id, url);
       }
-      videoUrlRef.current = URL.createObjectURL(clip.file);
-      videoRef.current.src = videoUrlRef.current;
-      
-      generateThumbnails();
-    }
+    });
+
+    generateThumbnails();
 
     return () => {
-      if (videoUrlRef.current) {
-        URL.revokeObjectURL(videoUrlRef.current);
-      }
+      sourceUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      sourceUrlsRef.current.clear();
+      sourceVideosRef.current.clear();
     };
-  }, [clip.file, generateThumbnails]);
-
+  }, [timingValues.sourceClips, generateThumbnails]);
+  
   // Handle resize with debouncing
   useEffect(() => {
     let resizeTimeout;
