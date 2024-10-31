@@ -1,3 +1,4 @@
+// src/components/Viewers/BinViewerSection.js
 import React, { useState } from 'react';
 import { 
   Box, 
@@ -9,46 +10,15 @@ import {
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import BinViewer from './BinViewer';
-import TranscriptViewerSection from './TranscriptViewerSection';
-
+import TranscriptViewer from './TranscriptViewer';
 
 const BinViewerSection = ({ 
-  clips,
-  selectedClips, 
+  selectedClips = [], // Changed from selectedClip to selectedClips
   onAddToTimeline,
   transcriptData,
-  timelineState,
-  onTranscriptUpload,
+  onTranscriptUpload 
 }) => {
   const [viewMode, setViewMode] = useState(0);
-  const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
-  console.log("BinViewerSection received selectedClips:", selectedClips);
-
-  const getHeaderText = () => {
-    if (!selectedClips?.length) return "No clips selected";
-    if (selectedClips.length === 1) return selectedClips[0].name;
-    return `${selectedClips.length} clips selected`;
-  };
-
-
-  // Modified add to timeline handler to update timelineRows
-  const handleAddToTimeline = (clipData) => {
-    // Call the parent's onAddToTimeline
-    onAddToTimeline?.(clipData);
-    
-    // Update local timelineRows state if needed
-    setTimelineRows(prev => {
-      const rowIndex = clipData.metadata.timeline.row;
-      const updated = [...prev];
-      while (updated.length <= rowIndex) {
-        updated.push({ rowId: updated.length, clips: [], lastEnd: 0 });
-      }
-      const targetRow = updated[rowIndex];
-      targetRow.clips.push(clipData);
-      targetRow.lastEnd = Math.max(targetRow.lastEnd, clipData.metadata.timeline.end);
-      return updated;
-    });
-  };
 
   return (
     <Paper 
@@ -60,7 +30,6 @@ const BinViewerSection = ({
         overflow: 'hidden'
       }}
     >
-      {/* Single header with view toggle */}
       <Box sx={{ 
         p: 2,
         borderBottom: 1, 
@@ -93,7 +62,6 @@ const BinViewerSection = ({
         </Tabs>
       </Box>
 
-      {/* Content area */}
       <Box sx={{ 
         flex: 1, 
         position: 'relative',
@@ -101,20 +69,14 @@ const BinViewerSection = ({
       }}>
         {viewMode === 0 ? (
           <BinViewer
-            clips={clips}
-            selectedClips={selectedClips}
-            onAddToTimeline={handleAddToTimeline}
-            timelineRows={timelineRows}
-            setTimelineRows={setTimelineRows}
+            selectedClips={selectedClips} // Changed from selectedClip
+            onAddToTimeline={onAddToTimeline}
           />
         ) : (
-          <TranscriptViewerSection
-            clips={clips}
-            selectedClip={selectedClips[0]}
+          <TranscriptViewer
+            selectedClip={selectedClips[0]} // Pass first selected clip for transcript view
             transcriptData={transcriptData}
-            onAddToTimeline={handleAddToTimeline}
-            timelineRows={timelineRows}
-            setTimelineRows={setTimelineRows}
+            onAddToTimeline={onAddToTimeline}
           />
         )}
       </Box>
