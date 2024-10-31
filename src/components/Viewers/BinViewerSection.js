@@ -8,7 +8,8 @@ import {
 } from '@mui/material';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
-import BinViewer from './BinViewer';import TranscriptViewer from './TranscriptViewer';
+import BinViewer from './BinViewer';
+import TranscriptViewerSection from './TranscriptViewerSection';
 
 
 const BinViewerSection = ({ 
@@ -99,7 +100,7 @@ const BinViewerSection = ({
             setTimelineRows={setTimelineRows}
           />
         ) : (
-          <TranscriptViewer
+          <TranscriptViewerSection
             clips={clips}
             selectedClip={selectedClip}
             transcriptData={transcriptData}

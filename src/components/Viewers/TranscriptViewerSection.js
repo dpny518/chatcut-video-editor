@@ -1,8 +1,16 @@
-import React from 'react';
+import {React, useEffect} from 'react';
 import { Paper } from '@mui/material';
 import TranscriptViewer from './TranscriptViewer';
 
-const TranscriptViewerSection = ({ selectedClip, transcriptData, onAddToTimeline }) => {
+const TranscriptViewerSection = ({ 
+  clips,
+  selectedClip,
+  transcriptData, 
+  onAddToTimeline,
+  timelineRows,
+  setTimelineRows,
+  sx
+}) => {
     useEffect(() => {
         console.log('TranscriptViewerSection props updated:', {
           selectedClip,
@@ -14,10 +22,12 @@ const TranscriptViewerSection = ({ selectedClip, transcriptData, onAddToTimeline
     
     <Paper sx={{ flex: 1, p: 2, bgcolor: 'background.paper' }}>
       <TranscriptViewer
-        key={selectedClip?.id}
-        selectedClip={selectedClip}  // Pass the whole selectedClip object
-        transcriptData={transcriptData}
-        onAddToTimeline={onAddToTimeline}
+         clips={clips}
+         selectedClip={selectedClip}
+         transcriptData={transcriptData}
+         onAddToTimeline={onAddToTimeline}
+         timelineRows={timelineRows}
+         setTimelineRows={setTimelineRows}
       />
     </Paper>
   );
