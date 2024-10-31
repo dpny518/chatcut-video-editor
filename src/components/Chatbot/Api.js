@@ -110,17 +110,8 @@ export const sendToLLM = async (wordTimingJson, promptTemplate, userInput, task)
       user_input: userInput,
       task: task,
     });
-    
     if (response.data && response.data.result) {
-      console.log('Raw LLM response:', response.data.result.slice(0, 200) + '...');
-      
-      const filteredResponse = filterWordTimings(response.data.result);
-      
-      if (!filteredResponse || filteredResponse.trim().length === 0) {
-        throw new Error('Filtering produced empty result');
-      }
-      
-      return filteredResponse;
+      return response.data.result;
     } else {
       throw new Error('Invalid response format');
     }
