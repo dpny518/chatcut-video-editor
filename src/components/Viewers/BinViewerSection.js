@@ -14,7 +14,7 @@ import TranscriptViewer from './TranscriptViewer';
 
 const BinViewerSection = ({ 
   clips,
-  selectedClips = [], // Changed from selectedClip to selectedClips
+  selectedClips = [],
   onAddToTimeline,
   transcriptData,
   onTranscriptUpload 
@@ -50,13 +50,13 @@ const BinViewerSection = ({
           <Tab
             icon={<VideoFileIcon />}
             iconPosition="start"
-            label="Video"
+            label="VIDEO"
             sx={{ minHeight: 48 }}
           />
           <Tab
             icon={<TextSnippetIcon />}
             iconPosition="start"
-            label="Transcript"
+            label="TRANSCRIPT"
             disabled={!transcriptData}
             sx={{ minHeight: 48 }}
           />
@@ -70,13 +70,13 @@ const BinViewerSection = ({
       }}>
         {viewMode === 0 ? (
           <BinViewer
-            clips = {clips}
-            selectedClips={selectedClips} // Changed from selectedClip
+            clips={clips}
+            selectedClips={selectedClips}
             onAddToTimeline={onAddToTimeline}
           />
         ) : (
           <TranscriptViewer
-            selectedClip={selectedClips[0]} // Pass first selected clip for transcript view
+            selectedClip={selectedClips[0]}
             transcriptData={transcriptData}
             onAddToTimeline={onAddToTimeline}
           />

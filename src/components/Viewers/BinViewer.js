@@ -8,13 +8,13 @@ const MIN_CLIP_DURATION = 1;
 const PROGRESS_INTERVAL = 100;
 
 const BinViewer = ({ 
-  clips,                    // All available clips
-  selectedClips = [],           // Currently selected clips
-  onAddToTimeline,             // Handler for adding to timeline
-  timelineRows = [],           // Timeline row data
-  setTimelineRows              // Timeline row updater
+  clips,                    
+  selectedClips = [],           
+  onAddToTimeline,             
+  timelineRows = [],           
+  setTimelineRows              
 }) => {
-  // State
+  // Existing state
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -24,12 +24,16 @@ const BinViewer = ({
   const [totalDuration, setTotalDuration] = useState(0);
   const [range, setRange] = useState([0, 0]);
 
+  // New state for frame sync
+  const [seekTime, setSeekTime] = useState(null);
+
   // Refs
   const playerRefs = useRef(new Map());
   const urlRefs = useRef(new Map());
   const durationRefs = useRef(new Map());
+  const lastSeekRef = useRef(null);
 
-  // Load videos when selection changes
+  // Existing load clips effect
   useEffect(() => {
     const loadClips = async () => {
       if (!selectedClips?.length) return;
@@ -58,13 +62,12 @@ const BinViewer = ({
           });
 
           video.addEventListener('error', () => {
-            resolve(0); // Handle loading errors gracefully
+            resolve(0);
           });
         }));
 
         await Promise.all(durationPromises);
 
-        // Create segments from loaded clips
         const newSegments = selectedClips.map(clip => ({
           sourceClip: {
             ...clip,
@@ -77,14 +80,12 @@ const BinViewer = ({
 
         setSegments(newSegments);
 
-        // Calculate total duration and set initial range
         const totalDur = newSegments.reduce((sum, segment) => 
           sum + (segment.endTime - segment.startTime), 0
         );
         setTotalDuration(totalDur);
         setRange([0, totalDur]);
 
-        // Set initial active segment
         if (newSegments.length > 0) {
           setActiveSegment({
             sourceClip: newSegments[0].sourceClip,
@@ -108,6 +109,18 @@ const BinViewer = ({
     };
   }, [selectedClips]);
 
+  // New effect for frame synchronization
+  useEffect(() => {
+    if (seekTime !== null && activeSegment) {
+      const player = playerRefs.current.get(activeSegment.sourceClip.id);
+      if (player && player.seekTo) {
+        player.seekTo(seekTime, 'seconds');
+        // Reset seek time after applying it
+        setSeekTime(null);
+      }
+    }
+  }, [seekTime, activeSegment]);
+  
   const handleProgress = useCallback((state) => {
     if (!activeSegment || !segments.length) return;
 
@@ -115,30 +128,64 @@ const BinViewer = ({
     const segmentDuration = currentSegment.endTime - currentSegment.startTime;
     const currentSegmentTime = state.playedSeconds;
 
-    // Calculate global time position
-    let globalTime = 0;
-    for (let i = 0; i < activeSegment.segmentIndex; i++) {
-      globalTime += segments[i].endTime - segments[i].startTime;
+    // Only update if not seeking
+    if (lastSeekRef.current !== currentSegmentTime) {
+      let globalTime = 0;
+      for (let i = 0; i < activeSegment.segmentIndex; i++) {
+        globalTime += segments[i].endTime - segments[i].startTime;
+      }
+      globalTime += currentSegmentTime;
+
+      setCurrentTime(globalTime);
     }
-    globalTime += currentSegmentTime;
 
-    setCurrentTime(globalTime);
-
-    // Handle segment transitions
     if (currentSegmentTime >= segmentDuration) {
       if (activeSegment.segmentIndex < segments.length - 1) {
-        // Move to next segment
         setActiveSegment({
           sourceClip: segments[activeSegment.segmentIndex + 1].sourceClip,
           time: 0,
           segmentIndex: activeSegment.segmentIndex + 1
         });
       } else {
-        // End of all segments
         setPlaying(false);
       }
     }
   }, [activeSegment, segments]);
+
+  // Modified slider change handler
+  const handleSliderChange = useCallback((newValue) => {
+    if (newValue[1] - newValue[0] >= MIN_CLIP_DURATION) {
+      setRange(newValue);
+      setPlaying(false);
+      
+      // Find the correct segment and time for the slider position
+      let timeAcc = 0;
+      for (let i = 0; i < segments.length; i++) {
+        const segmentDuration = segments[i].endTime - segments[i].startTime;
+        if (timeAcc <= newValue[0] && timeAcc + segmentDuration > newValue[0]) {
+          const newSegmentTime = newValue[0] - timeAcc;
+          
+          // Update active segment
+          setActiveSegment({
+            sourceClip: segments[i].sourceClip,
+            time: newSegmentTime,
+            segmentIndex: i
+          });
+          
+          // Set seek time to update video frame
+          setSeekTime(newSegmentTime);
+          lastSeekRef.current = newSegmentTime;
+          
+          // Update current time
+          setCurrentTime(newValue[0]);
+          break;
+        }
+        timeAcc += segmentDuration;
+      }
+    }
+  }, [segments]);
+  
+  
 
   const handleAddToTimeline = useCallback(() => {
     if (!segments.length) return;
@@ -283,64 +330,57 @@ const BinViewer = ({
             ))}
           </Box>
 
-          <Box sx={{ p: 2 }}>
-            <Button
-              variant="contained"
-              onClick={() => setPlaying(!playing)}
-              disabled={!segments.length}
-              sx={{ mb: 2 }}
-            >
-              {playing ? 'Pause' : 'Play'}
-            </Button>
+                  <Box sx={{ p: 2 }}>
+          <Button
+            variant="contained"
+            onClick={() => setPlaying(!playing)}
+            disabled={!segments.length}
+            sx={{ mb: 2 }}
+          >
+            {playing ? 'Pause' : 'Play'}
+          </Button>
 
+          <Box sx={{ px: 1 }}>
             <Slider
               value={range}
-              onChange={(_, newValue) => {
-                if (newValue[1] - newValue[0] >= MIN_CLIP_DURATION) {
-                  setRange(newValue);
-                  setPlaying(false);
-                  
-                  // Update active segment based on new position
-                  let timeAcc = 0;
-                  for (let i = 0; i < segments.length; i++) {
-                    const segmentDuration = segments[i].endTime - segments[i].startTime;
-                    if (timeAcc <= newValue[0] && timeAcc + segmentDuration > newValue[0]) {
-                      setActiveSegment({
-                        sourceClip: segments[i].sourceClip,
-                        time: newValue[0] - timeAcc,
-                        segmentIndex: i
-                      });
-                      break;
-                    }
-                    timeAcc += segmentDuration;
-                  }
-                }
-              }}
+              onChange={(_, newValue) => handleSliderChange(newValue)}
               min={0}
               max={totalDuration}
               step={0.1}
               disabled={!segments.length}
+              sx={{
+                '& .MuiSlider-thumb': {
+                  width: 12,
+                  height: 12,
+                  transition: '0.1s cubic-bezier(.47,1.64,.41,.8)',
+                  '&.Mui-active': {
+                    width: 16,
+                    height: 16,
+                  },
+                }
+              }}
             />
-
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
-              <Typography variant="caption">
-                Range: {formatTime(range[0])} - {formatTime(range[1])}
-              </Typography>
-              <Typography variant="caption">
-                Current: {formatTime(currentTime)}
-              </Typography>
-            </Box>
-
-            <Button
-              variant="contained"
-              onClick={handleAddToTimeline}
-              disabled={!segments.length || range[1] - range[0] < MIN_CLIP_DURATION}
-              fullWidth
-              sx={{ mt: 2 }}
-            >
-              Add to Timeline
-            </Button>
           </Box>
+
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="caption">
+              Range: {formatTime(range[0])} - {formatTime(range[1])}
+            </Typography>
+            <Typography variant="caption">
+              Current: {formatTime(currentTime)}
+            </Typography>
+          </Box>
+
+          <Button
+            variant="contained"
+            onClick={handleAddToTimeline}
+            disabled={!segments.length || range[1] - range[0] < MIN_CLIP_DURATION}
+            fullWidth
+            sx={{ mt: 2 }}
+          >
+            Add to Timeline
+          </Button>
+        </Box>
         </>
       )}
     </Box>
