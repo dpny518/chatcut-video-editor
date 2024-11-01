@@ -8,7 +8,7 @@ const MIN_CLIP_DURATION = 1;
 const PROGRESS_INTERVAL = 100;
 
 const BinViewer = ({ 
-  clips = [],                    // All available clips
+  clips,                    // All available clips
   selectedClips = [],           // Currently selected clips
   onAddToTimeline,             // Handler for adding to timeline
   timelineRows = [],           // Timeline row data
@@ -146,28 +146,43 @@ const BinViewer = ({
     const [startTime, endTime] = range;
     
     try {
-      // Calculate which segments overlap with the selection
-      let accumulatedTime = 0;
+      // Find the end position of the last clip in the timeline
+      const findTimelineEndPosition = (clips) => {
+        console.log('Finding last clip end from clips:', clips);
+        if (!clips.length) return 0;
+        const maxEnd = Math.max(...clips.map(clip => clip.metadata.timeline.end));
+        console.log('Found last clip end position:', maxEnd);
+        return maxEnd;
+      };
+  
+      // Start position for the new clips
+      let timelinePosition = findTimelineEndPosition(clips);
+      console.log('Initial timeline position:', timelinePosition);
       
-      segments.forEach(segment => {
+      // Add a small gap if there are existing clips
+      if (timelinePosition > 0) {
+        timelinePosition += 0.0; // 0ms gap between clips
+        console.log('Timeline position after gap:', timelinePosition);
+      }
+  
+      let accumulatedTime = 0;
+      const clipsToAdd = [];
+      
+      segments.forEach((segment, index) => {
+        console.log(`Processing segment ${index}:`, segment);
+        
         const segmentDuration = segment.endTime - segment.startTime;
         const segmentStart = accumulatedTime;
         const segmentEnd = segmentStart + segmentDuration;
   
-        // Check if this segment overlaps with the selection
+        // Check if this segment overlaps with the selected range
         if (startTime < segmentEnd && endTime > segmentStart) {
-          // Calculate the overlap
+          // Calculate the portion of this segment to use
           const clipStartTime = Math.max(0, startTime - segmentStart);
           const clipEndTime = Math.min(segmentDuration, endTime - segmentStart);
           const clipDuration = clipEndTime - clipStartTime;
-          
-          // Find the last clip in the timeline to determine where to place this one
-          const lastTimelineEnd = timelineRows[0]?.clips?.reduce((maxEnd, clip) => 
-            Math.max(maxEnd, clip.metadata?.timeline?.end || 0), 0) || 0;
-          
-          // Add a small gap after the last clip
-          const timelineStart = lastTimelineEnd > 0 ? lastTimelineEnd + 0.1 : 0;
-          
+  
+          // Create clip data
           const clipData = {
             id: `clip-${Date.now()}-${segment.sourceClip.id}`,
             file: segment.sourceClip.file,
@@ -175,8 +190,8 @@ const BinViewer = ({
             type: 'video/mp4',
             size: segment.sourceClip.size,
             duration: clipDuration,
-            startTime: clipStartTime,
-            endTime: clipEndTime,
+            startTime: clipStartTime + segment.startTime,
+            endTime: clipEndTime + segment.startTime,
             source: {
               duration: segment.sourceClip.duration,
               startTime: 0,
@@ -184,31 +199,41 @@ const BinViewer = ({
             },
             metadata: {
               timeline: {
-                start: timelineStart,
-                end: timelineStart + clipDuration,
+                start: timelinePosition,
+                end: timelinePosition + clipDuration,
                 duration: clipDuration,
-                track: 0
+                track: 0 // Default to first track
               },
               playback: {
-                start: clipStartTime,
-                end: clipEndTime,
+                start: clipStartTime + segment.startTime,
+                end: clipEndTime + segment.startTime,
                 duration: clipDuration
               }
             }
           };
   
-          console.log('Adding clip to timeline:', clipData);
-          onAddToTimeline(clipData);
+          console.log('Created clip data:', clipData);
+          clipsToAdd.push(clipData);
+  
+          // Update position for next clip
+          timelinePosition += clipDuration;
+          console.log('Updated timeline position for next clip:', timelinePosition);
         }
   
         accumulatedTime += segmentDuration;
+      });
+  
+      // Add all clips to timeline
+      clipsToAdd.forEach(clipData => {
+        console.log('Adding clip to timeline:', clipData);
+        onAddToTimeline(clipData);
       });
   
     } catch (error) {
       console.error('Error adding to timeline:', error);
       setError('Failed to add clip to timeline: ' + error.message);
     }
-  }, [segments, range, timelineRows, onAddToTimeline]);
+  }, [segments, range, clips, onAddToTimeline]);
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

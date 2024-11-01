@@ -13,6 +13,7 @@ import BinViewer from './BinViewer';
 import TranscriptViewer from './TranscriptViewer';
 
 const BinViewerSection = ({ 
+  clips,
   selectedClips = [], // Changed from selectedClip to selectedClips
   onAddToTimeline,
   transcriptData,
@@ -69,6 +70,7 @@ const BinViewerSection = ({
       }}>
         {viewMode === 0 ? (
           <BinViewer
+            clips = {clips}
             selectedClips={selectedClips} // Changed from selectedClip
             onAddToTimeline={onAddToTimeline}
           />
