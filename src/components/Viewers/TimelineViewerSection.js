@@ -48,6 +48,7 @@ const TimelineViewerSection = ({ clips, currentClip, transcript,timelineState })
             clips={clips}
             currentClip={currentClip}
             transcriptData={transcript}
+            timelineState={timelineState}
           />
         ) : (
           <TimelineTranscriptViewer

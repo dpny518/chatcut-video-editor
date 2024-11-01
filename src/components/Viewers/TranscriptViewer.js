@@ -111,7 +111,7 @@ const TranscriptViewer = ({
       
       // Add small gap if not first clip
       if (currentTimelinePosition > 0) {
-        currentTimelinePosition += 0.1;
+        currentTimelinePosition += 0.0;
       }
 
       const clipData = {
