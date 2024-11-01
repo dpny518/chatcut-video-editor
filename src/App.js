@@ -227,17 +227,18 @@ const handleChatMessage = (message) => {
             {/* Main Content Area */}
             <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
             <BinViewerSection
-            clips={timelineClips}
-            selectedClips={selectedBinClips}
-            onAddToTimeline={handleAddToTimeline}
-            transcriptData={
-              selectedBinClips.length === 1 
-                ? transcripts.get(selectedBinClips[0].name.replace(/\.[^/.]+$/, '.json')) 
-                : null
-            }
-            timelineState={timelineState}
-            setTimelineRows={setTimelineRows}
-                />
+              clips={timelineClips}
+              selectedClips={selectedBinClips}
+              onAddToTimeline={handleAddToTimeline}
+              transcriptData={
+                selectedBinClips.map(clip => ({
+                  clipId: clip.id,
+                  transcript: transcripts.get(clip.name.replace(/\.[^/.]+$/, '.json'))
+                }))
+              }
+              timelineState={timelineState}
+              setTimelineRows={setTimelineRows}
+            />
               <TimelineViewerSection 
                 clips={timelineClips}
                 transcript={transcripts}

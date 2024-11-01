@@ -5,7 +5,7 @@ import TimelineTranscriptViewer from './TimelineTranscriptViewer';
 const TimelineTranscriptViewerSection = ({ selectedClip, transcriptData }) => {
   return (
     <Paper sx={{ flex: 1, p: 2, bgcolor: 'background.paper' }}>
-      <TranscriptViewer
+      <TimelineTranscriptViewer
         selectedClip={selectedClip}  // Pass the whole selectedClip object
         transcriptData={transcriptData}
       />

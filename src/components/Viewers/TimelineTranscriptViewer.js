@@ -124,13 +124,15 @@ const TimelineTranscriptViewer = ({
   );
 
   const renderTranscript = () => {
+    console.log('=== Debug Transcript Data ===');
+    console.log('transcriptData:', transcriptData);
+    console.log('sortedClips:', sortedClips);
+  
     if (!transcriptData || !(transcriptData instanceof Map)) {
+      console.log('No transcript data available or invalid format');
       return <Typography>No transcript data available</Typography>;
     }
-
-    const transcriptEntry = Array.from(transcriptData.values())[0];
-    if (!transcriptEntry?.transcription) return null;
-
+  
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {sortedClips.map((clip, clipIndex) => {
@@ -138,7 +140,18 @@ const TimelineTranscriptViewer = ({
           const playback = clip.metadata?.playback || {};
           const clipColor = clipColors[clipIndex];
           const isCurrentClip = clipIndex === currentClipIndex;
-
+  
+          // Get the correct transcript for this clip
+          const transcriptKey = clip.name.replace(/\.[^/.]+$/, '.json');
+          console.log('Looking for transcript with key:', transcriptKey);
+          const transcriptEntry = transcriptData.get(transcriptKey);
+          console.log('Found transcript:', transcriptEntry);
+  
+          if (!transcriptEntry?.transcription) {
+            console.log('No transcript found for clip:', clip.name);
+            return null;
+          }
+  
           // Filter words that belong to this clip's playback range
           const clipWords = {};
           transcriptEntry.transcription.forEach(segment => {
@@ -153,9 +166,9 @@ const TimelineTranscriptViewer = ({
               clipWords[segment.segment.speaker].push(...speakerWords);
             }
           });
-
+  
           if (Object.keys(clipWords).length === 0) return null;
-
+  
           return (
             <Paper
               key={clip.id}
@@ -169,10 +182,10 @@ const TimelineTranscriptViewer = ({
               }}
             >
               <Typography variant="subtitle2" sx={{ mb: 1, opacity: 0.7 }}>
-                Clip {clipIndex + 1}: Timeline [{timeline.start?.toFixed(1)}s - {timeline.end?.toFixed(1)}s]
+                {clip.name}: Timeline [{timeline.start?.toFixed(1)}s - {timeline.end?.toFixed(1)}s]
                 {' '}| Source [{playback.start?.toFixed(1)}s - {playback.end?.toFixed(1)}s]
               </Typography>
-
+  
               {Object.entries(clipWords).map(([speaker, words]) => (
                 <Box key={`${clip.id}-${speaker}`} sx={{ mb: 2 }}>
                   <Typography variant="subtitle2" color="primary" sx={{ mb: 0.5 }}>
@@ -184,12 +197,21 @@ const TimelineTranscriptViewer = ({
                       const isCurrentWord = isCurrentClip && 
                         currentTime >= adjustedTime && 
                         currentTime < (adjustedTime + (word.end - word.start));
-
+  
                       return (
                         <Box
                           component="span"
                           key={`${word.word}-${wordIndex}`}
-                          onClick={() => videoRef.current && (videoRef.current.currentTime = word.start)}
+                          onClick={() => {
+                            if (videoRef.current && clipIndex === currentClipIndex) {
+                              videoRef.current.currentTime = adjustedTime;
+                            } else {
+                              handleClipSelect(clipIndex);
+                              if (videoRef.current) {
+                                videoRef.current.currentTime = adjustedTime;
+                              }
+                            }
+                          }}
                           sx={{
                             cursor: 'pointer',
                             px: 0.5,

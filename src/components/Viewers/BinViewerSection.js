@@ -75,15 +75,17 @@ const BinViewerSection = ({
             onAddToTimeline={onAddToTimeline}
           />
         ) : (
-          <TranscriptViewer
-            selectedClip={selectedClips[0]}
-            transcriptData={transcriptData}
-            onAddToTimeline={onAddToTimeline}
-          />
-        )}
+            <TranscriptViewer
+              selectedClips={selectedClips}
+              transcriptData={transcriptData}
+              onAddToTimeline={onAddToTimeline}
+              timelineClips={clips}
+            />
+          )}
       </Box>
     </Paper>
   );
 };
 
 export default BinViewerSection;
+
