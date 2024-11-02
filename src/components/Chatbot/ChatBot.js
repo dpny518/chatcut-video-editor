@@ -58,29 +58,19 @@ const ChatBot = ({
           };
         });
 
-      console.log('Parsed words:', words);
-
       if (words.length === 0) {
         throw new Error('No valid words found in response');
       }
 
-      // Group into segments with logging
+      // Group into segments
       let segments = [];
       let currentSegment = [words[0]];
       let currentSpeaker = words[0].speaker;
       let currentSource = words[0].sourceFile;
       
-      console.log('Starting segment grouping...');
       for (let i = 1; i < words.length; i++) {
         const currentWord = words[i];
-        
         if (currentWord.speaker !== currentSpeaker || currentWord.sourceFile !== currentSource) {
-          console.log('New segment:', { 
-            fromSpeaker: currentSpeaker, 
-            toSpeaker: currentWord.speaker,
-            fromSource: currentSource,
-            toSource: currentWord.sourceFile
-          });
           segments.push(currentSegment);
           currentSegment = [currentWord];
           currentSpeaker = currentWord.speaker;
@@ -94,42 +84,46 @@ const ChatBot = ({
         segments.push(currentSegment);
       }
 
-      console.log('Final segments:', segments);
       let timelinePosition = 0;
 
-      segments.forEach((segment, index) => {
+      // Process each segment sequentially
+      for (const segment of segments) {
         const sourceFile = segment[0].sourceFile;
         const sourceClip = selectedClips.find(clip => clip.file.name === sourceFile);
         
-        console.log('Processing segment:', {
-          index,
-          sourceFile,
-          foundClip: !!sourceClip,
-          clipName: sourceClip?.file.name,
-          words: segment.length
-        });
-
         if (!sourceClip) {
           console.warn(`Source clip not found for ${sourceFile}`);
-          return;
+          continue;
         }
+
+        // Get video duration
+        const duration = await new Promise((resolve, reject) => {
+          const video = document.createElement('video');
+          video.src = URL.createObjectURL(sourceClip.file);
+          
+          video.addEventListener('loadedmetadata', () => {
+            const duration = video.duration;
+            video.src = '';
+            URL.revokeObjectURL(video.src);
+            resolve(duration);
+          });
+          
+          video.addEventListener('error', (error) => {
+            video.src = '';
+            URL.revokeObjectURL(video.src);
+            reject(new Error(`Failed to load video metadata: ${error.message}`));
+          });
+        });
 
         const segmentStart = Math.min(...segment.map(w => w.start));
         const segmentEnd = Math.max(...segment.map(w => w.end));
         const timelineDuration = segmentEnd - segmentStart;
-
-        console.log('Segment timing:', {
-          start: segmentStart,
-          end: segmentEnd,
-          duration: timelineDuration,
-          timelinePosition
-        });
-  
+        
         const timelineStart = timelinePosition;
         const timelineEnd = timelineStart + timelineDuration;
-  
+
         const clipData = {
-          id: `clip-${Date.now()}-${index}`,
+          id: `clip-${Date.now()}-${segments.indexOf(segment)}`,
           file: sourceClip.file,
           name: sourceFile,
           startTime: segmentStart,
@@ -137,8 +131,8 @@ const ChatBot = ({
           duration: timelineDuration,
           source: {
             startTime: 0,
-            endTime: sourceClip.duration,
-            duration: sourceClip.duration
+            endTime: duration,
+            duration: duration
           },
           transcript: segment.map(word => word.text).join(' '),
           metadata: {
@@ -165,18 +159,18 @@ const ChatBot = ({
             sourceFile: sourceFile
           }
         };
-  
-        console.log(`Adding clip ${index + 1}:`, {
+
+        console.log(`Adding clip:`, {
           text: clipData.transcript,
           speaker: segment[0].speaker,
           sourceFile: sourceFile,
+          sourceClip: sourceClip,
+          sourceDuration: duration,
           timelineStart,
           timelineEnd,
-          duration: timelineDuration,
-          sourceStart: segmentStart,
-          sourceEnd: segmentEnd
+          duration: timelineDuration
         });
-  
+
         setTimelineRows(prev => {
           const updated = [...prev];
           const targetRow = updated[0];
@@ -184,17 +178,17 @@ const ChatBot = ({
           targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
           return updated;
         });
-  
+
         timelinePosition = timelineEnd + 0.0;
         onAddToTimeline?.(clipData);
-      });
-  
+      }
+
       onSendMessage({
         text: `Successfully cleared timeline and added ${segments.length} new clip${segments.length > 1 ? 's' : ''}`,
         sender: 'bot',
         isSuccess: true
       });
-  
+
     } catch (error) {
       console.error('Error processing timeline:', error);
       console.error('Stack:', error.stack);
