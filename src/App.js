@@ -274,22 +274,23 @@ const handleChatMessage = (message) => {
             />
             </Box>
           </EditorLayout>
-          <ChatBot 
-          clips={timelineClips}
-          messages={chatMessages}
-          onSendMessage={handleChatMessage}
-          selectedClips={selectedBinClips}
-          transcriptData={
-            selectedBinClips.length === 1 
-              ? transcripts.get(selectedBinClips[0].name.replace(/\.[^/.]+$/, '.json')) 
-              : null
-          }
-          onAddToTimeline={handleAddToTimeline}
-          timelineState={timelineState}
-          timelineRows={timelineRows}
-          setTimelineRows={setTimelineRows}
-          onClipsChange={handleTimelineClipsChange}
-          />
+            <ChatBot 
+            clips={timelineClips}
+            messages={chatMessages}
+            onSendMessage={handleChatMessage}
+            selectedClips={selectedBinClips}
+            transcriptData={
+              selectedBinClips.map(clip => ({
+                clipId: clip.id,
+                transcript: transcripts.get(clip.name.replace(/\.[^/.]+$/, '.json'))
+              }))
+            }
+                onAddToTimeline={handleAddToTimeline}
+                timelineState={timelineState}
+                timelineRows={timelineRows}
+                setTimelineRows={setTimelineRows}
+                onClipsChange={handleTimelineClipsChange}
+              />
         </MainLayout>
 
         {/* Notifications */}

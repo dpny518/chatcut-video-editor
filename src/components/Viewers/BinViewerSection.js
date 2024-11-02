@@ -72,6 +72,7 @@ const BinViewerSection = ({
           <BinViewer
             clips={clips}
             selectedClips={selectedClips}
+            transcriptData={transcriptData}
             onAddToTimeline={onAddToTimeline}
           />
         ) : (

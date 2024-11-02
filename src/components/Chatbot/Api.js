@@ -10,13 +10,13 @@ const AKASH_API_KEY = 'sk-PfeZjCAKproWYwMQfw2biw';
 // Filter function to clean responses
 const filterWordTimings = (response) => {
   try {
-    // Step 1: Remove backticks and markdown formatting
+    // Clean response
     let cleanedResponse = response
-      .replace(/`/g, '')  // Remove backticks
-      .replace(/\*\*/g, ''); // Remove bold markdown
+      .replace(/`/g, '')
+      .replace(/\*\*/g, '');
 
-    // Step 2: Extract patterns that match word|number|number|SPEAKER_XX
-    const wordTimingRegex = /([^|\s]+)\|(\d+(?:\.\d+)?)\|(\d+(?:\.\d+)?)\|SPEAKER_\d+/g;
+    // Updated regex to include filename
+    const wordTimingRegex = /([^|\s]+)\|(\d+(?:\.\d+)?)\|(\d+(?:\.\d+)?)\|SPEAKER_\d+\|([^|\s]+\.mp4)/g;
     const matches = [...cleanedResponse.matchAll(wordTimingRegex)];
 
     if (matches.length === 0) {
@@ -24,10 +24,9 @@ const filterWordTimings = (response) => {
       throw new Error('No valid word timings found in response');
     }
 
-    // Step 3: Join all matches with spaces
+    // Join matches with spaces
     const result = matches.map(match => match[0]).join(' ');
 
-    // Debug logging
     console.log('Found word timings:', matches.length);
     console.log('First few matches:', matches.slice(0, 3));
 
@@ -40,19 +39,10 @@ const filterWordTimings = (response) => {
 
 export const sendToLlama = async (wordTimingJson, promptTemplate, userInput, task) => {
   try {
-    // Make prompt even more explicit
-    const strictPrompt = `
-Edit the provided transcript according to this request: ${userInput}
-CRITICAL: Your response must ONLY contain word timings in exactly this format:
-word|number|number|SPEAKER_XX
-Example format:
-voice|8.441|8.721|SPEAKER_01
-listen|7.66|7.88|SPEAKER_01
-DO NOT include any text, markdown, formatting, or explanation.
-DO NOT use backticks or any other characters.
-Just the word timings, one per line.
-
-Original Transcript JSON: ${wordTimingJson}`;
+    // Use the provided prompt template, replacing placeholders
+    const formattedPrompt = promptTemplate
+      .replace('{user_input}', userInput)
+      .replace('{input_json}', wordTimingJson);
 
     const response = await axios.post(
       AKASH_API_URL,
@@ -61,7 +51,7 @@ Original Transcript JSON: ${wordTimingJson}`;
         messages: [
           {
             role: 'user',
-            content: strictPrompt
+            content: formattedPrompt
           }
         ]
       },

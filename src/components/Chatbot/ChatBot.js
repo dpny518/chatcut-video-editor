@@ -6,13 +6,13 @@ import { sendToLLM, sendToLlama } from './Api';
 const ChatBot = ({ 
   onSendMessage, 
   messages, 
-  selectedBinClip, 
-  transcriptData,
+  selectedClips = [],
+  transcriptData = [], 
   onAddToTimeline,
   timelineState,
   timelineRows = [{ rowId: 0, clips: [], lastEnd: 0 }],
   setTimelineRows,
-  onClipsChange  // Add this prop to handle clearing clips
+  onClipsChange
 }) => {
   const [input, setInput] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -32,47 +32,59 @@ const ChatBot = ({
 
   const processAndAddToTimeline = async (text) => {
     try {
-      if (!selectedBinClip) {
-        throw new Error('No video clip selected');
-      }
-
-      // Clear existing clips before adding new ones
+      console.log('=== Process Timeline Debug ===');
+      console.log('Selected Clips:', selectedClips);
+      console.log('Raw text response:', text);
+      
       clearExistingClips();
       
-      console.log('Timeline cleared, adding new clips...');
-
-      // Parse words maintaining original order
       const words = text.split(' ')
         .filter(w => w.includes('|'))
         .map(word => {
-          const [text, start, end, speaker] = word.split('|');
-          if (!start || !end || isNaN(parseFloat(start)) || isNaN(parseFloat(end))) {
+          console.log('Processing word:', word);
+          const [text, start, end, speaker, sourceFile] = word.split('|');
+          console.log('Word parts:', { text, start, end, speaker, sourceFile });
+          
+          if (!start || !end || !sourceFile || 
+              isNaN(parseFloat(start)) || isNaN(parseFloat(end))) {
             throw new Error('Invalid word timing format');
           }
           return {
             text,
             start: parseFloat(start),
             end: parseFloat(end),
-            speaker
+            speaker,
+            sourceFile
           };
         });
-  
+
+      console.log('Parsed words:', words);
+
       if (words.length === 0) {
         throw new Error('No valid words found in response');
       }
-  
-      // Group into segments by speaker
+
+      // Group into segments with logging
       let segments = [];
       let currentSegment = [words[0]];
       let currentSpeaker = words[0].speaker;
-    
+      let currentSource = words[0].sourceFile;
+      
+      console.log('Starting segment grouping...');
       for (let i = 1; i < words.length; i++) {
         const currentWord = words[i];
         
-        if (currentWord.speaker !== currentSpeaker) {
+        if (currentWord.speaker !== currentSpeaker || currentWord.sourceFile !== currentSource) {
+          console.log('New segment:', { 
+            fromSpeaker: currentSpeaker, 
+            toSpeaker: currentWord.speaker,
+            fromSource: currentSource,
+            toSource: currentWord.sourceFile
+          });
           segments.push(currentSegment);
           currentSegment = [currentWord];
           currentSpeaker = currentWord.speaker;
+          currentSource = currentWord.sourceFile;
         } else {
           currentSegment.push(currentWord);
         }
@@ -81,85 +93,100 @@ const ChatBot = ({
       if (currentSegment.length > 0) {
         segments.push(currentSegment);
       }
-  
-      const video = document.createElement('video');
-      video.src = URL.createObjectURL(selectedBinClip.file);
-  
-      video.addEventListener('loadedmetadata', () => {
-        // Start from position 0 since we cleared existing clips
-        let timelinePosition = 0;
-  
-        // Process each segment
-        segments.forEach((segment, index) => {
-          const segmentStart = Math.min(...segment.map(w => w.start));
-          const segmentEnd = Math.max(...segment.map(w => w.end));
-          const timelineDuration = segmentEnd - segmentStart;
-  
-          const timelineStart = timelinePosition;
-          const timelineEnd = timelineStart + timelineDuration;
-  
-          const clipData = {
-            id: `clip-${Date.now()}-${index}`,
-            file: selectedBinClip.file,
-            name: selectedBinClip.file.name,
-            startTime: segmentStart,
-            endTime: segmentEnd,
-            duration: timelineDuration,
-            source: {
-              startTime: 0,
-              endTime: video.duration,
-              duration: video.duration
-            },
-            transcript: segment.map(word => word.text).join(' '),
-            metadata: {
-              timeline: {
-                start: timelineStart,
-                end: timelineEnd,
-                duration: timelineDuration,
-                track: 0
-              },
-              playback: {
-                start: segmentStart,
-                end: segmentEnd,
-                duration: timelineDuration
-              }
-            },
-            selectionInfo: {
-              words: segment,
-              timeRange: {
-                start: segmentStart,
-                end: segmentEnd
-              },
-              text: segment.map(word => word.text).join(' '),
-              speaker: segment[0].speaker
-            }
-          };
-  
-          console.log(`Adding clip ${index + 1}:`, {
-            text: clipData.transcript,
-            speaker: segment[0].speaker,
-            timelineStart,
-            timelineEnd,
-            duration: timelineDuration,
-            sourceStart: segmentStart,
-            sourceEnd: segmentEnd
-          });
-  
-          setTimelineRows(prev => {
-            const updated = [...prev];
-            const targetRow = updated[0];
-            targetRow.clips.push(clipData);
-            targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
-            return updated;
-          });
-  
-          timelinePosition = timelineEnd + 0.0;
-  
-          onAddToTimeline?.(clipData);
+
+      console.log('Final segments:', segments);
+      let timelinePosition = 0;
+
+      segments.forEach((segment, index) => {
+        const sourceFile = segment[0].sourceFile;
+        const sourceClip = selectedClips.find(clip => clip.file.name === sourceFile);
+        
+        console.log('Processing segment:', {
+          index,
+          sourceFile,
+          foundClip: !!sourceClip,
+          clipName: sourceClip?.file.name,
+          words: segment.length
+        });
+
+        if (!sourceClip) {
+          console.warn(`Source clip not found for ${sourceFile}`);
+          return;
+        }
+
+        const segmentStart = Math.min(...segment.map(w => w.start));
+        const segmentEnd = Math.max(...segment.map(w => w.end));
+        const timelineDuration = segmentEnd - segmentStart;
+
+        console.log('Segment timing:', {
+          start: segmentStart,
+          end: segmentEnd,
+          duration: timelineDuration,
+          timelinePosition
         });
   
-        video.src = '';
-        URL.revokeObjectURL(video.src);
+        const timelineStart = timelinePosition;
+        const timelineEnd = timelineStart + timelineDuration;
+  
+        const clipData = {
+          id: `clip-${Date.now()}-${index}`,
+          file: sourceClip.file,
+          name: sourceFile,
+          startTime: segmentStart,
+          endTime: segmentEnd,
+          duration: timelineDuration,
+          source: {
+            startTime: 0,
+            endTime: sourceClip.duration,
+            duration: sourceClip.duration
+          },
+          transcript: segment.map(word => word.text).join(' '),
+          metadata: {
+            timeline: {
+              start: timelineStart,
+              end: timelineEnd,
+              duration: timelineDuration,
+              track: 0
+            },
+            playback: {
+              start: segmentStart,
+              end: segmentEnd,
+              duration: timelineDuration
+            }
+          },
+          selectionInfo: {
+            words: segment,
+            timeRange: {
+              start: segmentStart,
+              end: segmentEnd
+            },
+            text: segment.map(word => word.text).join(' '),
+            speaker: segment[0].speaker,
+            sourceFile: sourceFile
+          }
+        };
+  
+        console.log(`Adding clip ${index + 1}:`, {
+          text: clipData.transcript,
+          speaker: segment[0].speaker,
+          sourceFile: sourceFile,
+          timelineStart,
+          timelineEnd,
+          duration: timelineDuration,
+          sourceStart: segmentStart,
+          sourceEnd: segmentEnd
+        });
+  
+        setTimelineRows(prev => {
+          const updated = [...prev];
+          const targetRow = updated[0];
+          targetRow.clips.push(clipData);
+          targetRow.lastEnd = Math.max(targetRow.lastEnd, timelineEnd);
+          return updated;
+        });
+  
+        timelinePosition = timelineEnd + 0.0;
+        onAddToTimeline?.(clipData);
       });
   
       onSendMessage({
@@ -169,7 +196,8 @@ const ChatBot = ({
       });
   
     } catch (error) {
-      console.error('Error processing segments:', error);
+      console.error('Error processing timeline:', error);
+      console.error('Stack:', error.stack);
       onSendMessage({
         text: `Error: ${error.message}. Please try again with a different prompt.`,
         sender: 'bot',
@@ -184,6 +212,10 @@ const ChatBot = ({
     if (input.trim() && selectedTemplate) {
       setIsLoading(true);
       try {
+        console.log('=== ChatBot Submit Debug ===');
+        console.log('Selected Clips:', selectedClips);
+        console.log('TranscriptData:', transcriptData);
+
         onSendMessage({
           text: input,
           sender: 'user',
@@ -195,7 +227,19 @@ const ChatBot = ({
           throw new Error('Template not found');
         }
 
-        const wordTimingJson = transcriptData ? JSON.stringify(transcriptData) : '';
+        // Safety check for transcriptData
+        if (!Array.isArray(transcriptData)) {
+          throw new Error('No transcript data available');
+        }
+
+        // Prepare transcript data for API
+        const wordTimingData = transcriptData.map(td => ({
+          ...td.transcript,
+          sourceFile: selectedClips.find(clip => clip.id === td.clipId)?.file.name
+        }));
+        
+        console.log('Processed transcripts:', wordTimingData);
+        const wordTimingJson = JSON.stringify(wordTimingData);
         
         let response;
         if (useGPT) {
@@ -214,7 +258,7 @@ const ChatBot = ({
           );
         }
         
-        console.log(response);
+        console.log('LLM Response:', response);
         await processAndAddToTimeline(response);
         setInput('');
       } catch (error) {
@@ -229,7 +273,6 @@ const ChatBot = ({
       }
     }
   };
-
   return (
     <Box sx={{
       position: 'fixed',
