@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import ReactPlayer from 'react-player';
 import { Box, Typography, Slider, Alert, CircularProgress, Button } from '@mui/material';
 import { debounce } from 'lodash';
+import PropTypes from 'prop-types';
 
 // Constants
 const MIN_CLIP_DURATION = 1; // minimum clip duration in seconds
@@ -29,18 +30,25 @@ const BinViewer = ({
   const playerRef = useRef(null);
   const urlRef = useRef(null);
 
+
+
   // Determine active clip (single or merged)
   const activeClip = useMemo(() => {
-    if (mergedContent) {
+    // Check if we have selectedClips and mergedContent
+    if (!selectedClips?.length) return null;
+
+    if (mergedContent && selectedClips.length > 1) {
       return {
         file: selectedClips[0].file,
         name: `Merged (${selectedClips.length} clips)`,
-        duration: mergedContent.totalDuration,
+        duration: mergedContent.totalDuration || 0,
         isMerged: true,
-        ranges: mergedContent.ranges
+        ranges: mergedContent.ranges || []
       };
     }
-    return selectedClips[0];
+
+    // Single clip case
+    return selectedClips[0] || null;
   }, [selectedClips, mergedContent]);
 
   // Cleanup function for URL objects
@@ -50,33 +58,6 @@ const BinViewer = ({
       urlRef.current = null;
     }
   }, []);
-
-  // Load video durations for master timeline
-  useEffect(() => {
-    selectedClips.forEach(clip => {
-      if (clip?.file) {
-        const video = document.createElement('video');
-        
-        video.addEventListener('loadedmetadata', () => {
-          try {
-            masterClipManager.setVideoDuration(clip.name, video.duration);
-          } catch (error) {
-            console.error('Error setting video duration:', error);
-            setError(`Failed to process ${clip.name}: ${error.message}`);
-          }
-          URL.revokeObjectURL(video.src);
-        });
-
-        video.addEventListener('error', (e) => {
-          console.error('Error loading video:', e);
-          setError(`Failed to load ${clip.name}`);
-          URL.revokeObjectURL(video.src);
-        });
-
-        video.src = URL.createObjectURL(clip.file);
-      }
-    });
-  }, [selectedClips, masterClipManager]);
 
   // Handle video loading
   useEffect(() => {
@@ -102,6 +83,40 @@ const BinViewer = ({
     return cleanupVideoUrl;
   }, [activeClip, cleanupVideoUrl]);
 
+
+  useEffect(() => {
+    const loadedVideos = new Set();
+  
+    selectedClips.forEach(clip => {
+      if (clip?.file && !loadedVideos.has(clip.name)) {
+        loadedVideos.add(clip.name);
+        const video = document.createElement('video');
+        
+        video.addEventListener('loadedmetadata', () => {
+          try {
+            masterClipManager.setVideoDuration(clip.name, video.duration);
+            console.log('Set duration for:', clip.name, video.duration);
+          } catch (error) {
+            console.error('Error setting video duration:', error);
+            setError(`Failed to process ${clip.name}: ${error.message}`);
+          } finally {
+            URL.revokeObjectURL(video.src);
+          }
+        });
+  
+        video.addEventListener('error', (e) => {
+          console.error('Error loading video:', e);
+          setError(`Failed to load ${clip.name}`);
+          URL.revokeObjectURL(video.src);
+        });
+  
+        video.src = URL.createObjectURL(clip.file);
+      }
+    });
+  
+    return () => loadedVideos.clear();
+  }, [selectedClips, masterClipManager]);
+
   // Debounced seek function
   const debouncedSeek = useCallback(
     debounce((time) => {
@@ -111,6 +126,7 @@ const BinViewer = ({
     }, SEEK_DEBOUNCE_MS),
     []
   );
+
 
   // Event handlers
   const handlePlayPause = () => {
@@ -154,53 +170,90 @@ const BinViewer = ({
 
   const handleAddToTimeline = () => {
     if (!activeClip || error) return;
-
-    const clipStart = range[0];
-    const clipEnd = range[1];
-
-    if (activeClip.isMerged) {
-      // Create merged clip from ranges
-      const clipData = masterClipManager.createTimelineClip({
-        startTime: clipStart,
-        endTime: clipEnd,
-        ranges: activeClip.ranges,
-        type: 'merged'
+  
+    try {
+      const clipStart = range[0];
+      const clipEnd = range[1];
+  
+      // Validation
+      if (clipEnd <= clipStart) {
+        throw new Error('Invalid clip range: end time must be greater than start time');
+      }
+  
+      if (clipEnd - clipStart < MIN_CLIP_DURATION) {
+        throw new Error(`Clip must be at least ${MIN_CLIP_DURATION} seconds long`);
+      }
+  
+      console.log('Adding clip to timeline:', {
+        activeClip,
+        range: [clipStart, clipEnd],
+        isMerged: activeClip.isMerged
       });
-      onAddToTimeline?.(clipData);
-    } else {
-      // Normal single clip
-      const timelineDuration = clipEnd - clipStart;
-      const timelineStart = findTimelineEndPosition(clips);
-      const timelineEnd = timelineStart + timelineDuration;
-      
-      const clipData = {
-        id: `clip-${Date.now()}`,
-        file: activeClip.file,
-        name: activeClip.file.name,
-        startTime: clipStart,
-        endTime: clipEnd,
-        duration: timelineDuration,
-        source: {
-          startTime: 0,
-          endTime: duration,
-          duration: duration
-        },
-        metadata: {
-          timeline: {
-            start: timelineStart,
-            end: timelineEnd,
-            duration: timelineDuration,
-            row: 0
-          },
-          playback: {
-            start: clipStart,
-            end: clipEnd,
-            duration: timelineDuration
-          }
+  
+      if (activeClip.isMerged) {
+        if (!activeClip.ranges || !activeClip.ranges.length) {
+          throw new Error('No ranges available for merged clip');
         }
-      };
+  
+        console.log('Creating merged clip with ranges:', activeClip.ranges);
+        const clipData = masterClipManager.createTimelineClip({
+          startTime: clipStart,
+          endTime: clipEnd,
+          ranges: activeClip.ranges,
+          type: 'merged'
+        });
+  
+        if (!clipData) {
+          throw new Error('Failed to create merged clip');
+        }
+  
+        onAddToTimeline?.(clipData);
+      } else {
+        // Normal single clip
+        const timelineDuration = clipEnd - clipStart;
+        const timelineStart = findTimelineEndPosition(clips);
+        const timelineEnd = timelineStart + timelineDuration;
+        
+        if (!activeClip.file) {
+          throw new Error('No file available for clip');
+        }
+  
+        const clipData = {
+          id: `clip-${Date.now()}`,
+          file: activeClip.file,
+          name: activeClip.file.name,
+          startTime: clipStart,
+          endTime: clipEnd,
+          duration: timelineDuration,
+          source: {
+            startTime: 0,
+            endTime: duration,
+            duration: duration
+          },
+          metadata: {
+            timeline: {
+              start: timelineStart,
+              end: timelineEnd,
+              duration: timelineDuration,
+              row: 0
+            },
+            playback: {
+              start: clipStart,
+              end: clipEnd,
+              duration: timelineDuration
+            }
+          }
+        };
+        
+        onAddToTimeline?.(clipData);
+      }
+  
+      // Success notification or feedback
+      console.log('Successfully added clip to timeline');
       
-      onAddToTimeline?.(clipData);
+    } catch (error) {
+      console.error('Error adding clip to timeline:', error);
+      setError(`Failed to add clip: ${error.message}`);
     }
   };
 
@@ -349,6 +402,20 @@ const BinViewer = ({
       </Button>
     </Box>
   );
+};
+BinViewer.propTypes = {
+  clips: PropTypes.array,
+  selectedClips: PropTypes.array,
+  onAddToTimeline: PropTypes.func.isRequired,
+  setTimelineRows: PropTypes.func,
+  masterClipManager: PropTypes.object.isRequired,
+  mergedContent: PropTypes.object
+};
+
+BinViewer.defaultProps = {
+  clips: [],
+  selectedClips: [],
+  mergedContent: null
 };
 
 export default BinViewer;

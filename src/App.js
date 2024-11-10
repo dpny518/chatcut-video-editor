@@ -4,6 +4,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { Box, Snackbar, Alert } from '@mui/material';
 import { MasterClipManager } from './services/masterClip/MasterClipManager';
 
+
 // Layout components
 import MainLayout from './components/Layout/MainLayout';
 import EditorLayout from './components/Layout/EditorLayout';
@@ -41,7 +42,7 @@ function App() {
   const [transcripts, setTranscripts] = useState(new Map());
   const [chatMessages, setChatMessages] = useState([]);
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
-  const [selectedBinClips, setSelectedBinClips] = useState([]);
+  const [selectedClips, setSelectedClips] = useState([]);
 
   // Initialize MasterClipManager
   const masterClipManager = useMemo(() => new MasterClipManager(), []);
@@ -51,21 +52,6 @@ function App() {
     scale: 1,
     selectedClipId: null
   });
-
-  // Cleanup effect for MasterClipManager
-  useEffect(() => {
-    return () => {
-      masterClipManager.cleanup?.();
-    };
-  }, [masterClipManager]);
-
-  const showNotification = (message, severity = 'info') => {
-    setNotification({ message, severity });
-  };
-
-  const handleChatMessage = (message) => {
-    setChatMessages(prev => [...prev, message]);
-  };
 
   const timelineState = {
     clips: timelineClips.map(clip => {
@@ -94,6 +80,21 @@ function App() {
       scale: timelineMetadata.scale, 
       selectedClipId: timelineMetadata.selectedClipId 
     }
+  };
+  
+  // Cleanup effect for MasterClipManager
+  useEffect(() => {
+    return () => {
+      masterClipManager.cleanup?.();
+    };
+  }, [masterClipManager]);
+
+  const showNotification = (message, severity = 'info') => {
+    setNotification({ message, severity });
+  };
+
+  const handleChatMessage = (message) => {
+    setChatMessages(prev => [...prev, message]);
   };
 
   // File handling
@@ -149,31 +150,33 @@ function App() {
     }
   };
 
-  const handleFileSelect = (selectedFiles) => {
-    setSelectedBinClips(selectedFiles);
-    
-    if (selectedFiles.length > 0) {
-      // Get merged content from master manager
-      const mergedContent = masterClipManager.getSelectedContent(
-        selectedFiles.map(file => file.name)
-      );
-      
-      console.log('Merged content:', mergedContent);
-    }
-  };
+  const handleFileSelect = useCallback((selectedFile) => {
+    console.log('File selection:', selectedFile);
+    // Ensure we're always working with arrays
+    const fileArray = Array.isArray(selectedFile) ? selectedFile : [selectedFile];
+    const filteredArray = fileArray.filter(Boolean);
+    console.log('Setting selected clips:', filteredArray);
+    setSelectedClips(filteredArray);
+  }, []);
+  
 
-  const handleAddToTimeline = (clipData) => {
+  const handleAddToTimeline = useCallback((clipData) => {
     console.log("App.js handleAddToTimeline called with clipData:", clipData);
-
-    const enrichedClip = masterClipManager.createTimelineClip(clipData);
-
-    if (enrichedClip) {
+  
+    try {
+      const enrichedClip = masterClipManager.createTimelineClip(clipData);
+  
+      if (enrichedClip) {
         setTimelineClips(prevClips => [...prevClips, enrichedClip]);
-    } else {
+        showNotification('Clip added to timeline', 'success');
+      } else {
         showNotification('Failed to create timeline clip', 'error');
+      }
+    } catch (error) {
+      console.error('Error creating timeline clip:', error);
+      showNotification(`Error creating clip: ${error.message}`, 'error');
     }
-};
-
+  }, [masterClipManager]);
 
   const handleTimelineClipsChange = (newClips) => {
     setTimelineClips(newClips);
@@ -218,8 +221,7 @@ function App() {
         <CssBaseline />
         <MainLayout
           mediaFiles={mediaFiles}
-          selectedBinClip={selectedBinClip}
-          selectedFiles={selectedBinClips}
+          selectedFiles={selectedClips} // Changed from selectedBinClips
           onFileUpload={handleFileUpload}
           onFileSelect={handleFileSelect}
           timelineProjects={{
@@ -234,17 +236,15 @@ function App() {
             {/* Main Content Area */}
             <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
             <BinViewerSection
-              clips={timelineClips}
-              selectedClips={selectedBinClips} // Update to array
-              onAddToTimeline={handleAddToTimeline}
-              transcriptData={selectedBinClip ? 
-                masterClipManager.getTranscriptForClip(selectedBinClip.name) : null}
-              transcriptState={selectedBinClip ? 
-                masterClipManager.getTranscriptState(selectedBinClip.name) : null}
-              timelineState={timelineState}
-              setTimelineRows={setTimelineRows}
-              masterClipManager={masterClipManager}
-            />
+      clips={timelineClips}
+      selectedClips={selectedClips} // Pass array
+      onAddToTimeline={handleAddToTimeline}
+      transcriptData={selectedClips[0] ? 
+        transcripts.get(selectedClips[0].name.replace(/\.[^/.]+$/, '.json')) : null}
+      mergedContent={selectedClips.length > 1 ? 
+        masterClipManager.getSelectedContent(selectedClips.map(clip => clip.name)) : null}
+      masterClipManager={masterClipManager}
+    />
               <TimelineViewerSection 
                 clips={timelineClips}
                 transcript={transcripts}
@@ -276,29 +276,29 @@ function App() {
                 setTimelineRows={setTimelineRows}
                 masterClipManager={masterClipManager}
               />
-              <TimelineDebug
-                timelineClips={timelineClips}
-                selectedBinClip={selectedBinClip}
-                masterClipManager={masterClipManager}
-              />
+<TimelineDebug
+  timelineClips={timelineClips}
+  selectedClips={selectedClips} // Changed from selectedBinClip
+  masterClipManager={masterClipManager}
+/>
             </Box>
           </EditorLayout>
           <ChatBot 
-            clips={timelineClips}
-            messages={chatMessages}
-            onSendMessage={handleChatMessage}
-            selectedBinClip={selectedBinClip}
-            transcriptData={selectedBinClip ? 
-                masterClipManager.getTranscriptForClip(selectedBinClip.name) : null}
-            transcriptState={selectedBinClip ? 
-                masterClipManager.getTranscriptState(selectedBinClip.name) : null}
-            onAddToTimeline={handleAddToTimeline}
-            timelineState={timelineState}
-            timelineRows={timelineRows}
-            setTimelineRows={setTimelineRows}
-            onClipsChange={handleTimelineClipsChange}
-            masterClipManager={masterClipManager}
-          />
+          clips={timelineClips}
+          messages={chatMessages}
+          onSendMessage={handleChatMessage}
+          selectedClips={selectedClips} // Changed from selectedBinClip
+          transcriptData={selectedClips[0] ? 
+            masterClipManager.getTranscriptForClip(selectedClips[0].name) : null}
+          transcriptState={selectedClips[0] ? 
+            masterClipManager.getTranscriptState(selectedClips[0].name) : null}
+          onAddToTimeline={handleAddToTimeline}
+          timelineState={timelineState}
+          timelineRows={timelineRows}
+          setTimelineRows={setTimelineRows}
+          onClipsChange={handleTimelineClipsChange}
+          masterClipManager={masterClipManager}
+        />
         </MainLayout>
 
         {/* Notifications */}

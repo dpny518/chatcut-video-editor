@@ -8,7 +8,7 @@ import {
   Paper
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-
+import PropTypes from 'prop-types';
 
 // Remove duplicate useEffect (you have two versions - one using selectedClip and one using selectedClips)
 
@@ -81,7 +81,7 @@ const TranscriptViewer = ({
     };
   }, [selectedClips]);
   const transcriptContent = useMemo(() => {
-    if (mergedContent) {
+    if (mergedContent && selectedClips?.length > 1) {  // Check length
       return {
         transcription: mergedContent.mergedTranscript,
         isMerged: true
@@ -91,7 +91,36 @@ const TranscriptViewer = ({
       transcription: transcriptData?.transcription,
       isMerged: false
     };
-  }, [mergedContent, transcriptData]);
+  }, [mergedContent, transcriptData, selectedClips]);
+
+  useEffect(() => {
+    // Add null check for selectedClips
+    if (!selectedClips?.length) return;  // Early return if no clips
+    
+    if (videoRef.current && selectedClips[0]?.file) {
+      try {
+        if (videoUrlRef.current) {
+          URL.revokeObjectURL(videoUrlRef.current);
+        }
+        videoUrlRef.current = URL.createObjectURL(selectedClips[0].file);
+        videoRef.current.src = videoUrlRef.current;
+        
+        videoRef.current.onerror = (e) => {
+          console.error('Error loading video:', e);
+        };
+      } catch (error) {
+        console.error('Error setting up video:', error);
+      }
+    }
+  
+    return () => {
+      if (videoUrlRef.current) {
+        URL.revokeObjectURL(videoUrlRef.current);
+        videoUrlRef.current = null;
+      }
+    };
+  }, [selectedClips]);
+
 
   const handleWordClick = useCallback((time) => {
     if (videoRef.current) {
@@ -131,14 +160,14 @@ const TranscriptViewer = ({
     }
   }, [mergedContent, transcriptData, handleWordSelection]);
 
-  const handleAddToTimeline = useCallback(() => {
-    if (!selection) return;
-  
-    const activeClip = mergedContent ? {
-      file: selectedClips[0].file,
-      name: `Merged (${selectedClips.length} clips)`,
-      isMerged: true
-    } : selectedClips[0];
+ const handleAddToTimeline = useCallback(() => {
+  if (!selection || !selectedClips?.length) return;  // Add check for selectedClips
+
+  const activeClip = mergedContent && selectedClips.length > 1 ? {
+    file: selectedClips[0].file,
+    name: `Merged (${selectedClips.length} clips)`,
+    isMerged: true
+  } : selectedClips[0];
   
     if (activeClip.isMerged) {
       // Create merged clip
@@ -331,6 +360,48 @@ const TranscriptViewer = ({
       </CardContent>
     </Card>
   );
+};
+
+TranscriptViewer.propTypes = {
+  clips: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string,
+    file: PropTypes.object,
+    name: PropTypes.string,
+    metadata: PropTypes.object
+  })),
+  selectedClips: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string,
+    file: PropTypes.object,
+    name: PropTypes.string
+  })),
+  transcriptData: PropTypes.shape({
+    transcription: PropTypes.arrayOf(PropTypes.object)
+  }),
+  mergedContent: PropTypes.shape({
+    mergedTranscript: PropTypes.array,
+    ranges: PropTypes.array,
+    totalDuration: PropTypes.number
+  }),
+  onAddToTimeline: PropTypes.func.isRequired,
+  timelineRows: PropTypes.arrayOf(PropTypes.shape({
+    rowId: PropTypes.number,
+    clips: PropTypes.array,
+    lastEnd: PropTypes.number
+  })),
+  setTimelineRows: PropTypes.func,
+  masterClipManager: PropTypes.object.isRequired,
+  sx: PropTypes.object
+};
+
+// Add default props
+TranscriptViewer.defaultProps = {
+  clips: [],
+  selectedClips: [],
+  transcriptData: null,
+  mergedContent: null,
+  timelineRows: [],
+  setTimelineRows: () => {},
+  sx: {}
 };
 
 export default TranscriptViewer;

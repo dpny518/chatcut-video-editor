@@ -10,39 +10,20 @@ import {
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import BinViewer from './BinViewer';
-import TranscriptViewerSection from './TranscriptViewerSection';
+import TranscriptViewer from './TranscriptViewer';
 
 const BinViewerSection = ({ 
   clips,
-  selectedClips,
+  selectedClips = [], // Add default value
   onAddToTimeline,
   transcriptData,
-  timelineState,
-  onTranscriptUpload,
-  masterClipManager,
+  mergedContent,
+  masterClipManager
 }) => {
   const [viewMode, setViewMode] = useState(0);
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
   const [mergeError, setMergeError] = useState(null);
 
-  // Get merged content if multiple clips are selected
-  const mergedContent = useMemo(() => {
-    if (selectedClips.length > 1) {
-      try {
-        setMergeError(null);
-        const content = masterClipManager.getSelectedContent(
-          selectedClips.map(clip => clip.name)
-        );
-        console.log('Merged content:', content);
-        return content;
-      } catch (error) {
-        console.error('Error merging content:', error);
-        setMergeError(error.message);
-        return null;
-      }
-    }
-    return null;
-  }, [selectedClips, masterClipManager]);
 
   // Modified add to timeline handler to update timelineRows
   const handleAddToTimeline = (clipData) => {
@@ -119,26 +100,24 @@ const BinViewerSection = ({
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {selectedClips.length > 0 && (
-          viewMode === 0 ? (
-            <BinViewer
-              clips={clips}
-              selectedClip={selectedClips[0]}
-              mergedContent={mergedContent}
-              onAddToTimeline={handleAddToTimeline}
-              masterClipManager={masterClipManager}
-              timelineRows={timelineRows}
-              setTimelineRows={setTimelineRows}
-            />
+   {selectedClips.length > 0 && (
+        viewMode === 0 ? (
+          <BinViewer
+            clips={clips}
+            selectedClips={selectedClips}
+            mergedContent={mergedContent}
+            onAddToTimeline={onAddToTimeline}
+            masterClipManager={masterClipManager}
+          />
           ) : (
-            <TranscriptViewerSection
-              clips={clips}
-              selectedClips={selectedClips}
-              transcriptData={transcriptData}
-              mergedContent={mergedContent}
-              onAddToTimeline={handleAddToTimeline}
-              masterClipManager={masterClipManager}
-            />
+            <TranscriptViewer
+            clips={clips}
+            selectedClips={selectedClips}
+            transcriptData={transcriptData}
+            mergedContent={mergedContent}
+            onAddToTimeline={onAddToTimeline}
+            masterClipManager={masterClipManager}
+          />
           )
         )}
       </Box>
