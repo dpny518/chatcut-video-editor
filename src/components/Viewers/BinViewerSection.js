@@ -1,27 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Box, 
   Paper, 
   Typography,
   Tabs,
   Tab,
+  Alert
 } from '@mui/material';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import BinViewer from './BinViewer';
 import TranscriptViewerSection from './TranscriptViewerSection';
 
-
 const BinViewerSection = ({ 
   clips,
-  selectedClip, 
+  selectedClips,
   onAddToTimeline,
   transcriptData,
   timelineState,
   onTranscriptUpload,
+  masterClipManager,
 }) => {
   const [viewMode, setViewMode] = useState(0);
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
+  const [mergeError, setMergeError] = useState(null);
+
+  // Get merged content if multiple clips are selected
+  const mergedContent = useMemo(() => {
+    if (selectedClips.length > 1) {
+      try {
+        setMergeError(null);
+        const content = masterClipManager.getSelectedContent(
+          selectedClips.map(clip => clip.name)
+        );
+        console.log('Merged content:', content);
+        return content;
+      } catch (error) {
+        console.error('Error merging content:', error);
+        setMergeError(error.message);
+        return null;
+      }
+    }
+    return null;
+  }, [selectedClips, masterClipManager]);
 
   // Modified add to timeline handler to update timelineRows
   const handleAddToTimeline = (clipData) => {
@@ -52,7 +73,6 @@ const BinViewerSection = ({
         overflow: 'hidden'
       }}
     >
-      {/* Single header with view toggle */}
       <Box sx={{ 
         p: 2,
         borderBottom: 1, 
@@ -61,8 +81,11 @@ const BinViewerSection = ({
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
-        <Typography variant="subtitle1">
-          Bin Viewer
+        <Typography variant="h6">
+          {selectedClips.length > 1 
+            ? `Merged View (${selectedClips.length} clips)`
+            : 'Bin Viewer'
+          }
         </Typography>
         <Tabs 
           value={viewMode} 
@@ -79,35 +102,44 @@ const BinViewerSection = ({
             icon={<TextSnippetIcon />}
             iconPosition="start"
             label="Transcript"
-            disabled={!transcriptData}
+            disabled={!transcriptData && !mergedContent?.mergedTranscript}
             sx={{ minHeight: 48 }}
           />
         </Tabs>
       </Box>
 
-      {/* Content area */}
+      {mergeError && (
+        <Alert severity="error" sx={{ mx: 2, mt: 2 }}>
+          Error merging content: {mergeError}
+        </Alert>
+      )}
+
       <Box sx={{ 
         flex: 1, 
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {viewMode === 0 ? (
-          <BinViewer
-            clips={clips}
-            selectedClip={selectedClip}
-            onAddToTimeline={handleAddToTimeline}
-            timelineRows={timelineRows}
-            setTimelineRows={setTimelineRows}
-          />
-        ) : (
-          <TranscriptViewerSection
-            clips={clips}
-            selectedClip={selectedClip}
-            transcriptData={transcriptData}
-            onAddToTimeline={handleAddToTimeline}
-            timelineRows={timelineRows}
-            setTimelineRows={setTimelineRows}
-          />
+        {selectedClips.length > 0 && (
+          viewMode === 0 ? (
+            <BinViewer
+              clips={clips}
+              selectedClip={selectedClips[0]}
+              mergedContent={mergedContent}
+              onAddToTimeline={handleAddToTimeline}
+              masterClipManager={masterClipManager}
+              timelineRows={timelineRows}
+              setTimelineRows={setTimelineRows}
+            />
+          ) : (
+            <TranscriptViewerSection
+              clips={clips}
+              selectedClips={selectedClips}
+              transcriptData={transcriptData}
+              mergedContent={mergedContent}
+              onAddToTimeline={handleAddToTimeline}
+              masterClipManager={masterClipManager}
+            />
+          )
         )}
       </Box>
     </Paper>

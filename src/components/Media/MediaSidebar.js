@@ -17,33 +17,80 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField
+  TextField,
+  Checkbox
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import AudioFileIcon from '@mui/icons-material/AudioFile';
 import ImageIcon from '@mui/icons-material/Image';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import TextSnippetIcon from '@mui/icons-material/TextSnippet'; // Add this import
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
+import MergeIcon from '@mui/icons-material/CallMerge';
 
 const MediaSidebar = ({ 
   files, 
   onFileUpload, 
-  onFileSelect, 
-  selectedFile,
-  timelineProjects 
+  onFileSelect,
+  selectedFiles, // Changed from selectedFile
+  timelineProjects,
+  masterClipManager
 }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [currentTab, setCurrentTab] = useState(0);
   const [contextMenu, setContextMenu] = useState(null);
-
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newTimelineName, setNewTimelineName] = useState('');
+  const [selectionMode, setSelectionMode] = useState('single');
+
+  const handleFileClick = (file, event) => {
+    if (selectionMode === 'single') {
+      onFileSelect([file]); // Always send as array
+    } else {
+      // Multiple selection mode
+      const newSelection = new Set(selectedFiles || []);
+      
+      if (event.ctrlKey || event.metaKey) {
+        // Toggle selection
+        if (newSelection.has(file)) {
+          newSelection.delete(file);
+        } else {
+          newSelection.add(file);
+        }
+      } else if (event.shiftKey && selectedFiles?.length > 0) {
+        // Range selection
+        const filesList = files.map(f => f);
+        const lastSelected = selectedFiles[selectedFiles.length - 1];
+        const startIdx = filesList.indexOf(lastSelected);
+        const endIdx = filesList.indexOf(file);
+        const range = filesList.slice(
+          Math.min(startIdx, endIdx),
+          Math.max(startIdx, endIdx) + 1
+        );
+        range.forEach(f => newSelection.add(f));
+      } else {
+        // Simple selection
+        newSelection.clear();
+        newSelection.add(file);
+      }
+      
+      onFileSelect(Array.from(newSelection));
+    }
+  };
+
+  const toggleSelectionMode = () => {
+    if (selectionMode === 'single') {
+      setSelectionMode('multiple');
+    } else {
+      setSelectionMode('single');
+      onFileSelect(selectedFiles?.slice(0, 1) || []); // Keep only first selection
+    }
+  };
 
   const handleSaveClick = () => {
     setSaveDialogOpen(true);
@@ -60,7 +107,7 @@ const MediaSidebar = ({
   const handleFileUpload = (event) => {
     const uploadedFiles = Array.from(event.target.files);
     setUploading(true);
-    console.log(uploading)
+    
     uploadedFiles.forEach(file => {
       const fileId = Date.now() + Math.random();
       setUploadProgress(prev => ({
@@ -68,7 +115,6 @@ const MediaSidebar = ({
         [fileId]: 0
       }));
 
-      // Simulate progress
       let progress = 0;
       const interval = setInterval(() => {
         progress += Math.random() * 20;
@@ -76,7 +122,6 @@ const MediaSidebar = ({
           progress = 100;
           clearInterval(interval);
           
-          // Remove this file's progress after completion
           setUploadProgress(prev => {
             const newProgress = { ...prev };
             delete newProgress[fileId];
@@ -95,7 +140,6 @@ const MediaSidebar = ({
       }, 500);
     });
 
-    // Reset uploading state when all files are done
     const checkUploadComplete = setInterval(() => {
       setUploadProgress(prev => {
         if (Object.keys(prev).length === 0) {
@@ -107,24 +151,6 @@ const MediaSidebar = ({
     }, 1000);
   };
 
-  const getFileIcon = (type) => {
-    if (type.startsWith('video/')) return <VideoFileIcon />;
-    if (type.startsWith('image/')) return <ImageIcon />;
-    if (type.startsWith('audio/')) return <AudioFileIcon />;
-    // Add handling for JSON/transcript files
-    if (type === 'application/json' || type.endsWith('.json')) return <TextSnippetIcon />;
-    return <InsertDriveFileIcon />;
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  // Timeline handling
   const handleTimelineContextMenu = (event, timeline) => {
     event.preventDefault();
     setContextMenu({
@@ -152,19 +178,32 @@ const MediaSidebar = ({
     }
   };
 
+  const getFileIcon = (type) => {
+    if (type.startsWith('video/')) return <VideoFileIcon />;
+    if (type.startsWith('image/')) return <ImageIcon />;
+    if (type.startsWith('audio/')) return <AudioFileIcon />;
+    if (type === 'application/json' || type.endsWith('.json')) return <TextSnippetIcon />;
+    return <InsertDriveFileIcon />;
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   return (
-    <Box 
-      sx={{
-        width: 240,
-        height: '100%',
-        bgcolor: 'background.paper',
-        borderRight: 1,
-        borderColor: 'divider',
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-    >
-      {/* Tab Navigation */}
+    <Box sx={{
+      width: 240,
+      height: '100%',
+      bgcolor: 'background.paper',
+      borderRight: 1,
+      borderColor: 'divider',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       <Tabs 
         value={currentTab} 
         onChange={(_, newValue) => setCurrentTab(newValue)}
@@ -174,55 +213,51 @@ const MediaSidebar = ({
         <Tab label="Timelines" />
       </Tabs>
 
-      {/* Media Tab */}
       {currentTab === 0 && (
         <>
-       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6">Media</Typography>
-            <IconButton size="small">
-              <ExpandMoreIcon />
-            </IconButton>
-          </Box>
+          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<MergeIcon />}
+                onClick={toggleSelectionMode}
+                sx={{ width: '100%' }}
+              >
+                {selectionMode === 'single' ? 'Enable Merge Mode' : 'Disable Merge Mode'}
+              </Button>
 
-          <Typography variant="caption" display="block" sx={{ mb: 1, color: 'text.secondary' }}>
-            Upload video files with matching .json transcripts
-          </Typography>
+              <label htmlFor="upload-input">
+                <input
+                  id="upload-input"
+                  type="file"
+                  multiple
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
+                  accept="video/*,.json"
+                />
+                <Button
+                  component="span"
+                  variant="contained"
+                  startIcon={<CloudUploadIcon />}
+                  fullWidth
+                >
+                  Upload Files
+                </Button>
+              </label>
 
-          <label htmlFor="upload-input">
-            <input
-              id="upload-input"
-              type="file"
-              multiple
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-              accept="video/*,image/*,audio/*,.json" // Added .json
-            />
-            <Button
-              component="span"
-              variant="outlined"
-              startIcon={<CloudUploadIcon />}
-              fullWidth
-              sx={{ 
-                color: 'primary.main',
-                borderColor: 'primary.main',
-                '&:hover': {
-                  borderColor: 'primary.dark',
-                  bgcolor: 'action.hover'
-                }
-              }}
-            >
-              Upload
-            </Button>
-            </label>
+              <Typography variant="caption" color="text.secondary">
+                Upload video files with matching .json transcripts
+              </Typography>
+            </Box>
           </Box>
 
           <List sx={{ flexGrow: 1, overflow: 'auto' }}>
             {files?.map(file => (
               <ListItem 
                 key={file.id}
-                selected={selectedFile?.id === file.id}
-                onClick={() => onFileSelect?.(file)}
+                onClick={(e) => handleFileClick(file, e)}
+                selected={selectedFiles?.includes(file)}
                 sx={{
                   borderBottom: 1,
                   borderColor: 'divider',
@@ -232,6 +267,14 @@ const MediaSidebar = ({
                   cursor: 'pointer'
                 }}
               >
+                {selectionMode === 'multiple' && (
+                  <Checkbox
+                    edge="start"
+                    checked={selectedFiles?.includes(file)}
+                    tabIndex={-1}
+                    disableRipple
+                  />
+                )}
                 <ListItemIcon sx={{ minWidth: 40 }}>
                   {getFileIcon(file.type)}
                 </ListItemIcon>
@@ -242,13 +285,11 @@ const MediaSidebar = ({
                     variant: 'body2',
                     noWrap: true
                   }}
-                  secondaryTypographyProps={{
-                    variant: 'caption'
-                  }}
                 />
               </ListItem>
             ))}
 
+            {/* Upload Progress Items */}
             {Object.entries(uploadProgress).map(([id, progress]) => (
               progress < 100 && (
                 <ListItem 
@@ -272,30 +313,30 @@ const MediaSidebar = ({
               )
             ))}
           </List>
+
+          {selectionMode === 'multiple' && selectedFiles?.length > 0 && (
+            <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+              <Typography variant="body2" color="text.secondary">
+                {selectedFiles.length} files selected
+              </Typography>
+            </Box>
+          )}
         </>
       )}
 
-      {/* Timelines Tab */}
+      {/* Timelines Tab - Same as original */}
       {currentTab === 1 && (
-      <>
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Button
-            variant="outlined"
-            startIcon={<SaveIcon />}
-            fullWidth
-            onClick={handleSaveClick}
-            sx={{ 
-              color: 'primary.main',
-              borderColor: 'primary.main',
-              '&:hover': {
-                borderColor: 'primary.dark',
-                bgcolor: 'action.hover'
-              }
-            }}
-          >
-            Save Timeline
-          </Button>
-        </Box>
+        <>
+          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <Button
+              variant="outlined"
+              startIcon={<SaveIcon />}
+              fullWidth
+              onClick={handleSaveClick}
+            >
+              Save Timeline
+            </Button>
+          </Box>
 
         {/* Save Dialog */}
         <Dialog 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { 
   Box,
   Card, 
@@ -9,13 +9,18 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 
+
+// Remove duplicate useEffect (you have two versions - one using selectedClip and one using selectedClips)
+
 const TranscriptViewer = ({ 
   clips,
-  selectedClip,
-  transcriptData, 
+  selectedClips, // Changed from selectedClip
+  transcriptData,
+  mergedContent, // Add this prop
   onAddToTimeline,
   timelineRows,
   setTimelineRows,
+  masterClipManager,
   sx
 }) => {
   const [currentTime, setCurrentTime] = useState(0);
@@ -25,15 +30,21 @@ const TranscriptViewer = ({
   
   // Update useEffect to use selectedClip.file
   useEffect(() => {
-    if (videoRef.current && selectedClip?.file) {
+    if (videoRef.current && selectedClips?.[0]?.file) {
       if (videoUrlRef.current) {
         URL.revokeObjectURL(videoUrlRef.current);
       }
-      videoUrlRef.current = URL.createObjectURL(selectedClip.file);
+      videoUrlRef.current = URL.createObjectURL(selectedClips[0].file);
       videoRef.current.src = videoUrlRef.current;
     }
-  }, [selectedClip]);
-
+  
+    return () => {
+      if (videoUrlRef.current) {
+        URL.revokeObjectURL(videoUrlRef.current);
+        videoUrlRef.current = null;
+      }
+    };
+  }, [selectedClips]);
   const handleWordSelection = useCallback((startWord, endWord, text) => {
     setSelection({
       start: startWord.start,
@@ -44,7 +55,43 @@ const TranscriptViewer = ({
     });
   }, []);
 
-
+  useEffect(() => {
+    if (videoRef.current && selectedClips?.[0]?.file) {
+      try {
+        if (videoUrlRef.current) {
+          URL.revokeObjectURL(videoUrlRef.current);
+        }
+        videoUrlRef.current = URL.createObjectURL(selectedClips[0].file);
+        videoRef.current.src = videoUrlRef.current;
+        
+        videoRef.current.onerror = (e) => {
+          console.error('Error loading video:', e);
+        };
+        
+      } catch (error) {
+        console.error('Error setting up video:', error);
+      }
+    }
+  
+    return () => {
+      if (videoUrlRef.current) {
+        URL.revokeObjectURL(videoUrlRef.current);
+        videoUrlRef.current = null;
+      }
+    };
+  }, [selectedClips]);
+  const transcriptContent = useMemo(() => {
+    if (mergedContent) {
+      return {
+        transcription: mergedContent.mergedTranscript,
+        isMerged: true
+      };
+    }
+    return {
+      transcription: transcriptData?.transcription,
+      isMerged: false
+    };
+  }, [mergedContent, transcriptData]);
 
   const handleWordClick = useCallback((time) => {
     if (videoRef.current) {
@@ -64,105 +111,103 @@ const TranscriptViewer = ({
     if (startNode.hasAttribute('data-time') && endNode.hasAttribute('data-time')) {
       const startTime = parseFloat(startNode.getAttribute('data-time'));
       const endTime = parseFloat(endNode.getAttribute('data-time-end'));
+      const sourceFile = startNode.getAttribute('data-source');
   
-      // Find all words between start and end time
-      const allWords = transcriptData.transcription
-        .flatMap(item => item.words)
-        .filter(word => word.start >= startTime && word.end <= endTime);
-
-      if (allWords.length > 0) {
+      const words = mergedContent 
+        ? mergedContent.mergedTranscript.flatMap(item => item.words)
+        : transcriptData?.transcription.flatMap(item => item.words);
+  
+      const allWords = words?.filter(word => 
+        word.start >= startTime && 
+        word.end <= endTime &&
+        (!mergedContent || word.sourceFile === sourceFile)
+      );
+  
+      if (allWords?.length > 0) {
         const startWord = allWords[0];
         const endWord = allWords[allWords.length - 1];
-        
         handleWordSelection(startWord, endWord, selection.toString());
       }
     }
-  }, [transcriptData, handleWordSelection]);
-
+  }, [mergedContent, transcriptData, handleWordSelection]);
 
   const handleAddToTimeline = useCallback(() => {
-    if (!selection || !selectedClip) {
-      console.warn('Missing required data for timeline clip', { selection, selectedClip });
-      return;
-    }
+    if (!selection) return;
   
-    // Create a video element to get duration
-    const video = document.createElement('video');
-    video.src = URL.createObjectURL(selectedClip.file);
+    const activeClip = mergedContent ? {
+      file: selectedClips[0].file,
+      name: `Merged (${selectedClips.length} clips)`,
+      isMerged: true
+    } : selectedClips[0];
   
-    // Wait for metadata to load to get duration
-    video.addEventListener('loadedmetadata', () => {
-      const clipStart = selection.start;
-      const clipEnd = selection.end;
-      const timelineDuration = clipEnd - clipStart;
-  
-      // Find the end position of the last clip in the timeline
-      const findTimelineEndPosition = (clips) => {
-        if (!clips.length) return 0;
-        return Math.max(...clips.map(clip => clip.metadata.timeline.end));
-      };
-  
-      // Calculate where this clip should start in the timeline
-      const timelineStart = findTimelineEndPosition(clips); // Using clips from props/state
-      const timelineEnd = timelineStart + timelineDuration;
-      
-      const clipData = {
-        id: `clip-${Date.now()}`,
-        file: selectedClip.file,
-        name: selectedClip.file.name,
-        startTime: clipStart,
-        endTime: clipEnd,
-        duration: timelineDuration,
-        source: {
-          startTime: 0,
-          endTime: video.duration,
-          duration: video.duration
-        },
-        transcript: selection.text,
-        metadata: {
-          timeline: {
-            start: timelineStart,
-            end: timelineEnd,
-            duration: timelineDuration,
-            row: 0 // Always use row 0 as before
-          },
-          playback: {
-            start: clipStart,
-            end: clipEnd,
-            duration: timelineDuration
-          }
-        },
-        selectionInfo: {
-          text: selection.text,
-          startWord: selection.startWord,
-          endWord: selection.endWord,
-          timeRange: {
-            start: clipStart,
-            end: clipEnd
-          }
-        }
-      };
-  
-      // Cleanup
-      video.src = '';
-      URL.revokeObjectURL(video.src);
-  
-      console.log('Adding clip from transcript selection:', {
-        clipData,
-        selection,
-        timeline: clipData.metadata.timeline,
-        playback: clipData.metadata.playback,
-        rowIndex: 0
+    if (activeClip.isMerged) {
+      // Create merged clip
+      const clipData = masterClipManager.createTimelineClip({
+        startTime: selection.start,
+        endTime: selection.end,
+        ranges: mergedContent.ranges,
+        type: 'merged',
+        transcript: selection.text
       });
-  
       onAddToTimeline?.(clipData);
       setSelection(null);
-    });
+    } else {
+      // Create single clip
+      const video = document.createElement('video');
+      video.src = URL.createObjectURL(activeClip.file);
+      
+      video.addEventListener('loadedmetadata', () => {
+        const clipStart = selection.start;
+        const clipEnd = selection.end;
+        const timelineDuration = clipEnd - clipStart;
   
-  }, [selection, selectedClip, onAddToTimeline, clips]);
+        const findTimelineEndPosition = (clips) => {
+          if (!clips.length) return 0;
+          return Math.max(...clips.map(clip => clip.metadata?.timeline?.end || 0));
+        };
+  
+        const timelineStart = findTimelineEndPosition(clips);
+        const timelineEnd = timelineStart + timelineDuration;
+        
+        const clipData = {
+          id: `clip-${Date.now()}`,
+          file: activeClip.file,
+          name: activeClip.file.name,
+          startTime: clipStart,
+          endTime: clipEnd,
+          duration: timelineDuration,
+          source: {
+            startTime: 0,
+            endTime: video.duration,
+            duration: video.duration
+          },
+          transcript: selection.text,
+          metadata: {
+            timeline: {
+              start: timelineStart,
+              end: timelineEnd,
+              duration: timelineDuration,
+              row: 0
+            },
+            playback: {
+              start: clipStart,
+              end: clipEnd,
+              duration: timelineDuration
+            }
+          }
+        };
+  
+        // Cleanup
+        video.src = '';
+        URL.revokeObjectURL(video.src);
+        onAddToTimeline?.(clipData);
+        setSelection(null);
+      });
+    }
+  }, [selection, selectedClips, mergedContent, masterClipManager, onAddToTimeline, clips]);
 
   const renderTranscript = () => {
-    if (!transcriptData?.transcription) {
+    if (!transcriptContent.transcription) {
       return (
         <Box sx={{ 
           display: 'flex', 
@@ -175,24 +220,44 @@ const TranscriptViewer = ({
         </Box>
       );
     }
-  
-    return transcriptData.transcription.map((item, index) => (
-      <Box key={`segment-${index}`} sx={{ mb: 2 }}>
+    
+    return transcriptContent.transcription.map((item, index) => (
+      <Box 
+        key={`segment-${index}`} 
+        sx={{ 
+          mb: 2,
+          ...(transcriptContent.isMerged && {
+            borderLeft: 2,
+            borderColor: 'primary.main',
+            pl: 2
+          })
+        }}
+      >
         <Typography 
           variant="subtitle2" 
           color="primary"
           sx={{ mb: 0.5, fontWeight: 500 }}
         >
-          Speaker {item.segment.speaker}
+          {transcriptContent.isMerged ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span>Source: {item.sourceFile}</span>
+              <Typography variant="caption" color="text.secondary">
+                {item.startTime?.toFixed(2)}s - {item.endTime?.toFixed(2)}s
+              </Typography>
+            </Box>
+          ) : (
+            `Speaker ${item.segment.speaker}`
+          )}
         </Typography>
-        <Box sx={{ fontSize: '0.875rem', lineHeight: 1.75 }}>
-          {item.words.map((word, wordIndex) => (
-            <Box
-              component="span"
-              key={`word-${wordIndex}`}
-              data-time={word.start}
-              data-time-end={word.end}
-              onClick={() => handleWordClick(word.start)}
+      <Box sx={{ fontSize: '0.875rem', lineHeight: 1.75 }}>
+        {item.words.map((word, wordIndex) => (
+          <Box
+            component="span"
+            key={`word-${wordIndex}`}
+            data-time={word.start}
+            data-time-end={word.end}
+            data-source={word.sourceFile}
+            onClick={() => handleWordClick(word.start)}
               sx={{
                 cursor: 'pointer',
                 px: 0.5,

@@ -1,13 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box, Snackbar, Alert } from '@mui/material';
+import { MasterClipManager } from './services/masterClip/MasterClipManager';
 
 // Layout components
 import MainLayout from './components/Layout/MainLayout';
 import EditorLayout from './components/Layout/EditorLayout';
 
-// Chabot
+// Chatbot
 import ChatBot from './components/Chatbot/ChatBot';
 
 // Viewer components
@@ -18,9 +19,6 @@ import TimelineViewerSection from './components/Viewers/TimelineViewerSection';
 import TimelineSection from './components/Timeline/TimelineSection';
 import TimelineDebug from './components/Timeline/TimelineDebug';
 import { useTimelineStateManager } from './hooks/useTimeline/useTimelineStateManager';
-
-
-
 
 const theme = createTheme({
   palette: {
@@ -41,14 +39,12 @@ function App() {
   const [notification, setNotification] = useState(null);
   const [selectedTimelineProject, setSelectedTimelineProject] = useState(null);
   const [transcripts, setTranscripts] = useState(new Map());
-
   const [chatMessages, setChatMessages] = useState([]);
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
+  const [selectedBinClips, setSelectedBinClips] = useState([]);
 
-// Add this handler function:
-const handleChatMessage = (message) => {
-  setChatMessages(prev => [...prev, message]);
-};
+  // Initialize MasterClipManager
+  const masterClipManager = useMemo(() => new MasterClipManager(), []);
 
   // Timeline metadata state
   const [timelineMetadata, setTimelineMetadata] = useState({
@@ -56,8 +52,19 @@ const handleChatMessage = (message) => {
     selectedClipId: null
   });
 
+  // Cleanup effect for MasterClipManager
+  useEffect(() => {
+    return () => {
+      masterClipManager.cleanup?.();
+    };
+  }, [masterClipManager]);
+
   const showNotification = (message, severity = 'info') => {
     setNotification({ message, severity });
+  };
+
+  const handleChatMessage = (message) => {
+    setChatMessages(prev => [...prev, message]);
   };
 
   const timelineState = {
@@ -88,13 +95,11 @@ const handleChatMessage = (message) => {
       selectedClipId: timelineMetadata.selectedClipId 
     }
   };
-  
 
   // File handling
   const handleFileUpload = async (file) => {
     try {
       if (file.type.startsWith('video/')) {
-        // Handle video file
         const newFile = { 
           id: Date.now().toString(), 
           file: file, 
@@ -103,16 +108,18 @@ const handleChatMessage = (message) => {
           size: file.size 
         };
         setMediaFiles(prevFiles => [...prevFiles, newFile]);
+
+        // Add to master manager
+        masterClipManager.addVideo(file, newFile);
   
-        // Automatically look for matching transcript
         const transcriptName = file.name.replace(/\.[^/.]+$/, '.json');
-        const hasTranscript = transcripts.has(transcriptName);
+        const hasTranscript = masterClipManager.hasTranscript(transcriptName);
+        
         if (hasTranscript) {
           showNotification(`Found matching transcript for ${file.name}`, 'success');
         }
       } 
       else if (file.name.endsWith('.json')) {
-        // Handle transcript file
         try {
           const text = await file.text();
           const transcriptData = JSON.parse(text);
@@ -121,12 +128,13 @@ const handleChatMessage = (message) => {
             throw new Error('Invalid transcript format');
           }
   
-          // Get the corresponding video name
-          const videoName = file.name.replace('.json', '.mp4');
-          const hasVideo = mediaFiles.some(f => f.name === videoName);
-  
+          // Add to both transcript stores
           setTranscripts(prev => new Map(prev).set(file.name, transcriptData));
+          masterClipManager.addTranscript(file.name, transcriptData);
           
+          const videoName = file.name.replace('.json', '.mp4');
+          const hasVideo = masterClipManager.hasVideo(videoName);
+  
           if (hasVideo) {
             showNotification(`Transcript loaded for ${videoName}`, 'success');
           } else {
@@ -141,32 +149,31 @@ const handleChatMessage = (message) => {
     }
   };
 
-  const handleFileSelect = (selectedFile) => {
-    setSelectedBinClip(selectedFile);
+  const handleFileSelect = (selectedFiles) => {
+    setSelectedBinClips(selectedFiles);
+    
+    if (selectedFiles.length > 0) {
+      // Get merged content from master manager
+      const mergedContent = masterClipManager.getSelectedContent(
+        selectedFiles.map(file => file.name)
+      );
+      
+      console.log('Merged content:', mergedContent);
+    }
   };
 
   const handleAddToTimeline = (clipData) => {
-    const transcriptName = clipData.name.replace(/\.[^/.]+$/, '.json');
-    const transcriptData = transcripts.get(transcriptName);
-
     console.log("App.js handleAddToTimeline called with clipData:", clipData);
 
-    // Directly use the existing timeline metadata
-    const enrichedClip = {
-        ...clipData,
-        transcript: transcriptData || null,
-        metadata: {
-            ...clipData.metadata,
-            timeline: {
-                ...clipData.metadata.timeline,
-                track: 0 // Still placing all clips on track 0 for now
-            }
-        }
-    };
+    const enrichedClip = masterClipManager.createTimelineClip(clipData);
 
-    // Add enriched clip to timelineClips state
-    setTimelineClips((prevClips) => [...prevClips, enrichedClip]);
+    if (enrichedClip) {
+        setTimelineClips(prevClips => [...prevClips, enrichedClip]);
+    } else {
+        showNotification('Failed to create timeline clip', 'error');
+    }
 };
+
 
   const handleTimelineClipsChange = (newClips) => {
     setTimelineClips(newClips);
@@ -212,6 +219,7 @@ const handleChatMessage = (message) => {
         <MainLayout
           mediaFiles={mediaFiles}
           selectedBinClip={selectedBinClip}
+          selectedFiles={selectedBinClips}
           onFileUpload={handleFileUpload}
           onFileSelect={handleFileSelect}
           timelineProjects={{
@@ -220,22 +228,28 @@ const handleChatMessage = (message) => {
             onLoad: handleTimelineProjectLoad,
             onDelete: handleTimelineProjectDelete
           }}
+          masterClipManager={masterClipManager}
         >
           <EditorLayout>
             {/* Main Content Area */}
             <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
             <BinViewerSection
-            clips={timelineClips}
-            selectedClip={selectedBinClip}
-            onAddToTimeline={handleAddToTimeline}
-            transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
-            timelineState={timelineState}
-            setTimelineRows={setTimelineRows}
-                />
+              clips={timelineClips}
+              selectedClips={selectedBinClips} // Update to array
+              onAddToTimeline={handleAddToTimeline}
+              transcriptData={selectedBinClip ? 
+                masterClipManager.getTranscriptForClip(selectedBinClip.name) : null}
+              transcriptState={selectedBinClip ? 
+                masterClipManager.getTranscriptState(selectedBinClip.name) : null}
+              timelineState={timelineState}
+              setTimelineRows={setTimelineRows}
+              masterClipManager={masterClipManager}
+            />
               <TimelineViewerSection 
                 clips={timelineClips}
                 transcript={transcripts}
                 timelineState={timelineState} 
+                masterClipManager={masterClipManager}
               />
             </Box>
 
@@ -255,29 +269,35 @@ const handleChatMessage = (message) => {
               }
             }}>
               <TimelineSection
-             clips={timelineClips}
-             onClipsChange={handleTimelineClipsChange}
-             timelineState={timelineState}
-             timelineRows={timelineRows}
-             setTimelineRows={setTimelineRows}
-                />
+                clips={timelineClips}
+                onClipsChange={handleTimelineClipsChange}
+                timelineState={timelineState}
+                timelineRows={timelineRows}
+                setTimelineRows={setTimelineRows}
+                masterClipManager={masterClipManager}
+              />
               <TimelineDebug
                 timelineClips={timelineClips}
                 selectedBinClip={selectedBinClip}
+                masterClipManager={masterClipManager}
               />
             </Box>
           </EditorLayout>
           <ChatBot 
-          clips={timelineClips}
-          messages={chatMessages}
-          onSendMessage={handleChatMessage}
-          selectedBinClip={selectedBinClip}
-          transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
-          onAddToTimeline={handleAddToTimeline}
-          timelineState={timelineState}
-          timelineRows={timelineRows}
-          setTimelineRows={setTimelineRows}
-          onClipsChange={handleTimelineClipsChange}
+            clips={timelineClips}
+            messages={chatMessages}
+            onSendMessage={handleChatMessage}
+            selectedBinClip={selectedBinClip}
+            transcriptData={selectedBinClip ? 
+                masterClipManager.getTranscriptForClip(selectedBinClip.name) : null}
+            transcriptState={selectedBinClip ? 
+                masterClipManager.getTranscriptState(selectedBinClip.name) : null}
+            onAddToTimeline={handleAddToTimeline}
+            timelineState={timelineState}
+            timelineRows={timelineRows}
+            setTimelineRows={setTimelineRows}
+            onClipsChange={handleTimelineClipsChange}
+            masterClipManager={masterClipManager}
           />
         </MainLayout>
 
@@ -301,6 +321,3 @@ const handleChatMessage = (message) => {
 }
 
 export default App;
-
-
-
