@@ -46,51 +46,69 @@ const MediaSidebar = ({
   const [contextMenu, setContextMenu] = useState(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newTimelineName, setNewTimelineName] = useState('');
-  const [selectionMode, setSelectionMode] = useState('single');
+ 
 
-  const handleFileClick = (file, event) => {
-    if (selectionMode === 'single') {
-      onFileSelect([file]); // Always send as array
-    } else {
-      // Multiple selection mode
-      const newSelection = new Set(selectedFiles || []);
-      
-      if (event.ctrlKey || event.metaKey) {
-        // Toggle selection
-        if (newSelection.has(file)) {
-          newSelection.delete(file);
-        } else {
-          newSelection.add(file);
-        }
-      } else if (event.shiftKey && selectedFiles?.length > 0) {
-        // Range selection
-        const filesList = files.map(f => f);
-        const lastSelected = selectedFiles[selectedFiles.length - 1];
-        const startIdx = filesList.indexOf(lastSelected);
-        const endIdx = filesList.indexOf(file);
+  const [lastChecked, setLastChecked] = useState(null);
+
+  const handleCheckboxChange = (file, event) => {
+    event.stopPropagation();
+    console.log('Checkbox clicked for:', file.name);
+    console.log('Current selections:', selectedFiles?.map(f => f.name));
+
+    // Create new array from current selections
+    let newSelection = selectedFiles ? [...selectedFiles] : [];
+
+    if (event.shiftKey && lastChecked) {
+        // Handle range selection
+        const filesList = files;
+        const start = filesList.indexOf(lastChecked);
+        const end = filesList.indexOf(file);
         const range = filesList.slice(
-          Math.min(startIdx, endIdx),
-          Math.max(startIdx, endIdx) + 1
+            Math.min(start, end),
+            Math.max(start, end) + 1
         );
-        range.forEach(f => newSelection.add(f));
-      } else {
-        // Simple selection
-        newSelection.clear();
-        newSelection.add(file);
-      }
-      
-      onFileSelect(Array.from(newSelection));
-    }
-  };
 
-  const toggleSelectionMode = () => {
-    if (selectionMode === 'single') {
-      setSelectionMode('multiple');
+        console.log('Shift-click range:', range.map(f => f.name));
+
+        // If lastChecked is selected, add all in range. Otherwise remove all.
+        const isAdding = selectedFiles?.some(f => f.id === lastChecked.id);
+        
+        if (isAdding) {
+            // Add all files in range that aren't already selected
+            range.forEach(rangeFile => {
+                if (!newSelection.some(f => f.id === rangeFile.id)) {
+                    newSelection.push(rangeFile);
+                }
+            });
+        } else {
+            // Remove all files in range
+            newSelection = newSelection.filter(f => 
+                !range.some(rangeFile => rangeFile.id === f.id)
+            );
+        }
     } else {
-      setSelectionMode('single');
-      onFileSelect(selectedFiles?.slice(0, 1) || []); // Keep only first selection
+        // Toggle single selection
+        const fileIndex = newSelection.findIndex(f => f.id === file.id);
+        if (fileIndex >= 0) {
+            // Remove if already selected
+            newSelection.splice(fileIndex, 1);
+        } else {
+            // Add to selection
+            newSelection.push(file);
+        }
+        setLastChecked(file);
     }
-  };
+
+    // Keep track of selection order
+    newSelection.sort((a, b) => {
+        const aIndex = files.findIndex(f => f.id === a.id);
+        const bIndex = files.findIndex(f => f.id === b.id);
+        return aIndex - bIndex;
+    });
+
+    console.log('New selection:', newSelection.map(f => f.name));
+    onFileSelect(newSelection);
+};
 
   const handleSaveClick = () => {
     setSaveDialogOpen(true);
@@ -139,16 +157,6 @@ const MediaSidebar = ({
         }
       }, 500);
     });
-
-    const checkUploadComplete = setInterval(() => {
-      setUploadProgress(prev => {
-        if (Object.keys(prev).length === 0) {
-          setUploading(false);
-          clearInterval(checkUploadComplete);
-        }
-        return prev;
-      });
-    }, 1000);
   };
 
   const handleTimelineContextMenu = (event, timeline) => {
@@ -215,112 +223,114 @@ const MediaSidebar = ({
 
       {currentTab === 0 && (
         <>
-          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<MergeIcon />}
-                onClick={toggleSelectionMode}
-                sx={{ width: '100%' }}
-              >
-                {selectionMode === 'single' ? 'Enable Merge Mode' : 'Disable Merge Mode'}
-              </Button>
+<Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+    <label htmlFor="upload-input">
+      <input
+        id="upload-input"
+        type="file"
+        multiple
+        onChange={handleFileUpload}
+        style={{ display: 'none' }}
+        accept="video/*,.json"
+      />
+      <Button
+        component="span"
+        variant="contained"
+        startIcon={<CloudUploadIcon />}
+        fullWidth
+      >
+        Upload Files
+      </Button>
+    </label>
 
-              <label htmlFor="upload-input">
-                <input
-                  id="upload-input"
-                  type="file"
-                  multiple
-                  onChange={handleFileUpload}
-                  style={{ display: 'none' }}
-                  accept="video/*,.json"
-                />
-                <Button
-                  component="span"
-                  variant="contained"
-                  startIcon={<CloudUploadIcon />}
-                  fullWidth
-                >
-                  Upload Files
-                </Button>
-              </label>
+    <Typography variant="caption" color="text.secondary">
+      Upload video files with matching .json transcripts
+    </Typography>
+  </Box>
+</Box>
 
-              <Typography variant="caption" color="text.secondary">
-                Upload video files with matching .json transcripts
-              </Typography>
-            </Box>
-          </Box>
+  <List sx={{ flexGrow: 1, overflow: 'auto' }}>
+    {files?.map(file => (
+    <ListItem 
+    key={file.id}
+    selected={selectedFiles?.some(f => f.id === file.id)}
+    sx={{
+        borderBottom: 1,
+        borderColor: 'divider',
+        '&:hover': {
+            bgcolor: 'action.hover'
+        }
+    }}
+>
+    <Checkbox
+        edge="start"
+        checked={selectedFiles?.some(f => f.id === file.id)}
+        onChange={(e) => handleCheckboxChange(file, e)}
+        onClick={(e) => e.stopPropagation()}
+        tabIndex={-1}
+        disableRipple
+    />
+     <ListItemIcon sx={{ minWidth: 40 }}>
+       {getFileIcon(file.type)}
+     </ListItemIcon>
+     <ListItemText 
+       primary={file.name}
+       secondary={formatFileSize(file.size)}
+       primaryTypographyProps={{
+         variant: 'body2',
+         noWrap: true
+       }}
+     />
+   </ListItem>
+    ))}
+    {/* Upload Progress Items */}
+{Object.entries(uploadProgress).map(([id, progress]) => (
+  progress < 100 && (
+    <ListItem 
+      key={id}
+      sx={{
+        borderBottom: 1,
+        borderColor: 'divider',
+        display: 'block',
+        padding: 2
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <CloudUploadIcon sx={{ mr: 1, fontSize: 20, color: 'primary.main' }} />
+        <Typography variant="body2">Uploading...</Typography>
+      </Box>
+      <LinearProgress 
+        variant="determinate" 
+        value={progress}
+        sx={{ height: 2 }}
+      />
+    </ListItem>
+  )
+))}
+  </List>
 
-          <List sx={{ flexGrow: 1, overflow: 'auto' }}>
-            {files?.map(file => (
-              <ListItem 
-                key={file.id}
-                onClick={(e) => handleFileClick(file, e)}
-                selected={selectedFiles?.includes(file)}
-                sx={{
-                  borderBottom: 1,
-                  borderColor: 'divider',
-                  '&:hover': {
-                    bgcolor: 'action.hover'
-                  },
-                  cursor: 'pointer'
-                }}
-              >
-                {selectionMode === 'multiple' && (
-                  <Checkbox
-                    edge="start"
-                    checked={selectedFiles?.includes(file)}
-                    tabIndex={-1}
-                    disableRipple
-                  />
-                )}
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  {getFileIcon(file.type)}
-                </ListItemIcon>
-                <ListItemText 
-                  primary={file.name}
-                  secondary={formatFileSize(file.size)}
-                  primaryTypographyProps={{
-                    variant: 'body2',
-                    noWrap: true
-                  }}
-                />
-              </ListItem>
-            ))}
-
-            {/* Upload Progress Items */}
-            {Object.entries(uploadProgress).map(([id, progress]) => (
-              progress < 100 && (
-                <ListItem 
-                  key={id}
-                  sx={{
-                    borderBottom: 1,
-                    borderColor: 'divider',
-                    display: 'block'
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    <CloudUploadIcon sx={{ mr: 1, fontSize: 20, color: 'primary.main' }} />
-                    <Typography variant="body2">Uploading...</Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={progress}
-                    sx={{ height: 2 }}
-                  />
-                </ListItem>
-              )
-            ))}
-          </List>
-
-          {selectionMode === 'multiple' && selectedFiles?.length > 0 && (
-            <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-              <Typography variant="body2" color="text.secondary">
-                {selectedFiles.length} files selected
-              </Typography>
-            </Box>
-          )}
+  {selectedFiles?.length > 0 && (
+  <Box sx={{ 
+    p: 2, 
+    borderTop: 1, 
+    borderColor: 'divider',
+    bgcolor: selectedFiles.length > 1 ? 'primary.dark' : 'transparent'
+  }}>
+    <Typography 
+      variant="body2" 
+      color={selectedFiles.length > 1 ? 'primary.contrastText' : 'text.secondary'}
+    >
+      {selectedFiles.length} files selected
+      {selectedFiles.length > 1 && ' (will be merged)'}
+    </Typography>
+    {selectedFiles.length > 1 && (
+      <Typography variant="caption" color="primary.contrastText">
+        Order: {selectedFiles.map(f => f.name.split('.')[0]).join(' → ')}
+      </Typography>
+    )}
+  </Box>
+)}
         </>
       )}
 

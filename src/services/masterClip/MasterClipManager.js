@@ -46,30 +46,52 @@ export class MasterClipManager {
   }
 
   #processVideoTranscriptPair(videoName) {
-      const videoEntry = this.videoFiles.get(videoName);
-      const transcriptEntry = this.transcripts.get(this.#getTranscriptName(videoName));
-      
-      if (!videoEntry || !transcriptEntry) return;
-  
-      this.masterTimeline.push({
-          start: this.totalDuration,
-          video: videoName,
-          transcript: this.#getTranscriptName(videoName)
-      });
-  
-      const adjustedTranscript = transcriptEntry.data.transcription.map(segment => ({
-          ...segment,
-          words: segment.words.map(word => ({
-              ...word,
-              masterStart: word.start + this.totalDuration,
-              masterEnd: word.end + this.totalDuration
-          }))
-      }));
-  
-      this.masterTranscript.push(...adjustedTranscript);
-      transcriptEntry.processed = true;
-  }
+    const videoEntry = this.videoFiles.get(videoName);
+    const transcriptEntry = this.transcripts.get(this.#getTranscriptName(videoName));
+    
+    if (!videoEntry || !transcriptEntry) {
+        console.log('Cannot process pair, missing:', { 
+            videoName,
+            hasVideo: !!videoEntry, 
+            hasTranscript: !!transcriptEntry 
+        });
+        return;
+    }
 
+    console.log('Processing video-transcript pair:', {
+        video: videoName,
+        addedAt: videoEntry.addedAt,
+        duration: videoEntry.duration
+    });
+
+    // Adjust transcript timestamps
+    const adjustedTranscript = transcriptEntry.data.transcription.map(segment => ({
+        ...segment,
+        originalStart: segment.words[0].start,
+        words: segment.words.map(word => ({
+            ...word,
+            originalStart: word.start,
+            masterStart: word.start + videoEntry.addedAt,
+            masterEnd: word.end + videoEntry.addedAt
+        }))
+    }));
+
+    console.log('Adjusting transcript timestamps:', {
+        videoName,
+        offset: videoEntry.addedAt,
+        segments: adjustedTranscript.length
+    });
+
+    this.masterTranscript.push(...adjustedTranscript);
+    transcriptEntry.processed = true;
+
+    console.log('Master timeline status:', {
+        totalDuration: this.totalDuration,
+        totalSegments: this.masterTranscript.length,
+        totalWords: this.masterTranscript.reduce((sum, seg) => sum + seg.words.length, 0),
+        videos: Array.from(this.videoFiles.keys())
+    });
+  }
   #recalculateTimeline() {
       let position = 0;
       for (const [filename, entry] of this.videoFiles.entries()) {
@@ -90,6 +112,20 @@ export class MasterClipManager {
           }
       }
   }
+  #findGaps(ranges) {
+    const gaps = [];
+    for (let i = 0; i < ranges.length - 1; i++) {
+        const gap = {
+            start: ranges[i].end,
+            end: ranges[i + 1].start,
+            duration: ranges[i + 1].start - ranges[i].end
+        };
+        if (gap.duration > 0) {
+            gaps.push(gap);
+        }
+    }
+    return gaps;
+}
 
   #getClipSegments(start, end) {
       const segments = [];
@@ -134,6 +170,16 @@ export class MasterClipManager {
     console.log('Adding video:', { file, videoData });
     const filename = file.name;
     
+    // Set initial entry first
+    const initialEntry = {
+        file,
+        data: videoData,
+        addedAt: this.totalDuration,
+        duration: 0,
+        transcriptName: filename.replace(/\.[^/.]+$/, '.json')
+    };
+    this.videoFiles.set(filename, initialEntry);
+    
     // Create a video element to get duration
     const video = document.createElement('video');
     video.src = URL.createObjectURL(file);
@@ -142,31 +188,35 @@ export class MasterClipManager {
         const duration = video.duration;
         console.log('Video duration loaded:', { filename, duration });
         
-        this.videoFiles.set(filename, {
-            file,
-            data: videoData,
-            addedAt: this.totalDuration,
-            duration: duration,
-            transcriptName: filename.replace(/\.[^/.]+$/, '.json')
+        // Update the entry with actual duration
+        initialEntry.duration = duration;
+        this.totalDuration += duration;
+
+        console.log('Updated master timeline:', {
+            filename,
+            addedAt: initialEntry.addedAt,
+            duration: initialEntry.duration,
+            totalDuration: this.totalDuration
         });
 
+        // Process transcript if available
         if (this.transcripts.has(this.#getTranscriptName(filename))) {
             this.#processVideoTranscriptPair(filename);
         }
 
         URL.revokeObjectURL(video.src);
+        this.#recalculateTimeline();
     });
 
-    // Set initial entry with zero duration
-    this.videoFiles.set(filename, {
-        file,
-        data: videoData,
-        addedAt: this.totalDuration,
-        duration: 0,
-        transcriptName: filename.replace(/\.[^/.]+$/, '.json')
+    // Add error handler
+    video.addEventListener('error', (error) => {
+        console.error('Error loading video duration:', error);
+        URL.revokeObjectURL(video.src);
     });
+
+    // Set the source last, after handlers are set up
+    video.src = URL.createObjectURL(file);
 }
-
 
   addTranscript(filename, transcriptData) {
       this.transcripts.set(filename, {
@@ -223,47 +273,113 @@ export class MasterClipManager {
   }
 
   getSelectedContent(clipIds) {
-      const selectedRanges = clipIds.map(id => {
-          const videoEntry = this.videoFiles.get(id);
-          if (!videoEntry) return null;
-          
-          return {
-              start: videoEntry.addedAt,
-              end: videoEntry.addedAt + videoEntry.duration,
-              source: {
-                  file: videoEntry.file,
-                  filename: id,
-                  transcript: this.transcripts.get(this.#getTranscriptName(id))
-              }
-          };
-      }).filter(Boolean);
+    console.log('Creating merged view for selected clips:', clipIds);
 
-      return {
-          ranges: selectedRanges,
-          totalDuration: selectedRanges.reduce((sum, range) => 
-              sum + (range.end - range.start), 0),
-          mergedTranscript: this.getMergedTranscript(selectedRanges)
-      };
-  }
+    // First get the full timeline structure
+    const allClips = Array.from(this.videoFiles.entries())
+        .map(([filename, entry]) => ({
+            filename,
+            start: entry.addedAt,
+            end: entry.addedAt + entry.duration,
+            duration: entry.duration
+        }))
+        .sort((a, b) => a.start - b.start);
 
-  getMergedTranscript(ranges) {
-      return ranges.flatMap(range => {
-          return this.masterTranscript
-              .filter(segment => {
-                  const segmentStart = segment.words[0]?.masterStart || 0;
-                  const segmentEnd = segment.words[segment.words.length - 1]?.masterEnd || 0;
-                  return segmentStart >= range.start && segmentEnd <= range.end;
-              })
-              .map(segment => ({
-                  ...segment,
-                  words: segment.words.map(word => ({
+    console.log('Full timeline structure:', allClips);
+
+    // Get selected clips and their positions in master timeline
+    const selectedRanges = clipIds.map(id => {
+        const videoEntry = this.videoFiles.get(id);
+        if (!videoEntry) return null;
+
+        return {
+            start: videoEntry.addedAt,
+            end: videoEntry.addedAt + videoEntry.duration,
+            duration: videoEntry.duration,
+            source: {
+                file: videoEntry.file,
+                filename: id,
+                transcript: this.transcripts.get(this.#getTranscriptName(id))
+            },
+            originalPosition: videoEntry.addedAt // Keep track of original position
+        };
+    }).filter(Boolean).sort((a, b) => a.start - b.start);
+
+    console.log('Selected ranges with original positions:', selectedRanges);
+
+    // Create continuous timeline for selected clips
+    let continuousPosition = 0;
+    const continuousRanges = selectedRanges.map(range => {
+        const newRange = {
+            ...range,
+            continuousStart: continuousPosition,
+            continuousEnd: continuousPosition + range.duration,
+            // Keep original position for transcript mapping
+            originalStart: range.start,
+            originalEnd: range.end
+        };
+        continuousPosition += range.duration;
+        return newRange;
+    });
+
+    console.log('Continuous ranges:', continuousRanges);
+
+    // Get transcripts with adjusted timestamps
+    const mergedTranscript = this.getMergedTranscript(continuousRanges);
+
+    const mergedContent = {
+        ranges: continuousRanges,
+        totalDuration: continuousPosition,
+        mergedTranscript,
+        originalTotalDuration: this.totalDuration,
+        gaps: this.#findGaps(selectedRanges)
+    };
+
+    console.log('Final merged content:', {
+        continuousDuration: mergedContent.totalDuration,
+        originalDuration: mergedContent.originalTotalDuration,
+        rangeCount: mergedContent.ranges.length,
+        gaps: mergedContent.gaps
+    });
+
+    return mergedContent;
+}
+
+
+getMergedTranscript(continuousRanges) {
+  return continuousRanges.flatMap(range => {
+      // Get transcript segments for this range
+      const segments = this.masterTranscript
+          .filter(segment => {
+              const segmentStart = segment.words[0]?.masterStart || 0;
+              const segmentEnd = segment.words[segment.words.length - 1]?.masterEnd || 0;
+              return segmentStart >= range.originalStart && segmentEnd <= range.originalEnd;
+          })
+          .map(segment => ({
+              ...segment,
+              words: segment.words.map(word => {
+                  // Adjust timestamps to continuous timeline
+                  const offset = word.masterStart - range.originalStart;
+                  return {
                       ...word,
+                      masterStart: range.continuousStart + offset,
+                      masterEnd: range.continuousStart + (word.masterEnd - word.masterStart),
                       sourceFile: range.source.filename,
-                      sourceTime: word.start
-                  }))
-              }));
+                      sourceTime: word.start,
+                      originalTime: word.masterStart
+                  };
+              })
+          }));
+
+      console.log(`Adjusted transcript for ${range.source.filename}:`, {
+          originalRange: `${range.originalStart}-${range.originalEnd}`,
+          continuousRange: `${range.continuousStart}-${range.continuousEnd}`,
+          segmentCount: segments.length
       });
-  }
+
+      return segments;
+  });
+}
 
   getTranscriptSegment(start, end) {
       return this.masterTranscript

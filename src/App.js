@@ -236,15 +236,19 @@ function App() {
             {/* Main Content Area */}
             <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
             <BinViewerSection
-      clips={timelineClips}
-      selectedClips={selectedClips} // Pass array
-      onAddToTimeline={handleAddToTimeline}
-      transcriptData={selectedClips[0] ? 
-        transcripts.get(selectedClips[0].name.replace(/\.[^/.]+$/, '.json')) : null}
-      mergedContent={selectedClips.length > 1 ? 
-        masterClipManager.getSelectedContent(selectedClips.map(clip => clip.name)) : null}
-      masterClipManager={masterClipManager}
-    />
+              clips={timelineClips}
+              selectedClips={selectedClips}
+              onAddToTimeline={handleAddToTimeline}
+              transcriptData={selectedClips.length === 1 ? 
+                  masterClipManager.getTranscriptForClip(selectedClips[0].name) : null}
+              mergedContent={selectedClips.length > 1 ? (() => {
+                  console.log('Getting merged content for clips:', selectedClips);
+                  return masterClipManager.getSelectedContent(
+                      selectedClips.map(clip => clip.name)
+                  );
+              })() : null}
+              masterClipManager={masterClipManager}
+          />
               <TimelineViewerSection 
                 clips={timelineClips}
                 transcript={transcripts}

@@ -24,6 +24,17 @@ const BinViewerSection = ({
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
   const [mergeError, setMergeError] = useState(null);
 
+  const selectedContent = useMemo(() => {
+    if (selectedClips.length > 1) {
+        console.log('Creating merged view for clips:', 
+            selectedClips.map(c => c.name)
+        );
+        return masterClipManager.getSelectedContent(
+            selectedClips.map(c => c.name)
+        );
+    }
+    return null;
+}, [selectedClips, masterClipManager]);
 
   // Modified add to timeline handler to update timelineRows
   const handleAddToTimeline = (clipData) => {

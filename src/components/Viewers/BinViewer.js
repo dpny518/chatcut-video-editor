@@ -342,7 +342,56 @@ const BinViewer = ({
         )}
       </Box>
 
-      <Box sx={{ mb: 2, px: 1 }}>
+      <Box sx={{ 
+        mb: 2, 
+        px: 1,
+        position: 'relative',
+        height: '40px'
+      }}>
+        {/* Gap Indicators */}
+        {activeClip.isMerged && mergedContent?.gaps?.map((gap, index) => (
+          <Box
+            key={`gap-${index}`}
+            sx={{
+              position: 'absolute',
+              left: `${(gap.start / mergedContent.originalTotalDuration) * 100}%`,
+              width: `${(gap.duration / mergedContent.originalTotalDuration) * 100}%`,
+              height: '4px',
+              bottom: '20px',
+              bgcolor: 'error.main',
+              opacity: 0.5,
+              zIndex: 1
+            }}
+          />
+        ))}
+
+        {/* Clip Range Indicators */}
+        {activeClip.isMerged && mergedContent?.ranges?.map((range, index) => (
+          <Box
+            key={`range-${index}`}
+            sx={{
+              position: 'absolute',
+              left: `${(range.continuousStart / mergedContent.totalDuration) * 100}%`,
+              width: `${(range.duration / mergedContent.totalDuration) * 100}%`,
+              height: '4px',
+              bottom: '20px',
+              bgcolor: 'primary.main',
+              opacity: 0.5,
+              zIndex: 2,
+              '&::after': {
+                content: `"${range.source.filename.split('.')[0]}"`,
+                position: 'absolute',
+                bottom: '8px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: '10px',
+                whiteSpace: 'nowrap',
+                color: 'text.secondary'
+              }
+            }}
+          />
+        ))}
+
         <Slider
           value={range}
           onChange={handleRangeChange}
@@ -403,6 +452,7 @@ const BinViewer = ({
     </Box>
   );
 };
+
 BinViewer.propTypes = {
   clips: PropTypes.array,
   selectedClips: PropTypes.array,
