@@ -144,14 +144,21 @@ const timingValues = useMemo(() => ({
     };
   }, [timingValues]); 
 
+  const parseTimeString = (timeStr) => {
+    const parts = timeStr.split(':');
+    const minutes = parseInt(parts[0], 10);
+    const seconds = parseFloat(parts[1]);
+    return (minutes * 60) + seconds;
+  };
+  
   const thumbnailParams = useMemo(() => {
     const timingInfo = calculateCurrentTimes();
     if (!timingInfo) return null;
-
+  
     return {
       clipId: timingValues.clipId,
-      currentStart: parseFloat(timingInfo.currentStart.split(':').pop()),
-      currentEnd: parseFloat(timingInfo.currentEnd.split(':').pop()),
+      currentStart: parseTimeString(timingInfo.currentStart),
+      currentEnd: parseTimeString(timingInfo.currentEnd),
       width: containerWidth.current
     };
   }, [calculateCurrentTimes, timingValues.clipId]);
