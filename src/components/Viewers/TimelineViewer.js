@@ -4,10 +4,9 @@ import 'video-react/dist/video-react.css';
 import { Box, Button } from '@mui/material';
 import { PlayCircle, PauseCircle, SkipBack } from 'lucide-react';
 
-const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
+const TimelineViewer = ({ clips = [] }) => {
   const [timelineTime, setTimelineTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentSourceTime, setCurrentSourceTime] = useState(0);
   const [hasEnded, setHasEnded] = useState(false);
   const playerRef = useRef(null);
   const rafRef = useRef(null);
@@ -38,30 +37,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
     }
     return null;
   }, [clips]);
-
-  const getCurrentWords = useCallback(() => {
-    if (!transcriptData || !(transcriptData instanceof Map)) return [];
-    
-    const activeClip = getActiveClip(timelineTime);
-    if (!activeClip) return [];
-
-    const transcriptEntry = Array.from(transcriptData.values())[0];
-    if (!transcriptEntry?.transcription) return [];
-
-    const currentWords = [];
-    transcriptEntry.transcription.forEach(segment => {
-      segment.words.forEach(word => {
-        if (word.start <= currentSourceTime && word.end > currentSourceTime) {
-          currentWords.push({
-            ...word,
-            speaker: segment.segment.speaker
-          });
-        }
-      });
-    });
-
-    return currentWords;
-  }, [transcriptData, timelineTime, currentSourceTime, getActiveClip]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -124,8 +99,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
     if (!playerRef.current) return;
 
     const handleStateChange = (state) => {
-      setCurrentSourceTime(state.currentTime);
-      
       if (!currentClipRef.current) return;
 
       const activeClip = currentClipRef.current;
@@ -189,8 +162,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
 
-  const currentWords = getCurrentWords();
-
   if (!clips.length) {
     return <div>No clips loaded</div>;
   }
@@ -209,19 +180,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
             .video-react {
               position: relative;
             }
-            .subtitle-overlay {
-              position: absolute;
-              bottom: 80px;
-              left: 50%;
-              transform: translateX(-50%);
-              z-index: 1;
-              background-color: rgba(0, 0, 0, 0.7);
-              padding: 8px 16px;
-              border-radius: 4px;
-              text-align: center;
-              min-width: 200px;
-              max-width: 80%;
-            }
           `}
         </style>
         <Player
@@ -233,24 +191,6 @@ const TimelineViewer = ({ clips = [], transcriptData = [] }) => {
         >
           <source src={URL.createObjectURL(clips[0].file)} />
         </Player>
-        
-        {currentWords.length > 0 && (
-          <div className="subtitle-overlay">
-            <span style={{ color: 'white', fontSize: '1.2em', lineHeight: '1.4' }}>
-              {currentWords.map((word, index) => (
-                <span 
-                  key={index}
-                  style={{ 
-                    marginLeft: '4px',
-                    marginRight: '4px'
-                  }}
-                >
-                  {word.word}
-                </span>
-              ))}
-            </span>
-          </div>
-        )}
       </div>
 
       <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
