@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Box, Snackbar, Alert } from '@mui/material';
+import { Box, Snackbar, Alert, IconButton } from '@mui/material';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 
 // Layout components
 import MainLayout from './components/Layout/MainLayout';
@@ -19,21 +21,10 @@ import TimelineSection from './components/Timeline/TimelineSection';
 import TimelineDebug from './components/Timeline/TimelineDebug';
 import { useTimelineStateManager } from './hooks/useTimeline/useTimelineStateManager';
 
+// Contexts
+import { FileSystemProvider } from './contexts/FileSystemContext';
 
-
-
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: { main: '#0ea5e9' },
-    background: {
-      default: '#121212',
-      paper: '#1e1e1e',
-    },
-  },
-});
-
-function App() {
+const App = () => {
   // State
   const [mediaFiles, setMediaFiles] = useState([]);
   const [selectedBinClip, setSelectedBinClip] = useState(null);
@@ -41,14 +32,28 @@ function App() {
   const [notification, setNotification] = useState(null);
   const [selectedTimelineProject, setSelectedTimelineProject] = useState(null);
   const [transcripts, setTranscripts] = useState(new Map());
-
   const [chatMessages, setChatMessages] = useState([]);
   const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
+  const [themeMode, setThemeMode] = useState('dark');
 
-// Add this handler function:
-const handleChatMessage = (message) => {
-  setChatMessages(prev => [...prev, message]);
-};
+  const handleChatMessage = (message) => {
+    setChatMessages(prev => [...prev, message]);
+  };
+
+  const theme = createTheme({
+    palette: {
+      mode: themeMode,
+      primary: { main: '#0ea5e9' },
+      background: {
+        default: themeMode === 'dark' ? '#121212' : '#ffffff',
+        paper: themeMode === 'dark' ? '#1e1e1e' : '#f5f5f5',
+      },
+    },
+  });
+
+  const toggleThemeMode = () => {
+    setThemeMode((prevMode) => (prevMode === 'dark' ? 'light' : 'dark'));
+  };
 
   // Timeline metadata state
   const [timelineMetadata, setTimelineMetadata] = useState({
@@ -209,77 +214,90 @@ const handleChatMessage = (message) => {
     <StyledEngineProvider injectFirst>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <MainLayout
-          mediaFiles={mediaFiles}
-          selectedBinClip={selectedBinClip}
+        <FileSystemProvider 
           onFileUpload={handleFileUpload}
-          onFileSelect={handleFileSelect}
-          timelineProjects={{
-            selected: selectedTimelineProject,
-            onSave: handleTimelineProjectSave,
-            onLoad: handleTimelineProjectLoad,
-            onDelete: handleTimelineProjectDelete
-          }}
+          onError={(message) => showNotification(message, 'error')}
         >
-          <EditorLayout>
-            {/* Main Content Area */}
-            <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
-            <BinViewerSection
-            clips={timelineClips}
-            selectedClip={selectedBinClip}
-            onAddToTimeline={handleAddToTimeline}
-            transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
-            timelineState={timelineState}
-            setTimelineRows={setTimelineRows}
-                />
-              <TimelineViewerSection 
-                clips={timelineClips}
-                transcript={transcripts}
-                timelineState={timelineState} 
-              />
-            </Box>
+          <MainLayout
+            mediaFiles={mediaFiles}
+            selectedBinClip={selectedBinClip}
+            onFileSelect={handleFileSelect}
+            timelineProjects={{
+              selected: selectedTimelineProject,
+              onSave: handleTimelineProjectSave,
+              onLoad: handleTimelineProjectLoad,
+              onDelete: handleTimelineProjectDelete
+            }}
+          >
+            <EditorLayout>
+              {/* Theme Toggle Button */}
+              <IconButton
+                sx={{ ml: 1 }}
+                onClick={toggleThemeMode}
+                color="inherit"
+              >
+                {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+              </IconButton>
 
-            {/* Timeline and Controls Area */}
-            <Box sx={{ 
-              mt: 2, 
-              px: 2, 
-              pb: 2, 
-              bgcolor: 'background.default', 
-              borderTop: 1, 
-              borderColor: 'divider',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-              '& > *:last-child': {
-                marginBottom: '20px',
-              }
-            }}>
-              <TimelineSection
-             clips={timelineClips}
-             onClipsChange={handleTimelineClipsChange}
-             timelineState={timelineState}
-             timelineRows={timelineRows}
-             setTimelineRows={setTimelineRows}
+              {/* Main Content Area */}
+              <Box sx={{ display: 'flex', gap: 2, p: 2, pb: 0 }}>
+                <BinViewerSection
+                  clips={timelineClips}
+                  selectedClip={selectedBinClip}
+                  onAddToTimeline={handleAddToTimeline}
+                  transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
+                  timelineState={timelineState}
+                  setTimelineRows={setTimelineRows}
                 />
-              <TimelineDebug
-                timelineClips={timelineClips}
-                selectedBinClip={selectedBinClip}
-              />
-            </Box>
-          </EditorLayout>
-          <ChatBot 
-          clips={timelineClips}
-          messages={chatMessages}
-          onSendMessage={handleChatMessage}
-          selectedBinClip={selectedBinClip}
-          transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
-          onAddToTimeline={handleAddToTimeline}
-          timelineState={timelineState}
-          timelineRows={timelineRows}
-          setTimelineRows={setTimelineRows}
-          onClipsChange={handleTimelineClipsChange}
-          />
-        </MainLayout>
+                <TimelineViewerSection 
+                  clips={timelineClips}
+                  transcript={transcripts}
+                  timelineState={timelineState} 
+                />
+              </Box>
+
+              {/* Timeline and Controls Area */}
+              <Box sx={{ 
+                mt: 2, 
+                px: 2, 
+                pb: 2, 
+                bgcolor: 'background.default', 
+                borderTop: 1, 
+                borderColor: 'divider',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                '& > *:last-child': {
+                  marginBottom: '20px',
+                }
+              }}>
+                <TimelineSection
+                  clips={timelineClips}
+                  onClipsChange={handleTimelineClipsChange}
+                  timelineState={timelineState}
+                  timelineRows={timelineRows}
+                  setTimelineRows={setTimelineRows}
+                />
+                <TimelineDebug
+                  timelineClips={timelineClips}
+                  selectedBinClip={selectedBinClip}
+                />
+              </Box>
+            </EditorLayout>
+            <ChatBot 
+              clips={timelineClips}
+              messages={chatMessages}
+              onSendMessage={handleChatMessage}
+              selectedBinClip={selectedBinClip}
+              transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name.replace(/\.[^/.]+$/, '.json')) : null}
+              onAddToTimeline={handleAddToTimeline}
+              timelineState={timelineState}
+              timelineRows={timelineRows}
+              setTimelineRows={setTimelineRows}
+              onClipsChange={handleTimelineClipsChange}
+            />
+          </MainLayout>
+        </FileSystemProvider>
 
         {/* Notifications */}
         <Snackbar
@@ -298,7 +316,7 @@ const handleChatMessage = (message) => {
       </ThemeProvider>
     </StyledEngineProvider>
   );
-}
+};
 
 export default App;
 

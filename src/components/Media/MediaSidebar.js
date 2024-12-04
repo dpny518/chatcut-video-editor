@@ -1,391 +1,363 @@
-import React, { useState } from 'react';
+// src/components/Media/MediaSidebar.js
+import React, { useState, useCallback } from 'react';
 import { 
+  Button, 
+  IconButton, 
   Box, 
-  Typography, 
-  List, 
-  ListItem, 
-  ListItemIcon, 
-  ListItemText, 
-  LinearProgress, 
-  Button,
-  IconButton,
-  Tabs,
-  Tab,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField
+  Input,
+  Typography,
 } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import AudioFileIcon from '@mui/icons-material/AudioFile';
-import ImageIcon from '@mui/icons-material/Image';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import TextSnippetIcon from '@mui/icons-material/TextSnippet'; // Add this import
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import TimelineIcon from '@mui/icons-material/Timeline';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SaveIcon from '@mui/icons-material/Save';
+import {
+  Folder as FolderIcon,
+  Description as DescriptionIcon,
+  Image as ImageIcon,
+  AddCircleOutline as AddIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  KeyboardArrowRight as ArrowRightIcon,
+  KeyboardArrowDown as ArrowDownIcon,
+} from '@mui/icons-material';
+import { useFileSystem, FileType } from '../../contexts/FileSystemContext';
 
-const MediaSidebar = ({ 
-  files, 
-  onFileUpload, 
-  onFileSelect, 
-  selectedFile,
-  timelineProjects 
-}) => {
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState({});
-  const [currentTab, setCurrentTab] = useState(0);
-  const [contextMenu, setContextMenu] = useState(null);
+const FileTypeIcon = ({ type }) => {
+  switch (type) {
+    case 'folder':
+      return <FolderIcon fontSize="small" />;
+    case 'media':
+      return <ImageIcon fontSize="small" />;
+    default:
+      return <DescriptionIcon fontSize="small" />;
+  }
+};
 
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [newTimelineName, setNewTimelineName] = useState('');
+const FileItem = ({ file, onSelect, isSelected, onDelete }) => {
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        p: 1,
+        cursor: 'pointer',
+        bgcolor: isSelected ? 'action.selected' : 'transparent',
+        '&:hover': {
+          bgcolor: 'action.hover',
+        },
+        borderRadius: 1,
+      }}
+      onClick={() => onSelect(file)}
+    >
+      <FileTypeIcon type={file.type} />
+      <Typography
+        variant="body2"
+        sx={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}
+      >
+        {file.name}
+      </Typography>
+      {onDelete && (
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(file);
+          }}
+        >
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      )}
+    </Box>
+  );
+};
 
-  const handleSaveClick = () => {
-    setSaveDialogOpen(true);
-    setNewTimelineName(`Timeline ${new Date().toLocaleString()}`);
-  };
+const FileSystemTree = ({ parentId }) => {
+  const {
+    files,
+    selectedItems,
+    moveItem,
+    deleteItem,
+    renameItem,
+    createFolder,
+    getDirectoryItems
+  } = useFileSystem();
 
-  const handleSaveConfirm = () => {
-    if (newTimelineName.trim()) {
-      timelineProjects?.onSave?.(newTimelineName.trim());
-      setSaveDialogOpen(false);
+  const [openFolders, setOpenFolders] = useState(new Set());
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [newItemName, setNewItemName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [dragOverItemId, setDragOverItemId] = useState(null);
+
+  const toggleFolder = useCallback((folderId, e) => {
+    e.stopPropagation();
+    setOpenFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleCreateFolder = () => {
+    if (newItemName.trim()) {
+      createFolder(newItemName.trim(), parentId);
+      setNewItemName('');
+      setIsCreatingFolder(false);
     }
   };
 
-  const handleFileUpload = (event) => {
-    const uploadedFiles = Array.from(event.target.files);
-    setUploading(true);
-    console.log(uploading)
-    uploadedFiles.forEach(file => {
-      const fileId = Date.now() + Math.random();
-      setUploadProgress(prev => ({
-        ...prev,
-        [fileId]: 0
-      }));
+  const handleDelete = (e, itemId) => {
+    e.stopPropagation();
+    deleteItem(itemId);
+  };
 
-      // Simulate progress
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += Math.random() * 20;
-        if (progress > 100) {
-          progress = 100;
-          clearInterval(interval);
-          
-          // Remove this file's progress after completion
-          setUploadProgress(prev => {
-            const newProgress = { ...prev };
-            delete newProgress[fileId];
-            return newProgress;
-          });
-          
+  const handleRename = (e, itemId) => {
+    e.stopPropagation();
+    setEditingItemId(itemId);
+    setNewItemName(files[itemId].name);
+  };
+
+  const handleRenameSubmit = (itemId) => {
+    if (newItemName.trim()) {
+      renameItem(itemId, newItemName.trim());
+      setEditingItemId(null);
+      setNewItemName('');
+    }
+  };
+
+  const handleDragStart = (e, itemId) => {
+    e.dataTransfer.setData('text/plain', itemId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, itemId) => {
+    e.preventDefault();
+    setDragOverItemId(itemId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverItemId(null);
+  };
+
+  const handleDrop = (e, targetId) => {
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData('text/plain');
+    
+    if (draggedId !== targetId && files[targetId]?.type === FileType.FOLDER) {
+      moveItem(draggedId, targetId, null);
+    }
+    
+    setDragOverItemId(null);
+  };
+
+  const renderItem = (item) => {
+    const isFolder = item.type === FileType.FOLDER;
+    const isSelected = selectedItems.includes(item.id);
+    const isDraggedOver = dragOverItemId === item.id && isFolder;
+
+    return (
+      <Box
+        key={item.id}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          p: 1,
+          borderRadius: 1,
+          cursor: 'pointer',
+          bgcolor: isDraggedOver ? 'action.hover' : isSelected ? 'action.selected' : 'transparent',
+          '&:hover': {
+            bgcolor: 'action.hover',
+          },
+          border: isDraggedOver ? '2px dashed primary.main' : 'none',
+          transition: 'all 0.2s',
+        }}
+        draggable
+        onDragStart={(e) => handleDragStart(e, item.id)}
+        onDragOver={(e) => handleDragOver(e, item.id)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, item.id)}
+      >
+        {isFolder && (
+          <IconButton
+            size="small"
+            onClick={(e) => toggleFolder(item.id, e)}
+            sx={{ p: 0.5 }}
+          >
+            {openFolders.has(item.id) ? <ArrowDownIcon /> : <ArrowRightIcon />}
+          </IconButton>
+        )}
+        <FileTypeIcon type={item.type} />
+        {editingItemId === item.id ? (
+          <Input
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+            onBlur={() => handleRenameSubmit(item.id)}
+            onKeyPress={(e) => e.key === 'Enter' && handleRenameSubmit(item.id)}
+            size="small"
+            fullWidth
+            onClick={(e) => e.stopPropagation()}
+            autoFocus
+            sx={{ mx: 1 }}
+          />
+        ) : (
+          <Box sx={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {item.name}
+          </Box>
+        )}
+        <IconButton
+          size="small"
+          onClick={(e) => handleRename(e, item.id)}
+          sx={{ p: 0.5 }}
+        >
+          <EditIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={(e) => handleDelete(e, item.id)}
+          sx={{ p: 0.5 }}
+        >
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    );
+  };
+
+  const items = getDirectoryItems(parentId);
+
+  return (
+    <Box sx={{ pl: 2 }}>
+      {items.map(item => (
+        <React.Fragment key={item.id}>
+          {renderItem(item)}
+          {item.type === FileType.FOLDER && openFolders.has(item.id) && (
+            <Box sx={{ ml: 2 }}>
+              <FileSystemTree parentId={item.id} />
+            </Box>
+          )}
+        </React.Fragment>
+      ))}
+      {isCreatingFolder ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
+          <Input
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+            placeholder="New folder name"
+            size="small"
+            fullWidth
+            onKeyPress={(e) => e.key === 'Enter' && handleCreateFolder()}
+            autoFocus
+          />
+          <Button
+            size="small"
+            onClick={handleCreateFolder}
+            variant="contained"
+          >
+            Create
+          </Button>
+        </Box>
+      ) : (
+        <Button
+          startIcon={<AddIcon />}
+          onClick={() => setIsCreatingFolder(true)}
+          fullWidth
+          sx={{ mt: 1 }}
+        >
+          New Folder
+        </Button>
+      )}
+    </Box>
+  );
+};
+
+const MediaSidebar = ({ 
+  files = [],
+  onFileUpload,
+  onFileSelect,
+  selectedFile,
+  timelineProjects
+}) => {
+  const [uploadError, setUploadError] = useState(null);
+  const { addFile } = useFileSystem();
+
+  const handleFileUpload = async (event) => {
+    const files = event.target.files;
+    if (files?.length) {
+      for (const file of files) {
+        try {
+          await addFile(file, null);
           if (onFileUpload) {
             onFileUpload(file);
           }
-        } else {
-          setUploadProgress(prev => ({
-            ...prev,
-            [fileId]: progress
-          }));
+        } catch (error) {
+          console.error('Failed to upload file:', error);
+          setUploadError(error.message);
         }
-      }, 500);
-    });
-
-    // Reset uploading state when all files are done
-    const checkUploadComplete = setInterval(() => {
-      setUploadProgress(prev => {
-        if (Object.keys(prev).length === 0) {
-          setUploading(false);
-          clearInterval(checkUploadComplete);
-        }
-        return prev;
-      });
-    }, 1000);
-  };
-
-  const getFileIcon = (type) => {
-    if (type.startsWith('video/')) return <VideoFileIcon />;
-    if (type.startsWith('image/')) return <ImageIcon />;
-    if (type.startsWith('audio/')) return <AudioFileIcon />;
-    // Add handling for JSON/transcript files
-    if (type === 'application/json' || type.endsWith('.json')) return <TextSnippetIcon />;
-    return <InsertDriveFileIcon />;
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  // Timeline handling
-  const handleTimelineContextMenu = (event, timeline) => {
-    event.preventDefault();
-    setContextMenu({
-      mouseX: event.clientX - 2,
-      mouseY: event.clientY - 4,
-      timeline
-    });
-  };
-
-  const handleContextClose = () => {
-    setContextMenu(null);
-  };
-
-  const handleDeleteTimeline = () => {
-    if (contextMenu?.timeline) {
-      timelineProjects?.onDelete?.(contextMenu.timeline);
-      handleContextClose();
+      }
     }
-  };
-
-  const handleLoadTimeline = () => {
-    if (contextMenu?.timeline) {
-      timelineProjects?.onLoad?.(contextMenu.timeline);
-      handleContextClose();
-    }
+    event.target.value = '';
   };
 
   return (
-    <Box 
-      sx={{
-        width: 240,
-        height: '100%',
-        bgcolor: 'background.paper',
-        borderRight: 1,
-        borderColor: 'divider',
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-    >
-      {/* Tab Navigation */}
-      <Tabs 
-        value={currentTab} 
-        onChange={(_, newValue) => setCurrentTab(newValue)}
-        sx={{ borderBottom: 1, borderColor: 'divider' }}
-      >
-        <Tab label="Media" />
-        <Tab label="Timelines" />
-      </Tabs>
-
-      {/* Media Tab */}
-      {currentTab === 0 && (
-        <>
-       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6">Media</Typography>
-            <IconButton size="small">
-              <ExpandMoreIcon />
-            </IconButton>
-          </Box>
-
-          <Typography variant="caption" display="block" sx={{ mb: 1, color: 'text.secondary' }}>
-            Upload video files with matching .json transcripts
-          </Typography>
-
-          <label htmlFor="upload-input">
-            <input
-              id="upload-input"
-              type="file"
-              multiple
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-              accept="video/*,image/*,audio/*,.json" // Added .json
-            />
-            <Button
-              component="span"
-              variant="outlined"
-              startIcon={<CloudUploadIcon />}
-              fullWidth
-              sx={{ 
-                color: 'primary.main',
-                borderColor: 'primary.main',
-                '&:hover': {
-                  borderColor: 'primary.dark',
-                  bgcolor: 'action.hover'
-                }
-              }}
-            >
-              Upload
-            </Button>
-            </label>
-          </Box>
-
-          <List sx={{ flexGrow: 1, overflow: 'auto' }}>
-            {files?.map(file => (
-              <ListItem 
-                key={file.id}
-                selected={selectedFile?.id === file.id}
-                onClick={() => onFileSelect?.(file)}
-                sx={{
-                  borderBottom: 1,
-                  borderColor: 'divider',
-                  '&:hover': {
-                    bgcolor: 'action.hover'
-                  },
-                  cursor: 'pointer'
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  {getFileIcon(file.type)}
-                </ListItemIcon>
-                <ListItemText 
-                  primary={file.name}
-                  secondary={formatFileSize(file.size)}
-                  primaryTypographyProps={{
-                    variant: 'body2',
-                    noWrap: true
-                  }}
-                  secondaryTypographyProps={{
-                    variant: 'caption'
-                  }}
-                />
-              </ListItem>
-            ))}
-
-            {Object.entries(uploadProgress).map(([id, progress]) => (
-              progress < 100 && (
-                <ListItem 
-                  key={id}
-                  sx={{
-                    borderBottom: 1,
-                    borderColor: 'divider',
-                    display: 'block'
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    <CloudUploadIcon sx={{ mr: 1, fontSize: 20, color: 'primary.main' }} />
-                    <Typography variant="body2">Uploading...</Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={progress}
-                    sx={{ height: 2 }}
-                  />
-                </ListItem>
-              )
-            ))}
-          </List>
-        </>
-      )}
-
-      {/* Timelines Tab */}
-      {currentTab === 1 && (
-      <>
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Button
-            variant="outlined"
-            startIcon={<SaveIcon />}
-            fullWidth
-            onClick={handleSaveClick}
-            sx={{ 
-              color: 'primary.main',
-              borderColor: 'primary.main',
-              '&:hover': {
-                borderColor: 'primary.dark',
-                bgcolor: 'action.hover'
-              }
-            }}
-          >
-            Save Timeline
-          </Button>
-        </Box>
-
-        {/* Save Dialog */}
-        <Dialog 
-          open={saveDialogOpen} 
-          onClose={() => setSaveDialogOpen(false)}
-          maxWidth="sm"
+    <Box sx={{ 
+      width: '300px', 
+      height: '100%', 
+      borderRight: 1, 
+      borderColor: 'divider',
+      overflow: 'auto'
+    }}>
+      <Box sx={{ p: 2 }}>
+        <input
+          type="file"
+          id="media-upload"
+          multiple
+          onChange={handleFileUpload}
+          accept="video/*,image/*,audio/*,.json"
+          style={{ display: 'none' }}
+        />
+        <Button
+          variant="contained"
           fullWidth
+          onClick={() => document.getElementById('media-upload').click()}
+          sx={{ mb: 2 }}
         >
-          <DialogTitle>Save Timeline</DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Timeline Name"
-              fullWidth
-              value={newTimelineName}
-              onChange={(e) => setNewTimelineName(e.target.value)}
+          Upload Media
+        </Button>
+        {timelineProjects && (
+          <Box sx={{ mb: 2 }}>
+            <Button
               variant="outlined"
-              sx={{ mt: 1 }}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setSaveDialogOpen(false)}>
-              Cancel
+              fullWidth
+              onClick={timelineProjects.onSave}
+              sx={{ mb: 1 }}
+            >
+              Save Timeline
             </Button>
-            <Button onClick={handleSaveConfirm} variant="contained">
-              Save
-            </Button>
-          </DialogActions>
-        </Dialog>
-        
-          <List sx={{ flexGrow: 1, overflow: 'auto' }}>
-            {Object.entries(JSON.parse(localStorage.getItem('timelineProjects') || '{}')).map(([name, timeline]) => (
-              <ListItem
-                key={name}
-                selected={timelineProjects?.selected === name}
-                onContextMenu={(e) => handleTimelineContextMenu(e, name)}
-                onClick={() => timelineProjects?.onLoad?.(name)}
-                sx={{
-                  borderBottom: 1,
-                  borderColor: 'divider',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    bgcolor: 'action.hover'
-                  }
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  <TimelineIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary={name}
-                  secondary={new Date(timeline.timestamp).toLocaleString()}
-                  primaryTypographyProps={{
-                    variant: 'body2',
-                    noWrap: true
-                  }}
-                  secondaryTypographyProps={{
-                    variant: 'caption'
-                  }}
-                />
-              </ListItem>
-            ))}
-          </List>
-
-          {/* Context Menu */}
-          <Menu
-            open={contextMenu !== null}
-            onClose={handleContextClose}
-            anchorReference="anchorPosition"
-            anchorPosition={
-              contextMenu !== null
-                ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
-                : undefined
-            }
-          >
-            <MenuItem onClick={handleLoadTimeline}>
-              <ListItemIcon>
-                <TimelineIcon fontSize="small" />
-              </ListItemIcon>
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={timelineProjects.onLoad}
+            >
               Load Timeline
-            </MenuItem>
-            <MenuItem onClick={handleDeleteTimeline}>
-              <ListItemIcon>
-                <DeleteIcon fontSize="small" color="error" />
-              </ListItemIcon>
-              <Typography color="error">Delete Timeline</Typography>
-            </MenuItem>
-          </Menu>
-        </>
+            </Button>
+          </Box>
+        )}
+        <FileSystemTree 
+          parentId={null} 
+          onFileSelect={onFileSelect}
+          selectedFile={selectedFile}
+        />
+      </Box>
+      {uploadError && (
+        <Box sx={{ 
+          p: 2, 
+          color: 'error.main',
+          bgcolor: 'error.light',
+          mt: 2
+        }}>
+          {uploadError}
+        </Box>
       )}
     </Box>
   );
