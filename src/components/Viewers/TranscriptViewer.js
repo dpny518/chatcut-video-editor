@@ -13,15 +13,13 @@ const TranscriptViewer = ({ onAddToTimeline, timelineState }) => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const transcripts = useMemo(() => {
-    // Filter out folder IDs from selectedItems
     const selectedFileIds = selectedItems.filter(id => files[id] && files[id].type !== 'folder');
     return getTranscriptData(selectedFileIds);
   }, [selectedItems, getTranscriptData, files]);
 
   useEffect(() => {
     setIsProcessing(true);
-    console.log("Processing transcripts:", transcripts);
-
+    
     if (!transcripts.length) {
       setDisplayContent([]);
       setIsProcessing(false);
@@ -52,7 +50,6 @@ const TranscriptViewer = ({ onAddToTimeline, timelineState }) => {
           }
         }));
 
-        // Group continuous segments by the same speaker
         const groupedSegments = fileSegments.reduce((acc, segment) => {
           if (acc.length === 0 || acc[acc.length - 1][0].speaker !== segment.speaker) {
             acc.push([segment]);
@@ -84,11 +81,9 @@ const TranscriptViewer = ({ onAddToTimeline, timelineState }) => {
         return flatSegments[parseInt(segmentIndex)];
       })
       .sort((a, b) => {
-        // First, sort by file order
         const fileOrderA = transcripts.findIndex(t => t.id === a.fileId);
         const fileOrderB = transcripts.findIndex(t => t.id === b.fileId);
         if (fileOrderA !== fileOrderB) return fileOrderA - fileOrderB;
-        // If from the same file, sort by segment index
         return parseInt(a.globalIndex.split('-')[1]) - parseInt(b.globalIndex.split('-')[1]);
       });
 
@@ -118,22 +113,27 @@ const TranscriptViewer = ({ onAddToTimeline, timelineState }) => {
       }
     };
 
-    console.log('Adding to timeline:', clipData);
     onAddToTimeline(clipData);
   };
 
   return (
     <Card sx={{ 
-      height: '100%', 
-      display: 'flex', 
+      height: '100%',
+      display: 'flex',
       flexDirection: 'column',
       bgcolor: 'background.paper',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
     }}>
       {selectedSegments.size > 0 && (
         <Box sx={{ 
           p: 2, 
           borderBottom: 1, 
           borderColor: 'divider',
+          flexShrink: 0,
         }}>
           <Button
             variant="contained"
@@ -148,13 +148,16 @@ const TranscriptViewer = ({ onAddToTimeline, timelineState }) => {
 
       <Box sx={{ 
         flexGrow: 1,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
+        position: 'relative',
+        height: selectedSegments.size > 0 ? 'calc(100% - 72px)' : '100%',
       }}>
         <Box
           sx={{
-            flexGrow: 1,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             overflowY: 'auto',
             p: 2,
             maxWidth: '900px',

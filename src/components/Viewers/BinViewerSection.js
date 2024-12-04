@@ -1,4 +1,3 @@
-// src/components/Viewers/BinViewerSection.js
 import React, { useState } from 'react';
 import { 
   Box, 
@@ -11,17 +10,18 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import TranscriptViewer from './TranscriptViewer';
 
-const BinViewerSection = ({ onAddToTimeline, timelineState }) => {
+const BinViewerSection = () => {
   const [viewMode, setViewMode] = useState(1);
 
   return (
     <Paper 
       sx={{ 
-        flex: 1, 
+        flexGrow: 1,
         display: 'flex',
         flexDirection: 'column',
         bgcolor: 'background.default',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        height: '100vh'
       }}
     >
       <Box sx={{ 
@@ -61,7 +61,7 @@ const BinViewerSection = ({ onAddToTimeline, timelineState }) => {
       </Box>
 
       <Box sx={{ 
-        flex: 1, 
+        flexGrow: 1,
         position: 'relative',
         overflow: 'hidden'
       }}>
@@ -72,10 +72,7 @@ const BinViewerSection = ({ onAddToTimeline, timelineState }) => {
             </Typography>
           </Box>
         ) : (
-          <TranscriptViewer
-            onAddToTimeline={onAddToTimeline}
-            timelineState={timelineState}
-          />
+          <TranscriptViewer />
         )}
       </Box>
     </Paper>
