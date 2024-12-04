@@ -1,176 +1,117 @@
 // src/components/Viewers/TranscriptViewer.js
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Box,
-  Card,
-  IconButton,
-  Tooltip,
-  Button,
-  Typography,
-  CircularProgress,
-  Divider,
+  Box, Card, Button, Typography, CircularProgress, Divider,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  FormatStrikethrough as StrikethroughIcon,
-  HighlightAlt as HighlightIcon,
-  Search as SearchIcon,
-  ArrowUpward as InsertIcon,
-} from '@mui/icons-material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { useFileSystem } from '../../contexts/FileSystemContext';
 
-const ToolbarButton = ({ title, icon, onClick, disabled = false }) => (
-  <Tooltip title={title}>
-    <span>
-      <IconButton
-        onClick={onClick}
-        disabled={disabled}
-        size="small"
-        sx={{
-          color: 'text.secondary',
-          '&:hover': {
-            color: 'primary.main',
-            bgcolor: 'action.hover',
-          },
-        }}
-      >
-        {icon}
-      </IconButton>
-    </span>
-  </Tooltip>
-);
-
-const TranscriptToolbar = ({ onAction }) => (
-  <Box
-    sx={{
-      position: 'sticky',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      bgcolor: 'background.paper',
-      borderTop: 1,
-      borderColor: 'divider',
-      p: 0.5,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 0.5,
-      height: '48px',
-      zIndex: 1,
-    }}
-  >
-    <ToolbarButton
-      title="Insert Above"
-      icon={<InsertIcon fontSize="small" />}
-      onClick={() => onAction('insert')}
-    />
-    <ToolbarButton
-      title="Add Below"
-      icon={<AddIcon fontSize="small" />}
-      onClick={() => onAction('add')}
-    />
-    <Divider orientation="vertical" flexItem />
-    <ToolbarButton
-      title="Strikethrough"
-      icon={<StrikethroughIcon fontSize="small" />}
-      onClick={() => onAction('strikethrough')}
-    />
-    <ToolbarButton
-      title="Highlight"
-      icon={<HighlightIcon fontSize="small" />}
-      onClick={() => onAction('highlight')}
-    />
-    <Divider orientation="vertical" flexItem />
-    <ToolbarButton
-      title="Find/Match"
-      icon={<SearchIcon fontSize="small" />}
-      onClick={() => onAction('find')}
-    />
-  </Box>
-);
-
 const TranscriptViewer = ({ onAddToTimeline, timelineState }) => {
-  const { selectedItems, getTranscriptData } = useFileSystem();
+  const { selectedItems, getTranscriptData, getDirectoryItems } = useFileSystem();
   const [displayContent, setDisplayContent] = useState([]);
   const [selectedSegments, setSelectedSegments] = useState(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const transcripts = useMemo(() => getTranscriptData(selectedItems), [selectedItems, getTranscriptData]);
+  const transcripts = useMemo(() => {
+    const allItems = getDirectoryItems(null);
+    const sortedSelectedItems = allItems
+      .filter(item => selectedItems.includes(item.id))
+      .sort((a, b) => a.order - b.order)
+      .map(item => item.id);
 
-  console.log("TranscriptViewer received transcripts:", transcripts);
+    return getTranscriptData(sortedSelectedItems);
+  }, [selectedItems, getTranscriptData, getDirectoryItems]);
 
-  const processedTranscripts = useMemo(() => {
+  useEffect(() => {
+    setIsProcessing(true);
     console.log("Processing transcripts:", transcripts);
-    if (!transcripts || !transcripts.length) {
-      console.log("No transcripts to process");
-      return [];
+
+    if (!transcripts.length) {
+      setDisplayContent([]);
+      setIsProcessing(false);
+      return;
     }
 
-    const allSegments = transcripts.flatMap(transcript => {
-      try {
-        const serverResponse = JSON.parse(transcript.content);
-        console.log("Server response for file:", transcript.name, serverResponse);
-
-        if (!serverResponse.processed_data || !serverResponse.processed_data.transcript) {
-          console.log("Invalid processed data for file:", transcript.name);
-          return [];
+    const processTranscripts = () => {
+      return transcripts.map(transcript => {
+        const content = JSON.parse(transcript.content);
+        const fileContent = content.processed_data || content;
+        
+        if (!fileContent.transcript || !fileContent.transcript.segments) {
+          console.log("Transcript missing segments:", transcript);
+          return null;
         }
 
-        const { segments } = serverResponse.processed_data.transcript;
-
-        if (!segments || !Array.isArray(segments)) {
-          console.log("Invalid segments data for file:", transcript.name);
-          return [];
-        }
-
-        return segments.map((segment, index) => ({
+        const fileSegments = fileContent.transcript.segments.map((segment, index) => ({
           ...segment,
           fileId: transcript.id,
           fileName: transcript.name,
-          originalType: transcript.originalType,
           globalIndex: `${transcript.id}-${index}`,
+          metadata: {
+            ...segment.metadata,
+            transcript: {
+              fileId: transcript.id,
+              fileName: transcript.name
+            }
+          }
         }));
-      } catch (error) {
-        console.error(`Error parsing transcript ${transcript.name}:`, error);
-        return [];
-      }
-    });
 
-    // Sort all segments by start time
-    return allSegments.sort((a, b) => a.start_time - b.start_time);
+        // Group continuous segments by the same speaker
+        const groupedSegments = fileSegments.reduce((acc, segment) => {
+          if (acc.length === 0 || acc[acc.length - 1][0].speaker !== segment.speaker) {
+            acc.push([segment]);
+          } else {
+            acc[acc.length - 1].push(segment);
+          }
+          return acc;
+        }, []);
+
+        return {
+          fileId: transcript.id,
+          fileName: transcript.name,
+          groupedSegments
+        };
+      }).filter(Boolean);
+    };
+
+    const processed = processTranscripts();
+    setDisplayContent(processed);
+    setIsProcessing(false);
   }, [transcripts]);
 
-  useEffect(() => {
-    console.log("Setting display content:", processedTranscripts);
-    setIsProcessing(true);
-    setDisplayContent(processedTranscripts);
-    setIsProcessing(false);
-  }, [processedTranscripts]);
-
-  const handleSegmentClick = (globalIndex) => {
-    setSelectedSegments(prev => {
-      const newSelection = new Set(prev);
-      if (newSelection.has(globalIndex)) {
-        newSelection.delete(globalIndex);
-      } else {
-        newSelection.add(globalIndex);
-      }
-      return newSelection;
-    });
-  };
-
   const handleAddToTimeline = () => {
-    const selectedContent = Array.from(selectedSegments).map(globalIndex => {
-      const [fileId, segmentIndex] = globalIndex.split('-');
-      const transcriptFile = displayContent.find(t => t.fileId === fileId);
-      return transcriptFile.segments[parseInt(segmentIndex)];
-    }).sort((a, b) => a.start_time - b.start_time);
+    const selectedContent = Array.from(selectedSegments)
+      .map(globalIndex => {
+        const [fileId, segmentIndex] = globalIndex.split('-');
+        const transcriptFile = displayContent.find(t => t.fileId === fileId);
+        const flatSegments = transcriptFile.groupedSegments.flat();
+        return flatSegments[parseInt(segmentIndex)];
+      })
+      .sort((a, b) => {
+        // First, sort by file order
+        const fileOrderA = transcripts.findIndex(t => t.id === a.fileId);
+        const fileOrderB = transcripts.findIndex(t => t.id === b.fileId);
+        if (fileOrderA !== fileOrderB) return fileOrderA - fileOrderB;
+        // If from the same file, sort by segment index
+        return parseInt(a.globalIndex.split('-')[1]) - parseInt(b.globalIndex.split('-')[1]);
+      });
 
     if (!selectedContent.length) return;
 
     const clipData = {
       id: `clip-${Date.now()}`,
       type: 'transcript',
-      segments: selectedContent,
+      segments: selectedContent.map(segment => ({
+        ...segment,
+        metadata: {
+          ...segment.metadata,
+          timeline: {
+            start: segment.start_time,
+            end: segment.end_time,
+            duration: segment.end_time - segment.start_time,
+          }
+        }
+      })),
       metadata: {
         timeline: {
           start: timelineState.totalDuration,
@@ -185,12 +126,6 @@ const TranscriptViewer = ({ onAddToTimeline, timelineState }) => {
     onAddToTimeline(clipData);
   };
 
-  const formatTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
   return (
     <Card sx={{ 
       height: '100%', 
@@ -198,68 +133,117 @@ const TranscriptViewer = ({ onAddToTimeline, timelineState }) => {
       flexDirection: 'column',
       bgcolor: 'background.paper',
     }}>
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Button
-          variant="contained"
-          onClick={handleAddToTimeline}
-          disabled={!selectedSegments.size}
-        >
-          Add Selected to Timeline ({selectedSegments.size} segments)
-        </Button>
-      </Box>
+      {selectedSegments.size > 0 && (
+        <Box sx={{ 
+          p: 2, 
+          borderBottom: 1, 
+          borderColor: 'divider',
+        }}>
+          <Button
+            variant="contained"
+            onClick={handleAddToTimeline}
+            startIcon={<AddIcon />}
+            fullWidth
+          >
+            Add Selected to Timeline ({selectedSegments.size} segments)
+          </Button>
+        </Box>
+      )}
 
       <Box sx={{ 
         flexGrow: 1,
-        overflow: 'auto',
-        p: 2,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
-        {isProcessing ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : !displayContent.length ? (
-          <Box sx={{ textAlign: 'center', p: 4, color: 'text.secondary' }}>
-            <Typography>No transcript data available</Typography>
-          </Box>
-        ) : (
-          displayContent.map((segment) => {
-            const isSelected = selectedSegments.has(segment.globalIndex);
-            return (
-              <Box
-                key={segment.globalIndex}
-                sx={{
-                  p: 1,
-                  cursor: 'pointer',
-                  bgcolor: isSelected ? 'action.selected' : 'transparent',
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                  },
-                  borderRadius: 1,
-                  mb: 1,
-                  border: isSelected ? 1 : 0,
-                  borderColor: 'primary.main'
-                }}
-                onClick={() => handleSegmentClick(segment.globalIndex)}
-              >
-                <Typography variant="caption" color="text.secondary" display="block">
-                  [{formatTime(segment.start_time)} - {formatTime(segment.end_time)}] 
-                  {segment.fileName} ({segment.originalType})
+        <Box
+          sx={{
+            flexGrow: 1,
+            overflowY: 'auto',
+            p: 2,
+            maxWidth: '900px',
+            margin: '0 auto',
+          }}
+        >
+          {isProcessing ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : !displayContent.length ? (
+            <Box sx={{ textAlign: 'center', p: 4, color: 'text.secondary' }}>
+              <Typography>No transcript data available</Typography>
+            </Box>
+          ) : (
+            displayContent.map(file => (
+              <Box key={file.fileId} sx={{ mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  {file.fileName}
                 </Typography>
-                <Typography>
-                  <strong>{segment.speaker}:</strong> {segment.words ? segment.words.map(w => w.word).join(' ') : segment.text}
-                </Typography>
+                {file.groupedSegments.map((group, groupIndex) => (
+                  <Box key={`${file.fileId}-group-${groupIndex}`} sx={{ mb: 2 }}>
+                    <Typography 
+                      variant="subtitle2" 
+                      sx={{ 
+                        color: 'primary.main',
+                        mb: 0.5,
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.1em'
+                      }}
+                    >
+                      {group[0].speaker}
+                    </Typography>
+                    {group.map((segment) => {
+                      const isSelected = selectedSegments.has(segment.globalIndex);
+                      return (
+                        <Box
+                          key={segment.globalIndex}
+                          onClick={() => {
+                            setSelectedSegments(prev => {
+                              const newSelection = new Set(prev);
+                              if (newSelection.has(segment.globalIndex)) {
+                                newSelection.delete(segment.globalIndex);
+                              } else {
+                                newSelection.add(segment.globalIndex);
+                              }
+                              return newSelection;
+                            });
+                          }}
+                          sx={{
+                            py: 0.25,
+                            px: 1,
+                            cursor: 'pointer',
+                            borderRadius: 0.5,
+                            bgcolor: isSelected ? 'action.selected' : 'transparent',
+                            '&:hover': {
+                              bgcolor: 'action.hover'
+                            },
+                            transition: 'background-color 0.2s',
+                            borderLeft: isSelected ? 2 : 0,
+                            borderColor: 'primary.main',
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontFamily: 'system-ui',
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {segment.words ? segment.words.map(word => word.word).join(' ') : segment.text}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                ))}
+                <Divider sx={{ my: 2 }} />
               </Box>
-            );
-          })
-        )}
+            ))
+          )}
+        </Box>
       </Box>
-
-      <TranscriptToolbar 
-        onAction={(action) => {
-          console.log('Toolbar action:', action);
-          // Handle toolbar actions here
-        }}
-      />
     </Card>
   );
 };
