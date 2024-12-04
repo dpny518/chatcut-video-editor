@@ -1,46 +1,23 @@
+// src/components/Viewers/BinViewerSection.js
 import React, { useState } from 'react';
 import { 
   Box, 
-  Paper, 
-  Typography,
+  Paper,
   Tabs,
   Tab,
+  Typography,
 } from '@mui/material';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
-import BinViewer from './BinViewer';
-import TranscriptViewerSection from './TranscriptViewerSection';
-
+import TranscriptViewer from './TranscriptViewer';
 
 const BinViewerSection = ({ 
-  clips,
-  selectedClip, 
+  transcripts,
   onAddToTimeline,
-  transcriptData,
   timelineState,
-  onTranscriptUpload,
 }) => {
-  const [viewMode, setViewMode] = useState(0);
-  const [timelineRows, setTimelineRows] = useState([{ rowId: 0, clips: [], lastEnd: 0 }]);
-
-  // Modified add to timeline handler to update timelineRows
-  const handleAddToTimeline = (clipData) => {
-    // Call the parent's onAddToTimeline
-    onAddToTimeline?.(clipData);
-    
-    // Update local timelineRows state if needed
-    setTimelineRows(prev => {
-      const rowIndex = clipData.metadata.timeline.row;
-      const updated = [...prev];
-      while (updated.length <= rowIndex) {
-        updated.push({ rowId: updated.length, clips: [], lastEnd: 0 });
-      }
-      const targetRow = updated[rowIndex];
-      targetRow.clips.push(clipData);
-      targetRow.lastEnd = Math.max(targetRow.lastEnd, clipData.metadata.timeline.end);
-      return updated;
-    });
-  };
+  // Default to transcript view (1)
+  const [viewMode, setViewMode] = useState(1);
 
   return (
     <Paper 
@@ -48,39 +25,43 @@ const BinViewerSection = ({
         flex: 1, 
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: 'background.paper',
+        bgcolor: 'background.default',
         overflow: 'hidden'
       }}
     >
-      {/* Single header with view toggle */}
+      {/* Tabs header */}
       <Box sx={{ 
-        p: 2,
         borderBottom: 1, 
         borderColor: 'divider',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        bgcolor: 'background.paper',
       }}>
-        <Typography variant="subtitle1">
-          Bin Viewer
-        </Typography>
         <Tabs 
           value={viewMode} 
           onChange={(e, newValue) => setViewMode(newValue)}
-          sx={{ minHeight: 48 }}
+          sx={{ 
+            minHeight: 48,
+            '& .MuiTab-root': {
+              minHeight: 48,
+              color: 'text.secondary',
+            }
+          }}
         >
           <Tab
-            icon={<VideoFileIcon />}
+            icon={<PlayCircleOutlineIcon />}
             iconPosition="start"
-            label="Video"
-            sx={{ minHeight: 48 }}
+            label="VIDEO"
+            disabled
+            sx={{
+              opacity: 0.5,
+              '&.Mui-disabled': {
+                color: 'text.disabled',
+              }
+            }}
           />
           <Tab
             icon={<TextSnippetIcon />}
             iconPosition="start"
-            label="Transcript"
-            disabled={!transcriptData}
-            sx={{ minHeight: 48 }}
+            label="TRANSCRIPT"
           />
         </Tabs>
       </Box>
@@ -92,21 +73,16 @@ const BinViewerSection = ({
         overflow: 'hidden'
       }}>
         {viewMode === 0 ? (
-          <BinViewer
-            clips={clips}
-            selectedClip={selectedClip}
-            onAddToTimeline={handleAddToTimeline}
-            timelineRows={timelineRows}
-            setTimelineRows={setTimelineRows}
-          />
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography color="text.secondary">
+              Video viewer coming soon
+            </Typography>
+          </Box>
         ) : (
-          <TranscriptViewerSection
-            clips={clips}
-            selectedClip={selectedClip}
-            transcriptData={transcriptData}
-            onAddToTimeline={handleAddToTimeline}
-            timelineRows={timelineRows}
-            setTimelineRows={setTimelineRows}
+          <TranscriptViewer
+            transcripts={transcripts}
+            onAddToTimeline={onAddToTimeline}
+            timelineState={timelineState}
           />
         )}
       </Box>
