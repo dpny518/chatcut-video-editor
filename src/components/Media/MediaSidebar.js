@@ -181,7 +181,15 @@ const MediaSidebar = () => {
 };
 
 const FileItem = ({ file, depth = 0, onDragOver }) => {
-  const { moveItem, deleteItem, renameItem, selectedItems, setSelectedItems, files } = useFileSystem();
+  const { 
+    moveItem, 
+    deleteItem, 
+    renameItem, 
+    selectedItems, 
+    setSelectedItems, 
+    files,
+    getDirectoryItems
+  } = useFileSystem();
   const [anchorEl, setAnchorEl] = useState(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState(file.name);
@@ -239,15 +247,16 @@ const FileItem = ({ file, depth = 0, onDragOver }) => {
     }
   };
 
-  const getAllChildFiles = (folderId) => {
+  const getAllChildFiles = useCallback((folderId) => {
     const result = [];
 
     const traverse = (id) => {
-      const children = Object.values(files).filter(file => file.parentId === id);
+      const children = getDirectoryItems(id);
       children.forEach(child => {
         if (child.type !== 'folder') {
           result.push(child.id);
         } else {
+          result.push(child.id); // Include folder ID as well
           traverse(child.id);
         }
       });
@@ -255,21 +264,23 @@ const FileItem = ({ file, depth = 0, onDragOver }) => {
 
     traverse(folderId);
     return result;
-  };
+  }, [getDirectoryItems]);
 
-  const handleSelect = (event) => {
+  const handleSelect = useCallback((event) => {
     event.stopPropagation();
     if (file.type === 'folder') {
       const allChildFiles = getAllChildFiles(file.id);
       setSelectedItems(prev => {
         const newSelection = new Set(prev);
-        allChildFiles.forEach(childId => {
-          if (newSelection.has(childId)) {
-            newSelection.delete(childId);
-          } else {
-            newSelection.add(childId);
-          }
-        });
+        if (newSelection.has(file.id)) {
+          // Deselect folder and all its contents
+          newSelection.delete(file.id);
+          allChildFiles.forEach(childId => newSelection.delete(childId));
+        } else {
+          // Select folder and all its contents
+          newSelection.add(file.id);
+          allChildFiles.forEach(childId => newSelection.add(childId));
+        }
         return Array.from(newSelection);
       });
     } else {
@@ -283,7 +294,7 @@ const FileItem = ({ file, depth = 0, onDragOver }) => {
         return Array.from(newSelection);
       });
     }
-  };
+  }, [file, getAllChildFiles, setSelectedItems]);
 
   return (
     <Box

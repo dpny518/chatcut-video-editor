@@ -7,20 +7,16 @@ import { Add as AddIcon } from '@mui/icons-material';
 import { useFileSystem } from '../../contexts/FileSystemContext';
 
 const TranscriptViewer = ({ onAddToTimeline, timelineState }) => {
-  const { selectedItems, getTranscriptData, getDirectoryItems } = useFileSystem();
+  const { selectedItems, getTranscriptData, files } = useFileSystem();
   const [displayContent, setDisplayContent] = useState([]);
   const [selectedSegments, setSelectedSegments] = useState(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
 
   const transcripts = useMemo(() => {
-    const allItems = getDirectoryItems(null);
-    const sortedSelectedItems = allItems
-      .filter(item => selectedItems.includes(item.id))
-      .sort((a, b) => a.order - b.order)
-      .map(item => item.id);
-
-    return getTranscriptData(sortedSelectedItems);
-  }, [selectedItems, getTranscriptData, getDirectoryItems]);
+    // Filter out folder IDs from selectedItems
+    const selectedFileIds = selectedItems.filter(id => files[id] && files[id].type !== 'folder');
+    return getTranscriptData(selectedFileIds);
+  }, [selectedItems, getTranscriptData, files]);
 
   useEffect(() => {
     setIsProcessing(true);
