@@ -92,21 +92,29 @@ export const FileSystemProvider = ({ children, onError }) => {
       if (onError) {
         onError(error.message);
       }
-      throw error;
+    } finally {
+      setUploadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[file.name];
+        return newProgress;
+      });
     }
   }, [onError]);
 
   const createFolder = useCallback((name, parentId) => {
-    const id = Date.now().toString();
+    const folderId = Date.now().toString();
     setFiles(prev => {
-      const directoryItems = getDirectoryItems(parentId);
+      const directoryItems = Object.values(prev)
+        .filter(f => f.parentId === parentId)
+        .sort((a, b) => a.order - b.order);
+        
       const lastItem = directoryItems[directoryItems.length - 1];
       const order = lastItem ? lastItem.order + 1000 : 1000;
 
       return {
         ...prev,
-        [id]: {
-          id,
+        [folderId]: {
+          id: folderId,
           name,
           type: FileType.FOLDER,
           parentId,
@@ -114,18 +122,25 @@ export const FileSystemProvider = ({ children, onError }) => {
         }
       };
     });
-    return id;
   }, []);
 
-  const moveItem = useCallback((itemId, newParentId) => {
+  const moveItem = useCallback((itemId, newParentId, newOrder = null) => {
     setFiles(prev => {
       const newFiles = { ...prev };
       const item = newFiles[itemId];
-      if (!item) return prev;
+      const newParent = newFiles[newParentId];
 
-      const directoryItems = getDirectoryItems(newParentId);
-      const lastItem = directoryItems[directoryItems.length - 1];
-      const newOrder = lastItem ? lastItem.order + 1000 : 1000;
+      if (!item) return prev; // Item not found
+      if (!newParent && newParentId !== null) return prev; // New parent not found (unless it's the root)
+
+      // If the item is already in the correct place and order, do nothing
+      if (item.parentId === newParentId && (newOrder === null || item.order === newOrder)) return prev;
+
+      if (newOrder === null) {
+        const directoryItems = getDirectoryItems(newParentId);
+        const lastItem = directoryItems[directoryItems.length - 1];
+        newOrder = lastItem ? lastItem.order + 1000 : 1000;
+      }
 
       newFiles[itemId] = {
         ...item,
@@ -135,7 +150,7 @@ export const FileSystemProvider = ({ children, onError }) => {
 
       return newFiles;
     });
-  }, []);
+  }, [getDirectoryItems]);
 
   const deleteItem = useCallback((itemId) => {
     setFiles(prev => {
@@ -174,9 +189,19 @@ export const FileSystemProvider = ({ children, onError }) => {
         id: file.id,
         name: file.name,
         content: file.content,
-        originalType: file.type
+        originalType: file.type // Add this to keep track of the original file type
       }));
   }, [files]);
+
+  const renameItem = useCallback((itemId, newName) => {
+    setFiles(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        name: newName
+      }
+    }));
+  }, []);
 
   const value = useMemo(() => ({
     files,
@@ -188,8 +213,9 @@ export const FileSystemProvider = ({ children, onError }) => {
     deleteItem,
     getDirectoryItems,
     setSelectedItems,
-    getTranscriptData
-  }), [files, selectedItems, uploadProgress, addFile, createFolder, moveItem, deleteItem, getDirectoryItems, getTranscriptData]);
+    getTranscriptData,
+    renameItem
+  }), [files, selectedItems, uploadProgress, addFile, createFolder, moveItem, deleteItem, getDirectoryItems, getTranscriptData, renameItem]);
 
   return (
     <FileSystemContext.Provider value={value}>
