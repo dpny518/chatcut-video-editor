@@ -160,11 +160,21 @@ export const FileSystemProvider = ({ children, onError }) => {
   const getTranscriptData = useCallback((fileIds) => {
     return fileIds
       .map(id => files[id])
-      .filter(file => file && file.type === FileType.JSON)
+      .filter(file => {
+        if (!file) return false;
+        try {
+          const content = JSON.parse(file.content);
+          return content.processed_data && content.processed_data.transcript;
+        } catch (error) {
+          console.error(`Error parsing file content for ${file.name}:`, error);
+          return false;
+        }
+      })
       .map(file => ({
         id: file.id,
         name: file.name,
-        content: file.content
+        content: file.content,
+        originalType: file.type
       }));
   }, [files]);
 

@@ -11,12 +11,7 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import TranscriptViewer from './TranscriptViewer';
 
-const BinViewerSection = ({ 
-  transcripts,
-  onAddToTimeline,
-  timelineState,
-}) => {
-  // Default to transcript view (1)
+const BinViewerSection = ({ onAddToTimeline, timelineState }) => {
   const [viewMode, setViewMode] = useState(1);
 
   return (
@@ -29,7 +24,6 @@ const BinViewerSection = ({
         overflow: 'hidden'
       }}
     >
-      {/* Tabs header */}
       <Box sx={{ 
         borderBottom: 1, 
         borderColor: 'divider',
@@ -66,7 +60,6 @@ const BinViewerSection = ({
         </Tabs>
       </Box>
 
-      {/* Content area */}
       <Box sx={{ 
         flex: 1, 
         position: 'relative',
@@ -80,7 +73,6 @@ const BinViewerSection = ({
           </Box>
         ) : (
           <TranscriptViewer
-            transcripts={transcripts}
             onAddToTimeline={onAddToTimeline}
             timelineState={timelineState}
           />
