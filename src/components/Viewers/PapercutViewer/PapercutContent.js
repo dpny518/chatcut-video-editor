@@ -40,119 +40,138 @@ const PapercutContent = ({ papercutId }) => {
   }, [content, cursorPosition, splitSegmentAtCursor, deleteWordAtCursor, 
       updatePapercutContent, papercutId]);
 
-  return (
-    <Box sx={{ 
-      display: 'flex', 
-      height: '100%',
-      position: 'relative'
-    }}>
-      <Box 
-        sx={{ 
-          flex: 1,
-          overflow: 'auto',
-          p: 2
-        }}
-        tabIndex={0}
-        onKeyDown={handleKeyDown}
-      >
-        {content.map(segment => (
+      return (
+        <Box sx={{ 
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Scrollable Content Area */}
           <Box 
-            key={segment.id}
-            sx={{ mb: 2 }}
+            sx={{ 
+              flex: 1,
+              overflow: 'auto',
+              p: 2
+            }}
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
           >
-            <Box 
-              sx={{ 
-                mb: 2,
-                borderLeft: 3,
-                borderColor: getSpeakerColor(segment.speaker)
-                  .colors.edgeLine,
-                pl: 2
-              }}
-            >
-              <Typography 
-                variant="subtitle2" 
-                sx={{ 
-                  color: 'primary.main',
-                  mb: 0.5,
-                  fontWeight: 500,
-                  fontSize: '0.75rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em'
-                }}
+            {content.map(segment => (
+              <Box 
+                key={segment.id}
+                sx={{ mb: 2 }}
               >
-                {segment.speaker}
-              </Typography>
-              <Box>
-                {segment.words.map((word) => (
-                  <Typography
-                    key={word.id}
-                    component="span"
-                    variant="body2"
-                    onClick={() => handleWordClick(
-                      segment.id, 
-                      word.id, 
-                      word
-                    )}
-                    sx={{
-                      display: 'inline-block',
-                      cursor: 'pointer',
-                      px: 0.5,
-                      py: 0.25,
-                      borderRadius: 1,
-                      position: 'relative',
-                      backgroundColor: 
-                        cursorPosition?.segmentId === segment.id && 
-                        cursorPosition?.wordId === word.id 
-                          ? 'action.selected' 
-                          : 'transparent',
-                      '&:hover': {
-                        backgroundColor: 'action.hover'
-                      }
+                <Box 
+                  sx={{ 
+                    mb: 2,
+                    borderLeft: 3,
+                    borderColor: getSpeakerColor(segment.speaker).colors.edgeLine,
+                    pl: 2
+                  }}
+                >
+                  <Typography 
+                    variant="subtitle2" 
+                    sx={{ 
+                      color: 'primary.main',
+                      mb: 0.5,
+                      fontWeight: 500,
+                      fontSize: '0.75rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em'
                     }}
                   >
-                    {word.text}
-                    {cursorPosition?.segmentId === segment.id && 
-                     cursorPosition?.wordId === word.id && (
-                      <Box
+                    {segment.speaker}
+                  </Typography>
+                  <Box>
+                    {segment.words.map((word) => (
+                      <Typography
+                        key={word.id}
+                        component="span"
+                        variant="body2"
+                        onClick={() => handleWordClick(segment.id, word.id)}
                         sx={{
-                          position: 'absolute',
-                          right: 0,
-                          top: 0,
-                          width: 2,
-                          height: '100%',
-                          backgroundColor: 'primary.main',
-                          animation: 'blink 1s step-end infinite',
-                          '@keyframes blink': {
-                            '50%': {
-                              opacity: 0
-                            }
+                          display: 'inline-block',
+                          cursor: 'pointer',
+                          px: 0.5,
+                          py: 0.25,
+                          borderRadius: 1,
+                          position: 'relative',
+                          backgroundColor: 
+                            cursorPosition?.segmentId === segment.id && 
+                            cursorPosition?.wordId === word.id 
+                              ? 'action.selected' 
+                              : 'transparent',
+                          '&:hover': {
+                            backgroundColor: 'action.hover'
                           }
                         }}
-                      />
-                    )}
-                  </Typography>
-                ))}
+                      >
+                        {word.text}
+                        {cursorPosition?.segmentId === segment.id && 
+                         cursorPosition?.wordId === word.id && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              right: 0,
+                              top: 0,
+                              width: 2,
+                              height: '100%',
+                              backgroundColor: 'primary.main',
+                              animation: 'blink 1s step-end infinite',
+                              '@keyframes blink': {
+                                '50%': {
+                                  opacity: 0
+                                }
+                              }
+                            }}
+                          />
+                        )}
+                      </Typography>
+                    ))}
+                  </Box>
+                </Box>
               </Box>
-            </Box>
+            ))}
           </Box>
-        ))}
-      </Box>
-      
-      {cursorPosition && (
-        <WordMetadata 
-          word={content
-            .find(s => s.id === cursorPosition.segmentId)
-            ?.words.find(w => w.id === cursorPosition.wordId)
-          }
-          fileId={content
-            .find(s => s.id === cursorPosition.segmentId)
-            ?.fileId
-          }
-          sx={{ position: 'absolute', right: 0, top: 0 }}
-        />
-      )}
-    </Box>
-  );
-};
-
-export default PapercutContent;
+    
+          {/* Fixed Word Metadata at Bottom */}
+          {cursorPosition && (
+            <Box
+              sx={{
+                borderTop: 1,
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+                p: 2,
+              }}
+            >
+              <Typography variant="subtitle2" gutterBottom>
+                Word Metadata
+              </Typography>
+              {content
+                .find(s => s.id === cursorPosition.segmentId)
+                ?.words.find(w => w.id === cursorPosition.wordId)
+                && (
+                  <Box sx={{ display: 'flex', gap: 4 }}>
+                    <Typography variant="body2">
+                      Word: {content.find(s => s.id === cursorPosition.segmentId)
+                        .words.find(w => w.id === cursorPosition.wordId).text}
+                    </Typography>
+                    <Typography variant="body2">
+                      Start Time: {content.find(s => s.id === cursorPosition.segmentId)
+                        .words.find(w => w.id === cursorPosition.wordId).startTime}
+                    </Typography>
+                    <Typography variant="body2">
+                      End Time: {content.find(s => s.id === cursorPosition.segmentId)
+                        .words.find(w => w.id === cursorPosition.wordId).endTime}
+                    </Typography>
+                  </Box>
+                )}
+            </Box>
+          )}
+        </Box>
+      );
+    };
+    
+    export default PapercutContent;

@@ -1,13 +1,19 @@
 import React from 'react';
-import { Box, Tabs, Tab, Card } from '@mui/material';
+import { Box, Tabs, Tab, Card, IconButton } from '@mui/material';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 import PapercutContent from './PapercutContent';
+import { Plus } from 'lucide-react';
 
-const PapercutViewer = () => {
-  const { papercuts, activeTab, setActiveTab } = usePapercuts();
+
+const PapercutViewer = ({ transcriptData }) => {
+  const { papercuts, activeTab, setActiveTab, createNewPapercut } = usePapercuts();
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+  };
+
+  const handleNewPapercut = () => {
+    createNewPapercut();
   };
 
   const activePapercut = papercuts.find(p => p.id === activeTab);
@@ -18,18 +24,22 @@ const PapercutViewer = () => {
       display: 'flex',
       flexDirection: 'column',
       bgcolor: 'background.paper',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+      overflow: 'hidden'
     }}>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      {/* Tab Bar */}
+      <Box sx={{ 
+        borderBottom: 1, 
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        display: 'flex',
+        alignItems: 'center'
+      }}>
         <Tabs 
-          value={activeTab} 
+          value={activeTab}
           onChange={handleTabChange}
           variant="scrollable"
           scrollButtons="auto"
+          sx={{ flex: 1 }}
         >
           {papercuts.map(papercut => (
             <Tab 
@@ -39,18 +49,31 @@ const PapercutViewer = () => {
             />
           ))}
         </Tabs>
+        <IconButton 
+          onClick={handleNewPapercut}
+          sx={{ mx: 1 }}
+          size="small"
+        >
+          <Plus size={20} />
+        </IconButton>
       </Box>
       
-      <Box sx={{ flex: 1, overflow: 'hidden' }}>
+      {/* Content Area */}
+      <Box sx={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        overflow: 'hidden' 
+      }}>
         {activePapercut && (
           <PapercutContent
             content={activePapercut.content}
             papercutId={activePapercut.id}
+            transcriptData={transcriptData}
           />
         )}
       </Box>
     </Card>
   );
 };
-
 export default PapercutViewer;

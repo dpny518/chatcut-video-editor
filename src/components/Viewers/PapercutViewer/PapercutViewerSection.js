@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Paper, ToggleButtonGroup, ToggleButton, Tabs, Tab, IconButton } from '@mui/material';
 import { FileVideo, FileText, Plus } from 'lucide-react';
-import PapercutContent from './PapercutContent';
+import PapercutViewer from './index';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 
 const PapercutViewerSection = ({ transcriptData }) => {
@@ -30,6 +30,7 @@ const PapercutViewerSection = ({ transcriptData }) => {
       bgcolor: 'background.paper',
       overflow: 'hidden'
     }}>
+      {/* Header */}
       <Box sx={{ 
         p: 2, 
         borderBottom: 1, 
@@ -46,61 +47,20 @@ const PapercutViewerSection = ({ transcriptData }) => {
           exclusive
           size="small"
         >
-          <ToggleButton 
-            value="video" 
-            disabled
-          >
+          <ToggleButton value="video" disabled>
             <FileVideo className="w-4 h-4 mr-2" />
             Video
           </ToggleButton>
-          <ToggleButton 
-            value="transcript"
-          >
+          <ToggleButton value="transcript">
             <FileText className="w-4 h-4 mr-2" />
             Papercut
           </ToggleButton>
         </ToggleButtonGroup>
       </Box>
 
-      <Box sx={{ 
-        borderBottom: 1, 
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-        display: 'flex',
-        alignItems: 'center'
-      }}>
-        <Tabs 
-          value={activeTab}
-          onChange={handleTabChange}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ flex: 1 }}
-        >
-          {papercuts.map(papercut => (
-            <Tab 
-              key={papercut.id}
-              label={papercut.name}
-              value={papercut.id}
-            />
-          ))}
-        </Tabs>
-        <IconButton 
-          onClick={handleNewPapercut}
-          sx={{ mx: 1 }}
-          size="small"
-        >
-          <Plus size={20} />
-        </IconButton>
-      </Box>
-
+      {/* PapercutViewer */}
       <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {activePapercut && (
-          <PapercutContent
-            content={activePapercut.content}
-            papercutId={activePapercut.id}
-            transcriptData={transcriptData}
-          />
-        )}
+        <PapercutViewer transcriptData={transcriptData} />
       </Box>
     </Paper>
   );
