@@ -9,8 +9,11 @@ import MainLayout from './components/Layout/MainLayout';
 import EditorLayout from './components/Layout/EditorLayout';
 import BinViewerSection from './components/Viewers/BinViewerSection';
 import TimelineViewerSection from './components/Viewers/TimelineViewerSection';
+import PapercutViewerSection from './components/Viewers/PapercutViewerSection';
 import ChatBot from './components/Chatbot/ChatBot';
 import { FileSystemProvider } from './contexts/FileSystemContext';
+import { SpeakerColorProvider } from './contexts/SpeakerColorContext';
+import { PapercutProvider } from './contexts/PapercutContext';
 
 const App = () => {
   const [themeMode, setThemeMode] = useState('dark');
@@ -68,48 +71,63 @@ const App = () => {
           onFileUpload={handleFileUpload}
           onError={(message) => showNotification(message, 'error')}
         >
-          <MainLayout>
-            <EditorLayout>
-              <IconButton
-                sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1 }}
-                onClick={toggleThemeMode}
-                color="inherit"
-              >
-                {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-              </IconButton>
+          <SpeakerColorProvider>
+            <PapercutProvider>
+              <MainLayout>
+                <EditorLayout>
+                  <IconButton
+                    sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1 }}
+                    onClick={toggleThemeMode}
+                    color="inherit"
+                  >
+                    {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+                  </IconButton>
 
-              <Box sx={{ 
-                display: 'flex', 
-                height: 'calc(100vh - 48px)', 
-                overflow: 'hidden',
-                gap: 2,
-                p: 2
-              }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <BinViewerSection />
-                </Box>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <TimelineViewerSection 
-                    clips={[]}
-                    transcript={transcripts}
-                    timelineState={timelineState}
-                  />
-                </Box>
-              </Box>
-            </EditorLayout>
-            <ChatBot 
-              clips={[]}
-              messages={chatMessages}
-              onSendMessage={handleChatMessage}
-              selectedBinClip={selectedBinClip}
-              transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name) : null}
-              onAddToTimeline={() => {}}
-              timelineState={timelineState}
-              timelineRows={[]}
-              setTimelineRows={() => {}}
-              onClipsChange={() => {}}
-            />
-          </MainLayout>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    height: 'calc(100vh - 48px)', 
+                    overflow: 'hidden',
+                    gap: 2,
+                    p: 2
+                  }}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <BinViewerSection />
+                    </Box>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: 2, 
+                      flex: 1, 
+                      minWidth: 0 
+                    }}>
+                      <Box sx={{ flex: 1, minHeight: 0 }}>
+                        <TimelineViewerSection 
+                          clips={[]}
+                          transcript={transcripts}
+                          timelineState={timelineState}
+                        />
+                      </Box>
+                      <Box sx={{ flex: 1, minHeight: 0 }}>
+                        <PapercutViewerSection />
+                      </Box>
+                    </Box>
+                  </Box>
+                </EditorLayout>
+                <ChatBot 
+                  clips={[]}
+                  messages={chatMessages}
+                  onSendMessage={handleChatMessage}
+                  selectedBinClip={selectedBinClip}
+                  transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name) : null}
+                  onAddToTimeline={() => {}}
+                  timelineState={timelineState}
+                  timelineRows={[]}
+                  setTimelineRows={() => {}}
+                  onClipsChange={() => {}}
+                />
+              </MainLayout>
+            </PapercutProvider>
+          </SpeakerColorProvider>
         </FileSystemProvider>
 
         <Snackbar

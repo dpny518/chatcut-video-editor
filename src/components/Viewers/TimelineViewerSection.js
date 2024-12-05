@@ -1,11 +1,10 @@
-// src/components/Viewers/TimelineViewerSection.js
 import React, { useState } from 'react';
 import { Box, Paper, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import { FileVideo, FileText } from 'lucide-react';
 import TimelineViewer from './TimelineViewer';
-import TimelineTranscriptViewer from './TimelineTranscriptViewer';
+import PapercutViewerSection from './PapercutViewerSection';
 
-const TimelineViewerSection = ({ clips, currentClip, transcript,timelineState }) => {
+const TimelineViewerSection = ({ clips, currentClip, transcript, timelineState }) => {
   const [viewMode, setViewMode] = useState('video');
   
   return (
@@ -24,7 +23,9 @@ const TimelineViewerSection = ({ clips, currentClip, transcript,timelineState })
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        <Box sx={{ typography: 'subtitle1' }}>Timeline Viewer</Box>
+        <Box sx={{ typography: 'subtitle1' }}>
+          {viewMode === 'video' ? 'Video Viewer' : 'Papercut Editor'}
+        </Box>
         <ToggleButtonGroup
           value={viewMode}
           exclusive
@@ -37,7 +38,7 @@ const TimelineViewerSection = ({ clips, currentClip, transcript,timelineState })
           </ToggleButton>
           <ToggleButton value="transcript">
             <FileText className="w-4 h-4 mr-2" />
-            Transcript
+            Papercut
           </ToggleButton>
         </ToggleButtonGroup>
       </Box>
@@ -50,16 +51,13 @@ const TimelineViewerSection = ({ clips, currentClip, transcript,timelineState })
             transcriptData={transcript}
           />
         ) : (
-          <TimelineTranscriptViewer
-            key={clips.length} // Force refresh when clips array changes
-            clips={clips}
-            currentClip={currentClip}
+          <PapercutViewerSection
             transcriptData={transcript}
-            timelineState={timelineState}
           />
         )}
       </Box>
     </Paper>
   );
 };
+
 export default TimelineViewerSection;

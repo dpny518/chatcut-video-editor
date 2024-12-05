@@ -9,7 +9,6 @@ import {
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import TranscriptViewer from './TranscriptViewer';
-
 const BinViewerSection = () => {
   const [viewMode, setViewMode] = useState(1);
 
