@@ -1,9 +1,10 @@
+// PapercutContext.jsx
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const PapercutContext = createContext();
 
 const createInitialPapercut = () => ({
-  id: `papercut-${Date.now()}`, // Make unique using timestamp
+  id: `papercut-${Date.now()}`,
   name: 'Papercut 1',
   content: [],
   created: new Date(),
@@ -15,14 +16,31 @@ export function PapercutProvider({ children }) {
   const [activeTab, setActiveTab] = useState('papercut-default');
   const [cursorPosition, setCursorPosition] = useState(null);
 
+  const updateCursorPosition = useCallback((newPosition) => {
+    setCursorPosition(newPosition);
+  }, []);
+
+  const updatePapercutContent = useCallback((papercutId, newContent) => {
+    setPapercuts(prev => prev.map(papercut => {
+      if (papercut.id === papercutId) {
+        return {
+          ...papercut,
+          content: newContent,
+          modified: new Date()
+        };
+      }
+      return papercut;
+    }));
+  }, []);
+
   const addContentToPapercut = useCallback((papercutId, newContent) => {
-    console.log('Adding content to papercut:', papercutId, newContent);
     setPapercuts(prevPapercuts => {
       return prevPapercuts.map(papercut => {
         if (papercut.id === papercutId) {
           return {
             ...papercut,
-            content: [...papercut.content, ...newContent]
+            content: [...papercut.content, ...newContent],
+            modified: new Date()
           };
         }
         return papercut;
@@ -48,34 +66,16 @@ export function PapercutProvider({ children }) {
     }));
   }, []);
 
-  const updateCursorPosition = useCallback((newPosition) => {
-    setCursorPosition(newPosition);
-  }, []);
-
-  const createNewPapercut = useCallback(() => {
-    const newPapercut = {
-      id: `papercut-${Date.now()}`,
-      name: `Papercut ${papercuts.length + 1}`,
-      content: [],
-      created: new Date(),
-      modified: new Date()
-    };
-  
-    setPapercuts(prev => [...prev, newPapercut]);
-    setActiveTab(newPapercut.id); // Automatically switch to new papercut
-    return newPapercut.id;
-  }, [papercuts]);
-
   return (
     <PapercutContext.Provider value={{
       papercuts,
-      addContentToPapercut,
       activeTab,
       setActiveTab,
-      insertContentToPapercut,
       cursorPosition,
       updateCursorPosition,
-      createNewPapercut
+      updatePapercutContent,
+      addContentToPapercut,
+      insertContentToPapercut
     }}>
       {children}
     </PapercutContext.Provider>

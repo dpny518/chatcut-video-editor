@@ -3,17 +3,23 @@ import { Box, Typography } from '@mui/material';
 import { useSpeakerColors } from '../../../contexts/SpeakerColorContext';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 import WordMetadata from './WordMetadata';
-
+import { usePapercutActions } from '../../../hooks/usePapercut/usePapercutActions';
 const PapercutContent = ({ papercutId }) => {
   const { getSpeakerColor } = useSpeakerColors();
+  
+  // Get state and basic updates from context
   const { 
-    splitSegmentAtCursor, 
-    deleteWordAtCursor, 
     papercuts, 
     cursorPosition,
     updateCursorPosition,
     updatePapercutContent
   } = usePapercuts();
+
+  // Get complex operations from actions hook
+  const {
+    splitSegmentAtCursor,
+    deleteWordAtCursor
+  } = usePapercutActions();
 
   const content = useMemo(() => 
     papercuts.find(p => p.id === papercutId)?.content || [],
