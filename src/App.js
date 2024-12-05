@@ -14,6 +14,7 @@ import ChatBot from './components/Chatbot/ChatBot';
 import { FileSystemProvider } from './contexts/FileSystemContext';
 import { SpeakerColorProvider } from './contexts/SpeakerColorContext';
 import { PapercutProvider } from './contexts/PapercutContext';
+import { PapercutHistoryProvider } from './contexts/PapercutHistoryContext';
 
 const App = () => {
   const [themeMode, setThemeMode] = useState('dark');
@@ -72,48 +73,50 @@ const App = () => {
           onError={(message) => showNotification(message, 'error')}
         >
           <SpeakerColorProvider>
-            <PapercutProvider>
-              <MainLayout>
-                <EditorLayout>
-                  <IconButton
-                    sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1 }}
-                    onClick={toggleThemeMode}
-                    color="inherit"
-                  >
-                    {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-                  </IconButton>
+            <PapercutHistoryProvider>
+              <PapercutProvider>
+                <MainLayout>
+                  <EditorLayout>
+                    <IconButton
+                      sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1 }}
+                      onClick={toggleThemeMode}
+                      color="inherit"
+                    >
+                      {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+                    </IconButton>
 
-                  <Box sx={{ 
-                    display: 'flex', 
-                    height: 'calc(100vh - 48px)', 
-                    overflow: 'hidden',
-                    gap: 2,
-                    p: 2
-                  }}>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <BinViewerSection />
+                    <Box sx={{ 
+                      display: 'flex', 
+                      height: 'calc(100vh - 48px)', 
+                      overflow: 'hidden',
+                      gap: 2,
+                      p: 2
+                    }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <BinViewerSection />
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <PapercutViewerSection 
+                          transcriptData={transcripts}
+                        />
+                      </Box>
                     </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <PapercutViewerSection 
-                        transcriptData={transcripts}
-                      />
-                    </Box>
-                  </Box>
-                </EditorLayout>
-                <ChatBot 
-                  clips={[]}
-                  messages={chatMessages}
-                  onSendMessage={handleChatMessage}
-                  selectedBinClip={selectedBinClip}
-                  transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name) : null}
-                  onAddToTimeline={() => {}}
-                  timelineState={timelineState}
-                  timelineRows={[]}
-                  setTimelineRows={() => {}}
-                  onClipsChange={() => {}}
-                />
-              </MainLayout>
-            </PapercutProvider>
+                  </EditorLayout>
+                  <ChatBot 
+                    clips={[]}
+                    messages={chatMessages}
+                    onSendMessage={handleChatMessage}
+                    selectedBinClip={selectedBinClip}
+                    transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name) : null}
+                    onAddToTimeline={() => {}}
+                    timelineState={timelineState}
+                    timelineRows={[]}
+                    setTimelineRows={() => {}}
+                    onClipsChange={() => {}}
+                  />
+                </MainLayout>
+              </PapercutProvider>
+            </PapercutHistoryProvider>
           </SpeakerColorProvider>
         </FileSystemProvider>
 

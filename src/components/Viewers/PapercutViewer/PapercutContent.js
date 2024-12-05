@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   Box, 
   Typography,
@@ -10,6 +10,7 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useSpeakerColors } from '../../../contexts/SpeakerColorContext';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 import { usePapercutActions } from '../../../hooks/usePapercut/usePapercutActions';
+import { usePapercutHistory } from '../../../hooks/usePapercutHistory';
 import WordMetadata from './WordMetadata';
 
 const PapercutContent = ({ papercutId }) => {
@@ -26,6 +27,8 @@ const PapercutContent = ({ papercutId }) => {
     splitSegmentAtCursor,
     deleteWordAtCursor
   } = usePapercutActions();
+
+  const { currentState, pushState, undo, redo, canUndo, canRedo } = usePapercutHistory();
 
   // Drag state
   const [draggedSegment, setDraggedSegment] = useState(null);
@@ -83,7 +86,47 @@ const PapercutContent = ({ papercutId }) => {
     setDropPosition(null);
   };
 
-  const handleDrop = (e, targetSegmentId) => {
+  const handleContentUpdate = useCallback((newContent, operation) => {
+    const newState = {
+      id: papercutId,
+      content: newContent,
+      metadata: {
+        lastModified: Date.now(),
+        operation
+      }
+    };
+    pushState(newState);
+    updatePapercutContent(papercutId, newContent);
+  }, [papercutId, pushState, updatePapercutContent]);
+
+  const handleKeyDown = useCallback((event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+      event.preventDefault();
+      if (event.shiftKey && canRedo) {
+        redo();
+      } else if (canUndo) {
+        undo();
+      }
+      return;
+    }
+
+    if (!cursorPosition) return;
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const newContent = splitSegmentAtCursor(content, cursorPosition);
+      handleContentUpdate(newContent, 'split');
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      const updatedContent = deleteWordAtCursor(content, cursorPosition);
+      handleContentUpdate(updatedContent, 'delete');
+    }
+  }, [content, cursorPosition, canUndo, canRedo, undo, redo, 
+      splitSegmentAtCursor, deleteWordAtCursor, handleContentUpdate]);
+
+  const handleDrop = useCallback((e, targetSegmentId) => {
     e.preventDefault();
     const sourceSegmentId = e.dataTransfer.getData('text/plain');
     
@@ -100,27 +143,15 @@ const PapercutContent = ({ papercutId }) => {
     const [removedSegment] = newContent.splice(sourceIndex, 1);
     newContent.splice(targetIndex, 0, removedSegment);
 
-    updatePapercutContent(papercutId, newContent);
+    handleContentUpdate(newContent, 'move');
     handleDragEnd();
-  };
+  }, [content, dropPosition, handleContentUpdate]);
 
-  const handleKeyDown = useCallback((event) => {
-    if (!cursorPosition) return;
-
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      const newContent = splitSegmentAtCursor(content, cursorPosition);
-      updatePapercutContent(papercutId, newContent);
+  useEffect(() => {
+    if (currentState?.id === papercutId && currentState?.content) {
+      updatePapercutContent(papercutId, currentState.content);
     }
-
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      event.preventDefault();
-      const updatedContent = deleteWordAtCursor(content, cursorPosition);
-      updatePapercutContent(papercutId, updatedContent);
-    }
-  }, [content, cursorPosition, splitSegmentAtCursor, deleteWordAtCursor, 
-      updatePapercutContent, papercutId]);
-
+  }, [currentState, papercutId, updatePapercutContent]);
 
   const handleWordClick = useCallback((segmentId, wordId) => {
     const segmentIndex = content.findIndex(s => s.id === segmentId);
