@@ -1,13 +1,15 @@
 import React from 'react';
-import { Box, TextField, Button } from '@mui/material';
+import { Box, TextField, Button, useTheme } from '@mui/material';
 
 const ChatbotLayout = () => {
+  const theme = useTheme();
+
   return (
     <Box sx={{
       position: 'fixed',
       bottom: 0,
       left: 0,
-      width: '240px', // Match sidebar width
+      width: '240px',
       height: '300px',
       borderTop: 1,
       borderRight: 1,
@@ -16,6 +18,8 @@ const ChatbotLayout = () => {
       display: 'flex',
       flexDirection: 'column',
       zIndex: 1000,
+      borderRadius: '8px',
+      overflow: 'hidden',
     }}>
       <Box sx={{ 
         p: 1, 
@@ -30,19 +34,48 @@ const ChatbotLayout = () => {
 
       <Box sx={{ 
         flex: 1,
-        overflow: 'auto',
-        p: 1,
-        backgroundColor: '#1e1e1e'
+        overflowY: 'auto',
+        p: 2,
+        backgroundColor: 'background.default',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         {/* Chat messages would go here */}
+        <Box sx={{
+          alignSelf: 'flex-start',
+          maxWidth: '70%',
+          mb: 1.5,
+          p: '8px 12px',
+          borderRadius: '18px',
+          fontSize: '14px',
+          lineHeight: 1.4,
+          backgroundColor: 'grey.200',
+          color: 'text.primary',
+        }}>
+          Bot message
+        </Box>
+        <Box sx={{
+          alignSelf: 'flex-end',
+          maxWidth: '70%',
+          mb: 1.5,
+          p: '8px 12px',
+          borderRadius: '18px',
+          fontSize: '14px',
+          lineHeight: 1.4,
+          backgroundColor: 'primary.main',
+          color: 'primary.contrastText',
+        }}>
+          User message
+        </Box>
       </Box>
 
       <Box sx={{
-        p: 1,
+        p: 2,
         display: 'flex',
         gap: 1,
         borderTop: 1,
         borderColor: 'divider',
+        backgroundColor: 'background.paper',
       }}>
         <TextField
           size="small"
@@ -51,12 +84,13 @@ const ChatbotLayout = () => {
           fullWidth
           sx={{
             '& .MuiOutlinedInput-root': {
-              backgroundColor: '#2d2d2d',
+              backgroundColor: 'background.paper',
+              borderRadius: '20px',
               '& fieldset': {
-                borderColor: '#404040',
+                borderColor: 'grey.300',
               },
               '&:hover fieldset': {
-                borderColor: '#505050',
+                borderColor: 'grey.400',
               },
             },
           }}
@@ -64,7 +98,10 @@ const ChatbotLayout = () => {
         <Button 
           variant="contained" 
           color="primary"
-          sx={{ minWidth: '60px' }}
+          sx={{ 
+            minWidth: '60px',
+            borderRadius: '20px',
+          }}
         >
           Send
         </Button>

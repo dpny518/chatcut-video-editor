@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, TextField, Button, Select, MenuItem, FormControl, CircularProgress } from '@mui/material';
 import { promptTemplates } from './promptTemplates';
 import { sendToLLM, sendToLlama } from './Api';
+import { useTheme } from '@mui/material/styles';
 
 const ChatBot = ({ 
   onSendMessage, 
@@ -17,6 +18,7 @@ const ChatBot = ({
   const [input, setInput] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const theme = useTheme();
 
   const clearExistingClips = () => {
     // Clear the timeline rows
@@ -240,7 +242,7 @@ const ChatBot = ({
       borderTop: 1,
       borderRight: 1,
       borderColor: 'divider',
-      backgroundColor: 'background.paper',
+      backgroundColor: theme.palette.background.paper,
       display: 'flex',
       flexDirection: 'column',
       zIndex: 1000,
@@ -267,7 +269,7 @@ const ChatBot = ({
           flex: 1,
           overflow: 'auto',
           p: 1,
-          backgroundColor: '#1e1e1e'
+          backgroundColor: theme.palette.background.default
         }}
       >
         {messages.map((msg, index) => (
@@ -281,13 +283,13 @@ const ChatBot = ({
               wordBreak: 'break-word',
               ...(msg.sender === 'user' ? {
                 ml: 'auto',
-                backgroundColor: '#0ea5e9',
-                color: 'white',
+                backgroundColor: theme.palette.primary.main,
+                color: theme.palette.primary.contrastText,
               } : {
                 mr: 'auto',
-                backgroundColor: msg.isError ? '#ef4444' : 
-                               msg.isSuccess ? '#22c55e' : '#2d2d2d',
-                color: 'white',
+                backgroundColor: msg.isError ? theme.palette.error.main : 
+                               msg.isSuccess ? theme.palette.success.main : theme.palette.secondary.main,
+                color: theme.palette.secondary.contrastText,
               })
             }}
           >
@@ -307,7 +309,7 @@ const ChatBot = ({
           gap: 1,
           borderTop: 1,
           borderColor: 'divider',
-          backgroundColor: 'background.paper'
+          backgroundColor: theme.palette.background.paper
         }}
       >
         <FormControl size="small" fullWidth>
@@ -317,12 +319,12 @@ const ChatBot = ({
             displayEmpty
             disabled={isLoading}
             sx={{
-              backgroundColor: '#2d2d2d',
+              backgroundColor: theme.palette.background.paper,
               '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#404040',
+                borderColor: theme.palette.divider,
               },
               '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#505050',
+                borderColor: theme.palette.action.hover,
               },
             }}
           >
@@ -344,12 +346,12 @@ const ChatBot = ({
           fullWidth
           sx={{
             '& .MuiOutlinedInput-root': {
-              backgroundColor: '#2d2d2d',
+              backgroundColor: theme.palette.background.paper,
               '& fieldset': {
-                borderColor: '#404040',
+                borderColor: theme.palette.divider,
               },
               '&:hover fieldset': {
-                borderColor: '#505050',
+                borderColor: theme.palette.action.hover,
               },
             },
           }}

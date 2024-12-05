@@ -1,4 +1,5 @@
 import React from 'react';
+import { Box, Typography, Paper } from '@mui/material';
 
 const ChatbotResponseViewer = ({ response }) => {
   const handleCopy = (e) => {
@@ -13,22 +14,30 @@ const ChatbotResponseViewer = ({ response }) => {
   };
 
   return (
-    <div className="chatbot-response-viewer">
-      <h3>Chatbot Response</h3>
-      <div
+    <Box className="chatbot-response-viewer">
+      <Typography variant="h6" gutterBottom>
+        Chatbot Response
+      </Typography>
+      <Paper
+        elevation={1}
         onCopy={handleCopy}
-        style={{
+        sx={{
           minHeight: '100px',
           maxHeight: '300px',
           overflowY: 'auto',
-          border: '1px solid #ccc',
-          padding: '10px',
-          whiteSpace: 'pre-wrap'
+          p: 2,
+          whiteSpace: 'pre-wrap',
+          backgroundColor: 'background.paper',
+          '&:hover': {
+            backgroundColor: 'action.hover',
+          },
         }}
       >
-        {response}
-      </div>
-    </div>
+        <Typography variant="body2" color="text.primary">
+          {response}
+        </Typography>
+      </Paper>
+    </Box>
   );
 };
 
