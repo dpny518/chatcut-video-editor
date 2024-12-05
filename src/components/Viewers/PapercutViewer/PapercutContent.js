@@ -1,7 +1,8 @@
 import React, { useCallback } from 'react';
-import { Box, Typography, Paper } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { useSpeakerColors } from '../../../contexts/SpeakerColorContext';
 import { usePapercuts } from '../../../contexts/PapercutContext';
+import WordMetadata from './WordMetadata';
 
 const PapercutContent = ({ papercutId }) => {
   const { getSpeakerColor } = useSpeakerColors();
@@ -17,9 +18,11 @@ const PapercutContent = ({ papercutId }) => {
   const content = papercuts.find(p => p.id === papercutId)?.content || [];
 
   const handleWordClick = useCallback((segmentId, wordId, word) => {
-    updateCursorPosition({ segmentId, wordId, position: 'end' });
-  }, [updateCursorPosition]);
-
+    const segmentIndex = content.findIndex(s => s.id === segmentId);
+    const wordIndex = content[segmentIndex].words.findIndex(w => w.id === wordId);
+    updateCursorPosition({ segmentIndex, wordIndex });
+  }, [updateCursorPosition, content]);
+  
   const handleKeyDown = useCallback((event) => {
     if (!cursorPosition) return;
 
@@ -34,10 +37,15 @@ const PapercutContent = ({ papercutId }) => {
       const updatedContent = deleteWordAtCursor(content, cursorPosition);
       updatePapercutContent(papercutId, updatedContent);
     }
-  }, [content, cursorPosition, splitSegmentAtCursor, deleteWordAtCursor, updatePapercutContent, papercutId]);
+  }, [content, cursorPosition, splitSegmentAtCursor, deleteWordAtCursor, 
+      updatePapercutContent, papercutId]);
 
   return (
-    <Box sx={{ display: 'flex', height: '100%' }}>
+    <Box sx={{ 
+      display: 'flex', 
+      height: '100%',
+      position: 'relative'
+    }}>
       <Box 
         sx={{ 
           flex: 1,
@@ -56,7 +64,8 @@ const PapercutContent = ({ papercutId }) => {
               sx={{ 
                 mb: 2,
                 borderLeft: 3,
-                borderColor: getSpeakerColor(segment.speaker).colors.edgeLine,
+                borderColor: getSpeakerColor(segment.speaker)
+                  .colors.edgeLine,
                 pl: 2
               }}
             >
@@ -79,7 +88,11 @@ const PapercutContent = ({ papercutId }) => {
                     key={word.id}
                     component="span"
                     variant="body2"
-                    onClick={() => handleWordClick(segment.id, word.id, word)}
+                    onClick={() => handleWordClick(
+                      segment.id, 
+                      word.id, 
+                      word
+                    )}
                     sx={{
                       display: 'inline-block',
                       cursor: 'pointer',
@@ -124,36 +137,19 @@ const PapercutContent = ({ papercutId }) => {
           </Box>
         ))}
       </Box>
+      
       {cursorPosition && (
-        <Paper 
-          elevation={3}
-          sx={{ 
-            width: '300px', 
-            p: 2, 
-            position: 'sticky', 
-            top: 0, 
-            height: 'fit-content',
-            maxHeight: '100%',
-            overflow: 'auto'
-          }}
-        >
-          <Typography variant="h6" gutterBottom>Word Metadata</Typography>
-          {cursorPosition.segmentId && cursorPosition.wordId && (
-            <>
-              {content
-                .find(s => s.id === cursorPosition.segmentId)
-                ?.words.find(w => w.id === cursorPosition.wordId)
-                && (
-                  <>
-                    <Typography><strong>Word:</strong> {content.find(s => s.id === cursorPosition.segmentId).words.find(w => w.id === cursorPosition.wordId).text}</Typography>
-                    <Typography><strong>Start Time:</strong> {content.find(s => s.id === cursorPosition.segmentId).words.find(w => w.id === cursorPosition.wordId).startTime}</Typography>
-                    <Typography><strong>End Time:</strong> {content.find(s => s.id === cursorPosition.segmentId).words.find(w => w.id === cursorPosition.wordId).endTime}</Typography>
-                  </>
-                )
-              }
-            </>
-          )}
-        </Paper>
+        <WordMetadata 
+          word={content
+            .find(s => s.id === cursorPosition.segmentId)
+            ?.words.find(w => w.id === cursorPosition.wordId)
+          }
+          fileId={content
+            .find(s => s.id === cursorPosition.segmentId)
+            ?.fileId
+          }
+          sx={{ position: 'absolute', right: 0, top: 0 }}
+        />
       )}
     </Box>
   );

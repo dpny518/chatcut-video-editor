@@ -4,7 +4,7 @@ import {
   Paper,
   Tabs,
   Tab,
-  Typography,
+  Typography 
 } from '@mui/material';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
@@ -13,30 +13,30 @@ import TranscriptViewer from './TranscriptViewer';
 const BinViewerSection = () => {
   const [viewMode, setViewMode] = useState(1);
 
+  const handleViewChange = (e, newValue) => setViewMode(newValue);
+
   return (
-    <Paper 
-      sx={{ 
-        flexGrow: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        bgcolor: 'background.default',
-        overflow: 'hidden',
-        height: '100%', // Changed from '100vh' to '100%'
-      }}
-    >
+    <Paper sx={{ 
+      flexGrow: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      bgcolor: 'background.default',
+      overflow: 'hidden',
+      height: '100%'
+    }}>
       <Box sx={{ 
         borderBottom: 1, 
         borderColor: 'divider',
-        bgcolor: 'background.paper',
+        bgcolor: 'background.paper' 
       }}>
         <Tabs 
           value={viewMode} 
-          onChange={(e, newValue) => setViewMode(newValue)}
+          onChange={handleViewChange}
           sx={{ 
             minHeight: 48,
             '& .MuiTab-root': {
               minHeight: 48,
-              color: 'text.secondary',
+              color: 'text.secondary'
             }
           }}
         >
@@ -48,7 +48,7 @@ const BinViewerSection = () => {
             sx={{
               opacity: 0.5,
               '&.Mui-disabled': {
-                color: 'text.disabled',
+                color: 'text.disabled'
               }
             }}
           />
@@ -65,7 +65,7 @@ const BinViewerSection = () => {
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'column'
       }}>
         {viewMode === 0 ? (
           <Box sx={{ p: 2, textAlign: 'center' }}>
@@ -80,5 +80,6 @@ const BinViewerSection = () => {
     </Paper>
   );
 };
+
 
 export default BinViewerSection;

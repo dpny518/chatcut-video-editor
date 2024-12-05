@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 const PapercutContext = createContext();
 
 const createInitialPapercut = () => ({
-  id: 'papercut-default',
+  id: `papercut-${Date.now()}`, // Make unique using timestamp
   name: 'Papercut 1',
   content: [],
   created: new Date(),
@@ -58,8 +58,9 @@ export function PapercutProvider({ children }) {
       created: new Date(),
       modified: new Date()
     };
-
+  
     setPapercuts(prev => [...prev, newPapercut]);
+    setActiveTab(newPapercut.id); // Automatically switch to new papercut
     return newPapercut.id;
   }, [papercuts]);
 
