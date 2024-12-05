@@ -138,38 +138,17 @@ const PapercutContent = ({ papercutId }) => {
           </Box>
     
           {/* Fixed Word Metadata at Bottom */}
-          {cursorPosition && (
-            <Box
-              sx={{
-                borderTop: 1,
-                borderColor: 'divider',
-                bgcolor: 'background.paper',
-                p: 2,
-              }}
-            >
-              <Typography variant="subtitle2" gutterBottom>
-              WordMetadata
-              </Typography>
-              {content
-                .find(s => s.id === cursorPosition.segmentId)
-                ?.words.find(w => w.id === cursorPosition.wordId)
-                && (
-                  <Box sx={{ display: 'flex', gap: 4 }}>
-                    <Typography variant="body2">
-                      Word: {content.find(s => s.id === cursorPosition.segmentId)
-                        .words.find(w => w.id === cursorPosition.wordId).text}
-                    </Typography>
-                    <Typography variant="body2">
-                      Start Time: {content.find(s => s.id === cursorPosition.segmentId)
-                        .words.find(w => w.id === cursorPosition.wordId).startTime}
-                    </Typography>
-                    <Typography variant="body2">
-                      End Time: {content.find(s => s.id === cursorPosition.segmentId)
-                        .words.find(w => w.id === cursorPosition.wordId).endTime}
-                    </Typography>
-                  </Box>
-                )}
-            </Box>
+          {cursorPosition && content
+  .find(s => s.id === cursorPosition.segmentId)
+  ?.words.find(w => w.id === cursorPosition.wordId) && (
+    <WordMetadata
+      word={content
+        .find(s => s.id === cursorPosition.segmentId)
+        .words.find(w => w.id === cursorPosition.wordId)}
+      fileId={content
+        .find(s => s.id === cursorPosition.segmentId)
+        .sourceReference?.fileId}
+            />
           )}
         </Box>
       );
