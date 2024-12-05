@@ -9,6 +9,7 @@ import {
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import TranscriptViewer from './TranscriptViewer';
+
 const BinViewerSection = () => {
   const [viewMode, setViewMode] = useState(1);
 
@@ -20,7 +21,7 @@ const BinViewerSection = () => {
         flexDirection: 'column',
         bgcolor: 'background.default',
         overflow: 'hidden',
-        height: '100vh'
+        height: '100%', // Changed from '100vh' to '100%'
       }}
     >
       <Box sx={{ 
@@ -62,7 +63,9 @@ const BinViewerSection = () => {
       <Box sx={{ 
         flexGrow: 1,
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         {viewMode === 0 ? (
           <Box sx={{ p: 2, textAlign: 'center' }}>

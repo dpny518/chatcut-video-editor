@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Paper, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import { FileVideo, FileText } from 'lucide-react';
-import PapercutViewerSection from './PapercutViewerSection';
+import PapercutViewerSection from './PapercutViewer/PapercutViewerSection';
 
 const TimelineViewerSection = ({ transcript }) => {
   return (

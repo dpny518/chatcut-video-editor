@@ -9,7 +9,7 @@ import MainLayout from './components/Layout/MainLayout';
 import EditorLayout from './components/Layout/EditorLayout';
 import BinViewerSection from './components/Viewers/BinViewerSection';
 import TimelineViewerSection from './components/Viewers/TimelineViewerSection';
-import PapercutViewerSection from './components/Viewers/PapercutViewerSection';
+import PapercutViewerSection from './components/Viewers/PapercutViewer/PapercutViewerSection';
 import ChatBot from './components/Chatbot/ChatBot';
 import { FileSystemProvider } from './contexts/FileSystemContext';
 import { SpeakerColorProvider } from './contexts/SpeakerColorContext';
