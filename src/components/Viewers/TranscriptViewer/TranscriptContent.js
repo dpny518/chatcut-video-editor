@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { 
   Box, 
   Typography 
@@ -12,9 +12,28 @@ const TranscriptContent = ({
   onSelectionChange,
   highlightedWord = null 
 }) => {
-  const contentRef = React.useRef(null);
+  const contentRef = useRef(null);
 
   const { getSpeakerColor } = useSpeakerColors();
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      const selection = window.getSelection();
+      if (selection && contentRef.current.contains(selection.anchorNode)) {
+        const selectedText = selection.toString();
+        if (selectedText) {
+          onSelectionChange(selectedText);
+        } else {
+          onSelectionChange(null);
+        }
+      }
+    };
+
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [onSelectionChange]);
 
   const renderWord = (word, fileId) => (
     <Typography
@@ -139,7 +158,7 @@ const TranscriptContent = ({
 
   return (
     <Box 
-      onMouseUp={onSelectionChange}
+      ref={contentRef}
       sx={{ 
         width: '100%',
         overflow: 'hidden'

@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Tabs, Tab, Card, IconButton } from '@mui/material';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 import PapercutContent from './PapercutContent';
 import { Plus } from 'lucide-react';
 
-
 const PapercutViewer = ({ transcriptData }) => {
   const { papercuts, activeTab, setActiveTab, createNewPapercut } = usePapercuts();
+
+  // Set the first tab as active if no tab is selected
+  useEffect(() => {
+    if (!activeTab && papercuts.length > 0) {
+      setActiveTab(papercuts[0].id);
+    }
+  }, [activeTab, papercuts, setActiveTab]);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -60,20 +66,21 @@ const PapercutViewer = ({ transcriptData }) => {
       
       {/* Content Area */}
       <Box sx={{ 
-        flex: 1, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        overflow: 'hidden' 
-      }}>
-        {activePapercut && (
-          <PapercutContent
-            content={activePapercut.content}
-            papercutId={activePapercut.id}
-            transcriptData={transcriptData}
-          />
-        )}
-      </Box>
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          overflow: 'hidden' 
+        }}>
+          {activePapercut && (
+            <PapercutContent
+              content={activePapercut.content}
+              papercutId={activePapercut.id}
+              transcriptData={transcriptData}
+            />
+          )}
+        </Box>
     </Card>
   );
 };
+
 export default PapercutViewer;

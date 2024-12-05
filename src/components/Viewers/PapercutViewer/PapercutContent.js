@@ -50,13 +50,14 @@ const PapercutContent = ({ papercutId }) => {
         }}>
           {/* Scrollable Content Area */}
           <Box 
-            sx={{ 
-              flex: 1,
-              overflow: 'auto',
-              p: 2
-            }}
-            tabIndex={0}
-            onKeyDown={handleKeyDown}
+          sx={{ 
+            flex: 1,
+            overflowY: 'scroll', // Enables vertical scrolling when content overflows
+            overflowX: 'hidden', // Optional to disable horizontal scrolling
+            p: 2,
+          }}
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
           >
             {content.map(segment => (
               <Box 

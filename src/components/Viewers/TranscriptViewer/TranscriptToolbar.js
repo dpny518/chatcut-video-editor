@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Button } from '@mui/material';
 import { Add as AddIcon, InsertComment as InsertIcon } from '@mui/icons-material';
 
-const TranscriptToolbar = ({ selectedCount, onAddToTimeline, onAddToPapercut, onInsertToPapercut }) => {
+const TranscriptToolbar = ({ isSelectionActive, onAddToTimeline, onAddToPapercut, onInsertToPapercut }) => {
   return (
     <Box sx={{ 
       p: 2, 
@@ -16,27 +16,27 @@ const TranscriptToolbar = ({ selectedCount, onAddToTimeline, onAddToPapercut, on
         variant="contained"
         onClick={onAddToTimeline}
         startIcon={<AddIcon />}
-        disabled={selectedCount === 0}
+        disabled={!isSelectionActive}
       >
-        Add to Timeline {selectedCount > 0 && `(${selectedCount})`}
+        Add to Timeline
       </Button>
       <Button
         variant="contained"
         onClick={onAddToPapercut}
         startIcon={<AddIcon />}
         color="secondary"
-        disabled={selectedCount === 0}
+        disabled={!isSelectionActive}
       >
-        Add to Papercut {selectedCount > 0 && `(${selectedCount})`}
+        Add to Papercut
       </Button>
       <Button
         variant="contained"
         onClick={onInsertToPapercut}
         startIcon={<InsertIcon />}
         color="primary"
-        disabled={selectedCount === 0}
+        disabled={!isSelectionActive}
       >
-        Insert to Papercut {selectedCount > 0 && `(${selectedCount})`}
+        Insert to Papercut
       </Button>
     </Box>
   );

@@ -107,7 +107,7 @@ const TranscriptViewer = () => {
         </Box>
 
         <TranscriptToolbar 
-          selectedCount={selection ? 1 : 0}
+          isSelectionActive={!!selection}
           onAddToTimeline={handleTimelineAdd}
           onAddToPapercut={handleAddToPapercut}
           onInsertToPapercut={handleInsertToPapercut}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Paper, ToggleButtonGroup, ToggleButton, Tabs, Tab, IconButton } from '@mui/material';
 import { FileVideo, FileText, Plus } from 'lucide-react';
 import PapercutViewer from './index';
@@ -11,6 +11,12 @@ const PapercutViewerSection = ({ transcriptData }) => {
     setActiveTab, 
     createNewPapercut 
   } = usePapercuts();
+
+  useEffect(() => {
+    if (papercuts.length > 0 && !activeTab) {
+      setActiveTab(papercuts[0].id);
+    }
+  }, [papercuts, activeTab, setActiveTab]);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -28,6 +34,7 @@ const PapercutViewerSection = ({ transcriptData }) => {
       display: 'flex', 
       flexDirection: 'column',
       bgcolor: 'background.paper',
+      height: '100%',
       overflow: 'hidden'
     }}>
       {/* Header */}
@@ -59,7 +66,12 @@ const PapercutViewerSection = ({ transcriptData }) => {
       </Box>
 
       {/* PapercutViewer */}
-      <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      <Box sx={{ 
+        flex: 1, 
+        position: 'relative', 
+        overflow: 'hidden',
+        height: '500px'
+      }}>
         <PapercutViewer transcriptData={transcriptData} />
       </Box>
     </Paper>
