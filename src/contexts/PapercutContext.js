@@ -16,16 +16,18 @@ export function PapercutProvider({ children }) {
   const [cursorPosition, setCursorPosition] = useState(null);
 
   const addContentToPapercut = useCallback((papercutId, newContent) => {
-    setPapercuts(prev => prev.map(papercut => {
-      if (papercut.id === papercutId) {
-        return {
-          ...papercut,
-          content: [...papercut.content, ...newContent.map((item, index) => ({ ...item, id: `${papercutId}-${item.globalIndex}-${index}` }))],
-          modified: new Date()
-        };
-      }
-      return papercut;
-    }));
+    console.log('Adding content to papercut:', papercutId, newContent);
+    setPapercuts(prevPapercuts => {
+      return prevPapercuts.map(papercut => {
+        if (papercut.id === papercutId) {
+          return {
+            ...papercut,
+            content: [...papercut.content, ...newContent]
+          };
+        }
+        return papercut;
+      });
+    });
   }, []);
 
   const insertContentToPapercut = useCallback((papercutId, newContent, position) => {
@@ -67,9 +69,9 @@ export function PapercutProvider({ children }) {
   return (
     <PapercutContext.Provider value={{
       papercuts,
+      addContentToPapercut,
       activeTab,
       setActiveTab,
-      addContentToPapercut,
       insertContentToPapercut,
       cursorPosition,
       updateCursorPosition,

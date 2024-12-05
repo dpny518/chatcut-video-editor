@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { usePapercuts } from '../../contexts/PapercutContext';
+import { v4 as uuidv4 } from 'uuid';
 
 export function usePapercutActions() {
   const { addContentToPapercut, insertContentToPapercut, cursorPosition } = usePapercuts();
@@ -8,14 +9,14 @@ export function usePapercutActions() {
     console.log('Input segment:', segment);
     
     const transformedSegment = {
-      id: `segment-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      id: uuidv4(),
       speaker: segment.speaker,
       startTime: segment.start_time || segment.startTime,
       endTime: segment.end_time || segment.endTime,
       words: Array.isArray(segment.words) 
         ? segment.words.map((word, wordIndex) => {
             const transformedWord = {
-              id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              id: uuidv4(),
               text: word.word || word.text,
               startTime: word.start || word.startTime,
               endTime: word.end || word.endTime,
@@ -25,7 +26,7 @@ export function usePapercutActions() {
             return transformedWord;
           })
         : [{ 
-            id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            id: uuidv4(),
             text: segment.text,
             startTime: segment.start_time || segment.startTime,
             endTime: segment.end_time || segment.endTime,
@@ -37,19 +38,20 @@ export function usePapercutActions() {
         index: index
       }
     };
-  
+
     console.log('Transformed segment:', transformedSegment);
     return transformedSegment;
   }, []);
 
   const addToPapercut = useCallback((papercutId, selectedContent) => {
+    console.log('Adding content to papercut:', selectedContent);
     const transformedContent = selectedContent.map(transformSegment);
     addContentToPapercut(papercutId, transformedContent);
   }, [addContentToPapercut, transformSegment]);
 
-
   const insertToPapercut = useCallback((papercutId, selectedContent) => {
     if (cursorPosition) {
+      console.log('Inserting content to papercut:', selectedContent);
       const transformedContent = selectedContent.map((segment, index) => transformSegment(segment, index));
       insertContentToPapercut(papercutId, transformedContent, cursorPosition);
     } else {
