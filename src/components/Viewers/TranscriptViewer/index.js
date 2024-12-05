@@ -14,7 +14,7 @@ const TranscriptViewer = () => {
   const { selectedItems, getTranscriptData, files } = useFileSystem();
   const { handleAddToTimeline } = useTranscript();
   const { activeTab } = usePapercuts();
-  const { addToPapercut } = usePapercutActions();
+  const { addToPapercut, insertToPapercut } = usePapercutActions();
   
   const transcripts = useMemo(() => {
     const selectedFileIds = selectedItems.filter(id => files[id] && files[id].type !== 'folder');
@@ -34,14 +34,24 @@ const TranscriptViewer = () => {
   };
 
   const handleAddToPapercut = () => {
-    const selectedContent = getSelectedContent();
-    console.log('Selected content for Papercut:', selectedContent);
-    
-    if (selectedContent.length > 0) {
+    if (selection) {
+      const selectedContent = getSelectedContent();
+      console.log('Adding to Papercut:', selectedContent);
       addToPapercut(activeTab, selectedContent);
       clearSelection();
     } else {
-      console.log('No valid selection available for Papercut');
+      console.log('No selection available for Papercut');
+    }
+  };
+
+  const handleInsertToPapercut = () => {
+    if (selection) {
+      const selectedContent = getSelectedContent();
+      console.log('Inserting to Papercut:', selectedContent);
+      insertToPapercut(activeTab, selectedContent);
+      clearSelection();
+    } else {
+      console.log('No selection available for Papercut insertion');
     }
   };
 
@@ -67,6 +77,7 @@ const TranscriptViewer = () => {
           selectedCount={selection ? 1 : 0}
           onAddToTimeline={handleTimelineAdd}
           onAddToPapercut={handleAddToPapercut}
+          onInsertToPapercut={handleInsertToPapercut}
         />
       </Box>
     </Card>

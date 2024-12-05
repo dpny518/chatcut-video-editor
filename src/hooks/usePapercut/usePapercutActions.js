@@ -2,7 +2,62 @@ import { useCallback } from 'react';
 import { usePapercuts } from '../../contexts/PapercutContext';
 
 export function usePapercutActions() {
-  const { addContentToPapercut } = usePapercuts();
+  const { addContentToPapercut, insertContentToPapercut, cursorPosition } = usePapercuts();
+
+  const addToPapercut = useCallback((papercutId, selectedContent) => {
+    const transformedContent = selectedContent.map(segment => ({
+      id: `segment-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      speaker: segment.speaker,
+      words: Array.isArray(segment.words) 
+        ? segment.words.map(word => ({
+            id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            text: word.word || word.text,
+            startTime: word.start || word.startTime,
+            endTime: word.end || word.endTime
+          }))
+        : [{ // If segment.words is not an array, create a single word object
+            id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            text: segment.text,
+            startTime: segment.start,
+            endTime: segment.end
+          }],
+      sourceReference: {
+        fileId: segment.fileId,
+        segmentId: segment.globalIndex
+      }
+    }));
+  
+    addContentToPapercut(papercutId, transformedContent);
+  }, [addContentToPapercut]);
+
+  const insertToPapercut = useCallback((papercutId, selectedContent) => {
+    if (cursorPosition) {
+      const transformedContent = selectedContent.map(segment => ({
+        id: `segment-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        speaker: segment.speaker,
+        words: Array.isArray(segment.words) 
+          ? segment.words.map(word => ({
+              id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              text: word.word || word.text,
+              startTime: word.start || word.startTime,
+              endTime: word.end || word.endTime
+            }))
+          : [{ // If segment.words is not an array, create a single word object
+              id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              text: segment.text,
+              startTime: segment.start,
+              endTime: segment.end
+            }],
+        sourceReference: {
+          fileId: segment.fileId,
+          segmentId: segment.globalIndex
+        }
+      }));
+      insertContentToPapercut(papercutId, transformedContent, cursorPosition);
+    } else {
+      console.warn('No cursor position set for insert operation');
+    }
+  }, [insertContentToPapercut, cursorPosition]);
 
   const splitSegmentAtCursor = useCallback((content, cursorPosition) => {
     if (!cursorPosition?.segmentId || !cursorPosition?.wordId) {
@@ -59,35 +114,10 @@ export function usePapercutActions() {
     });
   }, []);
 
-  const addToPapercut = useCallback((papercutId, selectedContent) => {
-    const transformedContent = selectedContent.map(segment => ({
-      id: `segment-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      speaker: segment.speaker,
-      words: Array.isArray(segment.words) 
-        ? segment.words.map(word => ({
-            id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            text: word.word || word.text,
-            startTime: word.start || word.startTime,
-            endTime: word.end || word.endTime
-          }))
-        : [{ // If segment.words is not an array, create a single word object
-            id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            text: segment.text,
-            startTime: segment.start,
-            endTime: segment.end
-          }],
-      sourceReference: {
-        fileId: segment.fileId,
-        segmentId: segment.globalIndex
-      }
-    }));
-  
-    addContentToPapercut(papercutId, transformedContent);
-  }, [addContentToPapercut]);
-
   return {
     splitSegmentAtCursor,
     deleteWordAtCursor,
-    addToPapercut
+    addToPapercut,
+    insertToPapercut
   };
 }

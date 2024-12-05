@@ -13,6 +13,7 @@ const createInitialPapercut = () => ({
 export function PapercutProvider({ children }) {
   const [papercuts, setPapercuts] = useState([createInitialPapercut()]);
   const [activeTab, setActiveTab] = useState('papercut-default');
+  const [cursorPosition, setCursorPosition] = useState(null);
 
   const addContentToPapercut = useCallback((papercutId, newContent) => {
     setPapercuts(prev => prev.map(papercut => {
@@ -27,10 +28,14 @@ export function PapercutProvider({ children }) {
     }));
   }, []);
 
-  
-  const updatePapercutContent = useCallback((papercutId, updatedContent) => {
+  const insertContentToPapercut = useCallback((papercutId, newContent, position) => {
     setPapercuts(prev => prev.map(papercut => {
       if (papercut.id === papercutId) {
+        const updatedContent = [
+          ...papercut.content.slice(0, position),
+          ...newContent,
+          ...papercut.content.slice(position)
+        ];
         return {
           ...papercut,
           content: updatedContent,
@@ -39,6 +44,10 @@ export function PapercutProvider({ children }) {
       }
       return papercut;
     }));
+  }, []);
+
+  const updateCursorPosition = useCallback((newPosition) => {
+    setCursorPosition(newPosition);
   }, []);
 
   const createNewPapercut = useCallback(() => {
@@ -60,7 +69,9 @@ export function PapercutProvider({ children }) {
       activeTab,
       setActiveTab,
       addContentToPapercut,
-      updatePapercutContent,
+      insertContentToPapercut,
+      cursorPosition,
+      updateCursorPosition,
       createNewPapercut
     }}>
       {children}
