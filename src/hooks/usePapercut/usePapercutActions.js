@@ -4,60 +4,58 @@ import { usePapercuts } from '../../contexts/PapercutContext';
 export function usePapercutActions() {
   const { addContentToPapercut, insertContentToPapercut, cursorPosition } = usePapercuts();
 
-  const addToPapercut = useCallback((papercutId, selectedContent) => {
-    const transformedContent = selectedContent.map(segment => ({
+  const transformSegment = useCallback((segment, index) => {
+    console.log('Input segment:', segment);
+    
+    const transformedSegment = {
       id: `segment-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       speaker: segment.speaker,
+      startTime: segment.start_time || segment.startTime,
+      endTime: segment.end_time || segment.endTime,
       words: Array.isArray(segment.words) 
-        ? segment.words.map(word => ({
-            id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            text: word.word || word.text,
-            startTime: word.start || word.startTime,
-            endTime: word.end || word.endTime
-          }))
-        : [{ // If segment.words is not an array, create a single word object
-            id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            text: segment.text,
-            startTime: segment.start,
-            endTime: segment.end
-          }],
-      sourceReference: {
-        fileId: segment.fileId,
-        segmentId: segment.globalIndex
-      }
-    }));
-  
-    addContentToPapercut(papercutId, transformedContent);
-  }, [addContentToPapercut]);
-
-  const insertToPapercut = useCallback((papercutId, selectedContent) => {
-    if (cursorPosition) {
-      const transformedContent = selectedContent.map(segment => ({
-        id: `segment-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        speaker: segment.speaker,
-        words: Array.isArray(segment.words) 
-          ? segment.words.map(word => ({
+        ? segment.words.map((word, wordIndex) => {
+            const transformedWord = {
               id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
               text: word.word || word.text,
               startTime: word.start || word.startTime,
-              endTime: word.end || word.endTime
-            }))
-          : [{ // If segment.words is not an array, create a single word object
-              id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-              text: segment.text,
-              startTime: segment.start,
-              endTime: segment.end
-            }],
-        sourceReference: {
-          fileId: segment.fileId,
-          segmentId: segment.globalIndex
-        }
-      }));
+              endTime: word.end || word.endTime,
+              index: wordIndex
+            };
+            console.log('Transformed word:', transformedWord);
+            return transformedWord;
+          })
+        : [{ 
+            id: `word-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            text: segment.text,
+            startTime: segment.start_time || segment.startTime,
+            endTime: segment.end_time || segment.endTime,
+            index: 0
+          }],
+      sourceReference: {
+        fileId: segment.fileId,
+        segmentId: segment.globalIndex || segment.id,
+        index: index
+      }
+    };
+  
+    console.log('Transformed segment:', transformedSegment);
+    return transformedSegment;
+  }, []);
+
+  const addToPapercut = useCallback((papercutId, selectedContent) => {
+    const transformedContent = selectedContent.map(transformSegment);
+    addContentToPapercut(papercutId, transformedContent);
+  }, [addContentToPapercut, transformSegment]);
+
+
+  const insertToPapercut = useCallback((papercutId, selectedContent) => {
+    if (cursorPosition) {
+      const transformedContent = selectedContent.map((segment, index) => transformSegment(segment, index));
       insertContentToPapercut(papercutId, transformedContent, cursorPosition);
     } else {
       console.warn('No cursor position set for insert operation');
     }
-  }, [insertContentToPapercut, cursorPosition]);
+  }, [insertContentToPapercut, cursorPosition, transformSegment]);
 
   const splitSegmentAtCursor = useCallback((content, cursorPosition) => {
     if (!cursorPosition?.segmentId || !cursorPosition?.wordId) {

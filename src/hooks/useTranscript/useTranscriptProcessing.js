@@ -27,6 +27,7 @@ const useProcessTranscripts = (transcripts) => {
         }
 
         const fileSegments = fileContent.transcript.segments.map((segment, segmentIndex) => {
+          console.log('Original segment:', segment);
           const processedWords = segment.words.map((word, wordIndex) => ({
             ...word,
             id: `${transcript.id}-${segmentIndex}-${wordIndex}`,
@@ -36,7 +37,7 @@ const useProcessTranscripts = (transcripts) => {
               word: wordIndex
             }
           }));
-
+          
           return {
             ...segment,
             fileId: transcript.id,

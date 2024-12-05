@@ -1,70 +1,73 @@
 import React from 'react';
-import { Box, Paper, Typography, Button } from '@mui/material';
+import { Box, Typography, Button } from '@mui/material';
 import { Search } from 'lucide-react';
 import { useFileSystem } from '../../../contexts/FileSystemContext';
-import { usePapercuts } from '../../../contexts/PapercutContext';
 
-const WordMetadata = ({ word, fileId }) => {
+const WordMetadata = ({ word, segment, segmentIndex, wordIndex, fileId }) => {
   const { files } = useFileSystem();
-  const { papercuts, activeTab } = usePapercuts();
 
-  if (!word) return null;
+  if (!word || !segment) return null;
 
   const filename = fileId ? files[fileId]?.name || 'Unknown File' : 'No File';
 
   const findInSource = () => {
-    // Implement the logic to find the word in the source transcript
     console.log('Finding in source:', word);
-    // You might want to dispatch an action or use a callback prop here
+    // Implement the logic to find the word in the source transcript
+  };
+
+  const formatTime = (time) => {
+    if (!time) return 'Unknown';
+    const date = new Date(0);
+    date.setSeconds(time);
+    return date.toISOString().substr(11, 8);
   };
 
   return (
-    <Paper 
-      elevation={3}
+    <Box 
       sx={{ 
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        bgcolor: 'background.paper',
+        display: 'flex',
+        flexDirection: 'column',
         p: 2,
-        borderTop: 1,
-        borderLeft: 1,
-        borderColor: 'divider',
-        borderTopLeftRadius: 1,
-        zIndex: 1,
-        minWidth: '200px'
+        bgcolor: 'background.paper',
       }}
     >
-      <Box sx={{ 
-        typography: 'subtitle2', 
-        mb: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <span>Word Metadata</span>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+        <Typography variant="subtitle2">Word Metadata</Typography>
         <Button
           size="small"
           startIcon={<Search size={16} />}
           onClick={findInSource}
-          sx={{ minWidth: 'auto' }}
         >
           Find in Source
         </Button>
       </Box>
-      <Typography variant="body2">
-        Word: {word.text}
-      </Typography>
-      <Typography variant="body2">
-        Start Time: {word.startTime}
-      </Typography>
-      <Typography variant="body2">
-        End Time: {word.endTime}
-      </Typography>
-      <Typography variant="body2">
-        File: {filename}
-      </Typography>
-    </Paper>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+        <Typography variant="body2">
+          Word: {word.text}
+        </Typography>
+        <Typography variant="body2">
+          Word Time: {formatTime(word.startTime)} - {formatTime(word.endTime)}
+        </Typography>
+        <Typography variant="body2">
+          Word Index: {wordIndex}
+        </Typography>
+        <Typography variant="body2">
+          Segment: {formatTime(segment.startTime)} - {formatTime(segment.endTime)}
+        </Typography>
+        <Typography variant="body2">
+          Segment Index: {segmentIndex}
+        </Typography>
+        <Typography variant="body2">
+          Segment ID: {segment.sourceReference?.segmentId || 'Unknown'}
+        </Typography>
+        <Typography variant="body2">
+          File: {filename}
+        </Typography>
+        <Typography variant="body2">
+          File ID: {fileId || 'Unknown'}
+        </Typography>
+      </Box>
+    </Box>
   );
 };
 
