@@ -108,7 +108,7 @@ const TranscriptContent = ({
         <Typography 
           variant="subtitle2"
           sx={{ 
-            color: speakerColor.colors.text,
+            color: 'primary.main',
             textTransform: 'uppercase'
           }}
         >

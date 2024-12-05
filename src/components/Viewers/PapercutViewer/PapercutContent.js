@@ -147,7 +147,7 @@ const PapercutContent = ({ papercutId }) => {
               }}
             >
               <Typography variant="subtitle2" gutterBottom>
-                Word Metadata
+              WordMetadata
               </Typography>
               {content
                 .find(s => s.id === cursorPosition.segmentId)
