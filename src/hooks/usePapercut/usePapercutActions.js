@@ -6,9 +6,9 @@ import { v4 as uuidv4 } from 'uuid';
 export function usePapercutActions() {
   const { 
     addContentToPapercut, 
-    insertContentToPapercut, 
     cursorPosition,
-    updatePapercutContent 
+    updatePapercutContent,
+    papercuts
   } = usePapercuts();
 
   const transformSegment = useCallback((segment, index) => {
@@ -116,13 +116,57 @@ export function usePapercutActions() {
   }, [addContentToPapercut, transformSegment]);
 
   const insertToPapercut = useCallback((papercutId, selectedContent) => {
-    if (cursorPosition) {
+    console.log('Insert called with:', { papercutId, selectedContent, cursorPosition });
+    
+    if (!cursorPosition?.segmentId || !cursorPosition?.wordId) {
+      console.log('No cursor position, falling back to append');
       const transformedContent = selectedContent.map((segment, index) => 
         transformSegment(segment, index)
       );
-      insertContentToPapercut(papercutId, transformedContent, cursorPosition);
+      addContentToPapercut(papercutId, transformedContent);
+      return;
     }
-  }, [insertContentToPapercut, cursorPosition, transformSegment]);
+  
+    // Get current content
+    const papercut = papercuts.find(p => p.id === papercutId);
+    if (!papercut) {
+      console.warn('No papercut found with id:', papercutId);
+      return;
+    }
+  
+    // Find the original segment index before splitting
+    const originalIndex = papercut.content.findIndex(segment => 
+      segment.id === cursorPosition.segmentId
+    );
+  
+    // Split the segment at cursor
+    const splitContent = splitSegmentAtCursor(papercut.content, cursorPosition);
+    console.log('Split content:', splitContent);
+  
+    // After splitting, we want to insert after the first half of the split
+    // The split creates two segments where the original was, so our insert 
+    // position should be originalIndex + 1
+    const insertIndex = originalIndex + 1;
+    console.log('Insert index:', insertIndex);
+  
+    // Transform the new content
+    const transformedContent = selectedContent.map((segment, index) => 
+      transformSegment(segment, insertIndex + index)
+    );
+    console.log('Transformed content:', transformedContent);
+  
+    // Create final content
+    const newContent = [
+      ...splitContent.slice(0, insertIndex),
+      ...transformedContent,
+      ...splitContent.slice(insertIndex)
+    ];
+    console.log('Final content:', newContent);
+  
+    // Update the papercut
+    updatePapercutContent(papercutId, newContent);
+  }, [cursorPosition, papercuts, transformSegment, splitSegmentAtCursor, 
+      updatePapercutContent, addContentToPapercut]);
 
   return {
     splitSegmentAtCursor,
