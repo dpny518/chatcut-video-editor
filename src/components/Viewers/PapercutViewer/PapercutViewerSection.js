@@ -1,6 +1,15 @@
-import React, { useEffect } from 'react';
-import { Box, Paper, ToggleButtonGroup, ToggleButton, Tabs, Tab, IconButton } from '@mui/material';
-import { FileVideo, FileText, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, 
+  Paper,
+  Typography,
+  IconButton,
+  Menu,
+  MenuItem
+} from '@mui/material';
+import { ChevronDown } from 'lucide-react';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import PapercutViewer from './index';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 
@@ -12,67 +21,120 @@ const PapercutViewerSection = ({ transcriptData }) => {
     createNewPapercut 
   } = usePapercuts();
 
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [viewMode, setViewMode] = useState('papercut');
+
   useEffect(() => {
-    if (papercuts.length > 0 && !activeTab) {
+    if (papercuts.length > 0 && (!activeTab || !papercuts.find(p => p.id === activeTab))) {
       setActiveTab(papercuts[0].id);
     }
   }, [papercuts, activeTab, setActiveTab]);
 
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
+  const handleMenuClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handlePapercutSelect = (id) => {
+    setActiveTab(id);
+    handleMenuClose();
   };
 
   const handleNewPapercut = () => {
     createNewPapercut();
+    handleMenuClose();
   };
 
-  const activePapercut = papercuts.find(p => p.id === activeTab);
+  const activePapercut = papercuts.find(p => p.id === activeTab) || papercuts[0];
 
   return (
     <Paper sx={{ 
-      flex: 1, 
-      display: 'flex', 
+      flexGrow: 1,
+      display: 'flex',
       flexDirection: 'column',
-      bgcolor: 'background.paper',
-      height: '100%',
-      overflow: 'hidden'
+      bgcolor: 'background.default',
+      overflow: 'hidden',
+      height: '100%'
     }}>
-      {/* Header */}
       <Box sx={{ 
-        p: 2, 
         borderBottom: 1, 
         borderColor: 'divider',
+        bgcolor: 'background.paper',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
+        px: 2,
+        py: 1
       }}>
-        <Box sx={{ typography: 'subtitle1' }}>
-          Papercut Editor
+        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+          Files Selected
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <IconButton 
+            onClick={() => setViewMode('video')} 
+            disabled={viewMode === 'video'}
+            sx={{ 
+              mr: 1, 
+              opacity: viewMode === 'video' ? 1 : 0.5,
+              color: viewMode === 'video' ? 'primary.main' : 'text.secondary'
+            }}
+          >
+            <PlayCircleOutlineIcon />
+          </IconButton>
+          <IconButton 
+            onClick={() => setViewMode('papercut')} 
+            disabled={viewMode === 'papercut'}
+            sx={{ 
+              mr: 2, 
+              opacity: viewMode === 'papercut' ? 1 : 0.5,
+              color: viewMode === 'papercut' ? 'primary.main' : 'text.secondary'
+            }}
+          >
+            <TextSnippetIcon />
+          </IconButton>
+          <Typography variant="subtitle1">
+            {activePapercut ? activePapercut.name : 'No Papercuts'}
+          </Typography>
+          <IconButton onClick={handleMenuClick} size="small">
+            <ChevronDown />
+          </IconButton>
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+          >
+            {papercuts.map((papercut) => (
+              <MenuItem 
+                key={papercut.id} 
+                onClick={() => handlePapercutSelect(papercut.id)}
+              >
+                {papercut.name}
+              </MenuItem>
+            ))}
+            <MenuItem onClick={handleNewPapercut}>New Papercut</MenuItem>
+          </Menu>
         </Box>
-        <ToggleButtonGroup
-          value="transcript"
-          exclusive
-          size="small"
-        >
-          <ToggleButton value="video" disabled>
-            <FileVideo className="w-4 h-4 mr-2" />
-            Video
-          </ToggleButton>
-          <ToggleButton value="transcript">
-            <FileText className="w-4 h-4 mr-2" />
-            Papercut
-          </ToggleButton>
-        </ToggleButtonGroup>
       </Box>
 
-      {/* PapercutViewer */}
       <Box sx={{ 
-        flex: 1, 
-        position: 'relative', 
+        flexGrow: 1,
+        position: 'relative',
         overflow: 'hidden',
-        height: '500px'
+        display: 'flex',
+        flexDirection: 'column'
       }}>
-        <PapercutViewer transcriptData={transcriptData} />
+        {viewMode === 'video' ? (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography color="text.secondary">
+              Video viewer coming soon
+            </Typography>
+          </Box>
+        ) : (
+          <PapercutViewer transcriptData={transcriptData} />
+        )}
       </Box>
     </Paper>
   );
