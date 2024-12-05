@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { 
   Box, 
   Paper,
@@ -7,9 +7,9 @@ import {
   Menu,
   MenuItem
 } from '@mui/material';
-import { ChevronDown } from 'lucide-react';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
+import { ChevronDown } from 'lucide-react';
 import PapercutViewer from './index';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 
@@ -21,8 +21,7 @@ const PapercutViewerSection = ({ transcriptData }) => {
     createNewPapercut 
   } = usePapercuts();
 
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [viewMode, setViewMode] = useState('papercut');
+  const [anchorEl, setAnchorEl] = React.useState(null);
 
   useEffect(() => {
     if (papercuts.length > 0 && (!activeTab || !papercuts.find(p => p.id === activeTab))) {
@@ -62,62 +61,96 @@ const PapercutViewerSection = ({ transcriptData }) => {
       <Box sx={{ 
         borderBottom: 1, 
         borderColor: 'divider',
-        bgcolor: 'background.paper',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        px: 2,
-        py: 1
+        bgcolor: 'background.paper' 
       }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-          Files Selected
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <IconButton 
-            onClick={() => setViewMode('video')} 
-            disabled={viewMode === 'video'}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          minHeight: 48,
+          px: 2
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+            <IconButton
+              disabled
+              sx={{
+                opacity: 0.5,
+                color: 'text.disabled',
+                mr: 1
+              }}
+            >
+              <PlayCircleOutlineIcon />
+            </IconButton>
+            <Typography 
+              sx={{ 
+                color: 'text.disabled',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+              }}
+            >
+              VIDEO
+            </Typography>
+          </Box>
+          <Box 
             sx={{ 
-              mr: 1, 
-              opacity: viewMode === 'video' ? 1 : 0.5,
-              color: viewMode === 'video' ? 'primary.main' : 'text.secondary'
+              display: 'flex', 
+              alignItems: 'center',
+              borderBottom: 2,
+              borderColor: 'primary.main',
+              pb: 0.5
             }}
           >
-            <PlayCircleOutlineIcon />
-          </IconButton>
-          <IconButton 
-            onClick={() => setViewMode('papercut')} 
-            disabled={viewMode === 'papercut'}
-            sx={{ 
-              mr: 2, 
-              opacity: viewMode === 'papercut' ? 1 : 0.5,
-              color: viewMode === 'papercut' ? 'primary.main' : 'text.secondary'
-            }}
-          >
-            <TextSnippetIcon />
-          </IconButton>
-          <Typography variant="subtitle1">
-            {activePapercut ? activePapercut.name : 'No Papercuts'}
-          </Typography>
-          <IconButton onClick={handleMenuClick} size="small">
-            <ChevronDown />
-          </IconButton>
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleMenuClose}
-          >
-            {papercuts.map((papercut) => (
-              <MenuItem 
-                key={papercut.id} 
-                onClick={() => handlePapercutSelect(papercut.id)}
-              >
-                {papercut.name}
-              </MenuItem>
-            ))}
-            <MenuItem onClick={handleNewPapercut}>New Papercut</MenuItem>
-          </Menu>
+            <IconButton
+              sx={{
+                color: 'primary.main',
+                mr: 1
+              }}
+            >
+              <TextSnippetIcon />
+            </IconButton>
+            <Typography 
+              sx={{ 
+                color: 'primary.main',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+              }}
+            >
+              PAPERCUT
+            </Typography>
+          </Box>
+          <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography 
+              variant="subtitle2" 
+              sx={{ 
+                color: 'text.secondary',
+                fontSize: '0.75rem',
+                fontWeight: 500
+              }}
+            >
+              {activePapercut ? activePapercut.name : 'No Papercuts'}
+            </Typography>
+            <IconButton onClick={handleMenuClick} size="small">
+              <ChevronDown />
+            </IconButton>
+          </Box>
         </Box>
       </Box>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
+        {papercuts.map((papercut) => (
+          <MenuItem 
+            key={papercut.id} 
+            onClick={() => handlePapercutSelect(papercut.id)}
+          >
+            {papercut.name}
+          </MenuItem>
+        ))}
+        <MenuItem onClick={handleNewPapercut}>New Papercut</MenuItem>
+      </Menu>
 
       <Box sx={{ 
         flexGrow: 1,
@@ -126,15 +159,19 @@ const PapercutViewerSection = ({ transcriptData }) => {
         display: 'flex',
         flexDirection: 'column'
       }}>
-        {viewMode === 'video' ? (
-          <Box sx={{ p: 2, textAlign: 'center' }}>
-            <Typography color="text.secondary">
-              Video viewer coming soon
-            </Typography>
-          </Box>
-        ) : (
-          <PapercutViewer transcriptData={transcriptData} />
-        )}
+        <Box sx={{ p: 2 }}>
+          <Typography 
+            variant="subtitle2" 
+            sx={{ 
+              color: 'text.secondary',
+              fontSize: '0.75rem',
+              fontWeight: 700
+            }}
+          >
+            {activePapercut ? activePapercut.name : 'No Papercuts'}
+          </Typography>
+        </Box>
+        <PapercutViewer transcriptData={transcriptData} />
       </Box>
     </Paper>
   );
