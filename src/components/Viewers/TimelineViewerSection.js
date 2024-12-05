@@ -1,12 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Paper, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import { FileVideo, FileText } from 'lucide-react';
-import TimelineViewer from './TimelineViewer';
 import PapercutViewerSection from './PapercutViewerSection';
 
-const TimelineViewerSection = ({ clips, currentClip, transcript, timelineState }) => {
-  const [viewMode, setViewMode] = useState('video');
-  
+const TimelineViewerSection = ({ transcript }) => {
   return (
     <Paper sx={{ 
       flex: 1, 
@@ -24,19 +21,23 @@ const TimelineViewerSection = ({ clips, currentClip, transcript, timelineState }
         justifyContent: 'space-between'
       }}>
         <Box sx={{ typography: 'subtitle1' }}>
-          {viewMode === 'video' ? 'Video Viewer' : 'Papercut Editor'}
+          Papercut Editor
         </Box>
         <ToggleButtonGroup
-          value={viewMode}
+          value="transcript"
           exclusive
-          onChange={(e, newMode) => newMode && setViewMode(newMode)}
           size="small"
         >
-          <ToggleButton value="video">
+          <ToggleButton 
+            value="video" 
+            disabled
+          >
             <FileVideo className="w-4 h-4 mr-2" />
             Video
           </ToggleButton>
-          <ToggleButton value="transcript">
+          <ToggleButton 
+            value="transcript"
+          >
             <FileText className="w-4 h-4 mr-2" />
             Papercut
           </ToggleButton>
@@ -44,17 +45,9 @@ const TimelineViewerSection = ({ clips, currentClip, transcript, timelineState }
       </Box>
 
       <Box sx={{ flex: 1, position: 'relative' }}>
-        {viewMode === 'video' ? (
-          <TimelineViewer
-            clips={clips}
-            currentClip={currentClip}
-            transcriptData={transcript}
-          />
-        ) : (
-          <PapercutViewerSection
-            transcriptData={transcript}
-          />
-        )}
+        <PapercutViewerSection
+          transcriptData={transcript}
+        />
       </Box>
     </Paper>
   );

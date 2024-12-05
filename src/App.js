@@ -93,23 +93,10 @@ const App = () => {
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <BinViewerSection />
                     </Box>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: 2, 
-                      flex: 1, 
-                      minWidth: 0 
-                    }}>
-                      <Box sx={{ flex: 1, minHeight: 0 }}>
-                        <TimelineViewerSection 
-                          clips={[]}
-                          transcript={transcripts}
-                          timelineState={timelineState}
-                        />
-                      </Box>
-                      <Box sx={{ flex: 1, minHeight: 0 }}>
-                        <PapercutViewerSection />
-                      </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <PapercutViewerSection 
+                        transcriptData={transcripts}
+                      />
                     </Box>
                   </Box>
                 </EditorLayout>
