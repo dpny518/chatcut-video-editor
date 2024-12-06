@@ -2,17 +2,12 @@ import React from 'react';
 import { 
   Box, 
   Paper,
-  Tabs,
-  Tab,
   Typography 
 } from '@mui/material';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
-import TextSnippetIcon from '@mui/icons-material/TextSnippet';
-import { ChevronDown } from 'lucide-react';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 import PapercutContent from './PapercutContent';
 
-const PapercutViewer = ({ transcriptData }) => {
+const PapercutViewer = () => {
   const { papercuts, activeTab } = usePapercuts();
   const activePapercut = papercuts.find(p => p.id === activeTab);
 
@@ -25,13 +20,6 @@ const PapercutViewer = ({ transcriptData }) => {
       overflow: 'hidden',
       height: '100%'
     }}>
-      <Box sx={{ 
-        borderBottom: 1, 
-        borderColor: 'divider',
-        bgcolor: 'background.paper' 
-      }}>
-      </Box>
-
       <Box sx={{ 
         flexGrow: 1,
         position: 'relative',
@@ -60,12 +48,8 @@ const PapercutViewer = ({ transcriptData }) => {
           </Typography>
         </Box>
         {activePapercut && (
-          <Box sx={{ flexGrow: 1, overflow: 'auto', px: 2 }}>
-            <PapercutContent
-              content={activePapercut.content}
-              papercutId={activePapercut.id}
-              transcriptData={transcriptData}
-            />
+          <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+            <PapercutContent papercutId={activePapercut.id} />
           </Box>
         )}
       </Box>

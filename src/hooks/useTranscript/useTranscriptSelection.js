@@ -1,9 +1,9 @@
-// src/hooks/useTranscript/useTranscriptSelection.js
-
 import { useState, useCallback, useEffect } from 'react';
+import { useTranscriptStyling } from '../../contexts/TranscriptStylingContext';
 
 export const useTranscriptSelection = (displayContent) => {
   const [selection, setSelection] = useState(null);
+  const { getWordStyle } = useTranscriptStyling();
 
   const handleSelectionChange = useCallback(() => {
     const selectionObj = window.getSelection();
@@ -65,10 +65,18 @@ export const useTranscriptSelection = (displayContent) => {
       if (file.fileId === selection.start.fileId) {
         for (const group of file.groupedSegments) {
           for (const segment of group) {
-            const selectedWords = segment.words.filter(word => 
-              word.globalIndex >= selection.start.globalIndex &&
-              word.globalIndex <= selection.end.globalIndex
-            );
+            // Filter words by both selection range and strikethrough status
+            const selectedWords = segment.words.filter(word => {
+              const isInRange = 
+                word.globalIndex >= selection.start.globalIndex &&
+                word.globalIndex <= selection.end.globalIndex;
+              
+              // Check if word has strikethrough style
+              const style = getWordStyle(word.id);
+              const isNotStrikethrough = style !== 'strikethrough';
+
+              return isInRange && isNotStrikethrough;
+            });
 
             if (selectedWords.length > 0) {
               selectedContent.push({
@@ -79,18 +87,17 @@ export const useTranscriptSelection = (displayContent) => {
                 startTime: selectedWords[0].start,
                 endTime: selectedWords[selectedWords.length - 1].end,
                 globalIndex: segment.globalIndex,
-                // Add any other relevant metadata here
               });
             }
           }
         }
-        break; // We've processed the file containing the selection, no need to continue
+        break; // We've processed the file containing the selection
       }
     }
 
     console.log('Final selected content:', selectedContent);
     return selectedContent;
-  }, [selection, displayContent]);
+  }, [selection, displayContent, getWordStyle]);
 
   return {
     selection,
