@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
 import { CssBaseline, Box, Snackbar, Alert, IconButton } from '@mui/material';
-import Brightness4Icon from '@mui/icons-material/Brightness4';
-import Brightness7Icon from '@mui/icons-material/Brightness7';
+
 
 import MainLayout from './components/Layout/MainLayout';
 import EditorLayout from './components/Layout/EditorLayout';
@@ -69,25 +68,25 @@ const App = () => {
 const renderContent = () => {
   switch(currentView) {
     case 'home':
-    case 'editor':
-      return (
-        <EditorLayout>
-          <Box sx={{ 
-            display: 'flex', 
-            height: 'calc(100vh - 48px)', 
-            overflow: 'hidden',
-            gap: 2,
-            p: 2
-          }}>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <BinViewerSection />
+      case 'editor':
+        return (
+          <EditorLayout>
+            <Box sx={{ 
+              display: 'flex', 
+              height: 'calc(100vh - 48px)', 
+              overflow: 'hidden',
+              gap: 2,
+              p: 2
+            }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <BinViewerSection />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <PapercutViewerSection transcriptData={transcripts} />
+              </Box>
             </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <PapercutViewerSection transcriptData={transcripts} />
-            </Box>
-          </Box>
-        </EditorLayout>
-      );
+          </EditorLayout>
+        );
     case 'search':
       return <SearchPage />;
     case 'notifications':

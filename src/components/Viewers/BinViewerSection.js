@@ -8,8 +8,8 @@ import {
   SvgIcon
 } from '@mui/material';
 import TranscriptViewer from './TranscriptViewer';
-import { ReactComponent as TranscriptIcon } from '../../images/icons/gg_transcript.svg';
-import { ReactComponent as PlayIcon } from '../../images/icons/gg_play.svg';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import DescriptionIcon from '@mui/icons-material/Description';
 const BinViewerSection = () => {
   const [viewMode, setViewMode] = useState(1);
 
@@ -58,7 +58,7 @@ const BinViewerSection = () => {
           }}
         >
           <Tab
-            icon={<CustomIcon Icon={PlayIcon} alt="Play" color="text.disabled" />}
+            icon={<CustomIcon Icon={PlayCircleOutlineIcon} alt="Play" color="text.disabled" />}
             iconPosition="start"
             label="VIDEO"
             disabled
@@ -73,7 +73,7 @@ const BinViewerSection = () => {
             }}
           />
           <Tab
-            icon={<CustomIcon Icon={TranscriptIcon} alt="Transcript" />}
+            icon={<CustomIcon Icon={DescriptionIcon} alt="Transcript" />}
             iconPosition="start"
             label="TRANSCRIPT"
             sx={{

@@ -1,7 +1,5 @@
 import React from 'react';
 import { Box, IconButton } from '@mui/material';
-import Brightness4Icon from '@mui/icons-material/Brightness4';
-import Brightness7Icon from '@mui/icons-material/Brightness7';
 import MediaSidebar from '../Media/MediaSidebar';
 import Sidebar from './Sidebar';
 
@@ -29,12 +27,6 @@ const MainLayout = ({
           timelineProjects={timelineProjects}
         />
         <Box sx={{ flexGrow: 1, p: 2, position: 'relative' }}>
-          <IconButton
-            onClick={onThemeChange}
-            sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1 }}
-          >
-            {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-          </IconButton>
           {children}
         </Box>
       </Box>

@@ -10,11 +10,11 @@ import {
   SvgIcon,
   IconButton
 } from '@mui/material';
-import { ReactComponent as TranscriptIcon } from '../../../images/icons/gg_transcript.svg';
-import { ReactComponent as PlayIcon } from '../../../images/icons/gg_play.svg';
 import { ChevronDown } from 'lucide-react';
 import PapercutViewer from './index';
 import { usePapercuts } from '../../../contexts/PapercutContext';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import DescriptionIcon from '@mui/icons-material/Description';
 
 const PapercutViewerSection = ({ transcriptData }) => {
   const { 
@@ -98,7 +98,7 @@ const PapercutViewerSection = ({ transcriptData }) => {
           }}
         >
           <Tab
-            icon={<CustomIcon Icon={PlayIcon} alt="Play" color="text.disabled" />}
+            icon={<CustomIcon Icon={PlayCircleOutlineIcon} alt="Play" color="text.disabled" />}
             iconPosition="start"
             label="VIDEO"
             disabled
@@ -113,7 +113,7 @@ const PapercutViewerSection = ({ transcriptData }) => {
             }}
           />
           <Tab
-            icon={<CustomIcon Icon={TranscriptIcon} alt="Transcript" />}
+            icon={<CustomIcon Icon={DescriptionIcon} alt="Transcript" />}
             iconPosition="start"
             label="PAPERCUT"
             sx={{
