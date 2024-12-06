@@ -255,15 +255,15 @@ const ChatBot = ({
         elevation={3}
         sx={{
           position: 'fixed',
-          bottom: isExpanded ? 0 : 'auto',
+          bottom: isExpanded ? 0 : '48px',
           left: 0,
           width: '300px',
           height: isExpanded ? '400px' : '48px',
           backgroundColor: theme.palette.background.paper,
           display: 'flex',
           flexDirection: 'column',
-          zIndex: 1000,
-          transition: 'height 0.3s ease',
+          zIndex: 1200,
+          transition: 'all 0.3s ease',
           borderRadius: '8px 8px 0 0',
           cursor: !isExpanded ? 'pointer' : 'default' // Make entire header clickable when collapsed
         }}
@@ -282,7 +282,7 @@ const ChatBot = ({
           borderRadius: '8px 8px 0 0'
         }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-            Papercut Co-Pilot
+            Papercut Assistant
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {isLoading && <CircularProgress size={20} color="inherit" />}
