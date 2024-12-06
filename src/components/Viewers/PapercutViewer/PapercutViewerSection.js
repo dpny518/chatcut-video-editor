@@ -2,11 +2,13 @@ import React, { useEffect } from 'react';
 import { 
   Box, 
   Paper,
+  Tabs,
+  Tab,
   Typography,
-  IconButton,
   Menu,
   MenuItem,
-  SvgIcon
+  SvgIcon,
+  IconButton
 } from '@mui/material';
 import { ReactComponent as TranscriptIcon } from '../../../images/icons/gg_transcript.svg';
 import { ReactComponent as PlayIcon } from '../../../images/icons/gg_play.svg';
@@ -23,8 +25,9 @@ const PapercutViewerSection = ({ transcriptData }) => {
   } = usePapercuts();
 
   const [anchorEl, setAnchorEl] = React.useState(null);
-   // Custom icon component
-   const CustomIcon = ({ Icon, alt, color = 'primary.main' }) => {
+  const [viewMode, setViewMode] = React.useState(1);  // 0 for Video, 1 for Papercut
+
+  const CustomIcon = ({ Icon, alt, color = 'primary.main' }) => {
     return (
       <SvgIcon
         component={Icon}
@@ -64,86 +67,73 @@ const PapercutViewerSection = ({ transcriptData }) => {
     handleMenuClose();
   };
 
-  const activePapercut = papercuts.find(p => p.id === activeTab) || papercuts[0];
+  const activePapercut = papercuts.find(p => p.id === activeTab);
 
   return (
     <Paper sx={{ 
-      flexGrow: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      bgcolor: 'background.default',
-      overflow: 'hidden',
-      height: '100%'
-    }}>
+        flexGrow: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: 'background.default',
+        overflow: 'hidden',
+        height: '100%',
+        '& > *': {  // This will remove any default margins between children
+          margin: 0
+        }
+      }}>
       <Box sx={{ 
         borderBottom: 1, 
         borderColor: 'divider',
         bgcolor: 'background.paper' 
       }}>
-    <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          minHeight: 48,
-          px: 2
-        }}>
-          <IconButton
+        <Tabs 
+          value={viewMode} 
+          onChange={(e, newValue) => setViewMode(newValue)}
+          sx={{ 
+            minHeight: 48,
+            '& .MuiTab-root': {
+              minHeight: 48,
+              color: 'text.secondary'
+            }
+          }}
+        >
+          <Tab
+            icon={<CustomIcon Icon={PlayIcon} alt="Play" color="text.disabled" />}
+            iconPosition="start"
+            label="VIDEO"
             disabled
             sx={{
-              padding: 0.5,
-              mr: 0.5,
-              color: 'text.disabled',
+              opacity: 0.5,
               '&.Mui-disabled': {
-                color: 'text.disabled',
+                color: 'text.disabled'
               },
+              '& .MuiTab-iconWrapper': {
+                marginRight: 1
+              }
             }}
-          >
-            <CustomIcon Icon={PlayIcon} alt="Play" />
-          </IconButton>
-          <Typography 
-            sx={{ 
-              color: 'text.disabled',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              mr: 1.5,
-            }}
-          >
-            VIDEO
-          </Typography>
-          <IconButton
+          />
+          <Tab
+            icon={<CustomIcon Icon={TranscriptIcon} alt="Transcript" />}
+            iconPosition="start"
+            label="PAPERCUT"
             sx={{
-              padding: 0.5,
-              mr: 0.5,
-              color: 'primary.main',
+              '& .MuiTab-iconWrapper': {
+                marginRight: 1
+              }
             }}
-          >
-            <CustomIcon Icon={TranscriptIcon} alt="Transcript" />
-          </IconButton>
-          <Typography 
-            sx={{ 
-              color: 'primary.main',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              flexGrow: 1,
-            }}
-          >
-            PAPERCUT
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography 
-              variant="subtitle2" 
-              sx={{ 
-                color: 'primary.main',
-                fontSize: '0.75rem',
-                fontWeight: 700
-              }}
-            >
-              {activePapercut ? activePapercut.name : 'No Papercuts'}
-            </Typography>
-            <IconButton onClick={handleMenuClick} size="small">
-              <ChevronDown />
-            </IconButton>
-          </Box>
-        </Box>
+          />
+        </Tabs>
+      </Box>
+
+
+      <Box sx={{ 
+        flexGrow: 1,
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <PapercutViewer transcriptData={transcriptData} />
       </Box>
 
       <Menu
@@ -161,16 +151,6 @@ const PapercutViewerSection = ({ transcriptData }) => {
         ))}
         <MenuItem onClick={handleNewPapercut}>New Papercut</MenuItem>
       </Menu>
-
-      <Box sx={{ 
-        flexGrow: 1,
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        <PapercutViewer transcriptData={transcriptData} />
-      </Box>
     </Paper>
   );
 };

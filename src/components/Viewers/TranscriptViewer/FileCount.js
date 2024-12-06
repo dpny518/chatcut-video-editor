@@ -12,11 +12,12 @@ const FileCount = ({ count }) => (
       display: 'flex',
       alignItems: 'center',
       bgcolor: 'background.default',
+      height: '40px', // Set a fixed height
     }}
   >
     <Typography
       variant="body2"
-      color="text.secondary"
+      color="text.primary" // Change this to primary to make it black
       sx={{ 
         fontWeight: 500,
         fontSize: '0.75rem',

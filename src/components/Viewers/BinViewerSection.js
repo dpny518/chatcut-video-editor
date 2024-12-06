@@ -36,7 +36,10 @@ const BinViewerSection = () => {
       flexDirection: 'column',
       bgcolor: 'background.default',
       overflow: 'hidden',
-      height: '100%'
+      height: '100%',
+      '& > *': {  // This will remove any default margins between children
+        margin: 0
+      }
     }}>
       <Box sx={{ 
         borderBottom: 1, 

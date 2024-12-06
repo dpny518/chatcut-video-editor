@@ -1,59 +1,89 @@
 import React from 'react';
 import { 
   Box, 
-  Paper,
-  Typography 
+  Card,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 import PapercutContent from './PapercutContent';
+import ActivePapercut from './ActivePapercut';
 
-const PapercutViewer = () => {
-  const { papercuts, activeTab } = usePapercuts();
+// PapercutViewer.js
+const PapercutViewer = ({ transcriptData }) => {
+  const { 
+    papercuts, 
+    activeTab, 
+    setActiveTab, 
+    createNewPapercut 
+  } = usePapercuts();
+  const [anchorEl, setAnchorEl] = React.useState(null);
   const activePapercut = papercuts.find(p => p.id === activeTab);
 
+  const handleMenuClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handlePapercutSelect = (id) => {
+    setActiveTab(id);
+    handleMenuClose();
+  };
+
+  const handleNewPapercut = () => {
+    createNewPapercut();
+    handleMenuClose();
+  };
+
   return (
-    <Paper sx={{ 
-      flexGrow: 1,
-      display: 'flex',
+    <Card sx={{ 
+      height: '100%', 
+      display: 'flex', 
       flexDirection: 'column',
-      bgcolor: 'background.default',
-      overflow: 'hidden',
-      height: '100%'
-    }}>
+      bgcolor: 'background.paper' 
+    }}
+    tabIndex={0}>
+      <ActivePapercut 
+        name={activePapercut ? activePapercut.name : null}
+        onMenuClick={handleMenuClick}
+      />
+      
       <Box sx={{ 
-        flexGrow: 1,
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        <Box sx={{ 
-          py: 1.5,
-          px: 2,
-          borderBottom: 1,
-          borderColor: 'divider',
-          display: 'flex',
-          alignItems: 'center',
-          bgcolor: 'background.default',
+          flexGrow: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          overflow: 'hidden' 
         }}>
-          <Typography 
-            variant="body2"
-            color="text.secondary"
-            sx={{ 
-              fontWeight: 500,
-              fontSize: '0.75rem',
-            }}
-          >
-            {activePapercut ? activePapercut.name : 'No Papercuts'}
-          </Typography>
-        </Box>
-        {activePapercut && (
-          <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-            <PapercutContent papercutId={activePapercut.id} />
+          <Box sx={{ 
+            flexGrow: 1, 
+            overflowY: 'auto', 
+            p: 2
+          }}>
+            {activePapercut && (
+              <PapercutContent papercutId={activePapercut.id} />
+            )}
           </Box>
-        )}
-      </Box>
-    </Paper>
+        </Box>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
+        {papercuts.map((papercut) => (
+          <MenuItem 
+            key={papercut.id} 
+            onClick={() => handlePapercutSelect(papercut.id)}
+          >
+            {papercut.name}
+          </MenuItem>
+        ))}
+        <MenuItem onClick={handleNewPapercut}>New Papercut</MenuItem>
+      </Menu>
+    </Card>
   );
 };
 
