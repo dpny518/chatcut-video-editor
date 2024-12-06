@@ -139,26 +139,21 @@ const TranscriptViewer = () => {
       height: '100%', 
       display: 'flex', 
       flexDirection: 'column',
-      bgcolor: 'background.paper',
-      padding: 2,
-    }}
-    tabIndex={0}>
+      bgcolor: 'background.paper'
+    }} tabIndex={0}>
       <FileCount count={transcripts.length} />
       
       <Box sx={{ 
         flexGrow: 1, 
         display: 'flex', 
         flexDirection: 'column', 
-        overflow: 'hidden',
-        padding: 2,
+        overflow: 'hidden'
       }}>
         <Box sx={{ 
           flexGrow: 1, 
           overflowY: 'auto', 
-          p: 2, 
           maxWidth: '900px', 
-          margin: '0 auto',
-          padding: 2,
+          margin: '0 auto'
         }}>
           {isProcessing ? (
             <Box sx={{ 
@@ -177,7 +172,6 @@ const TranscriptViewer = () => {
             />
           )}
         </Box>
-
         <TranscriptToolbar 
           isSelectionActive={!!selection}
           onAddToPapercut={handleAddToPapercut}
