@@ -11,14 +11,17 @@ export const useTranscriptSelection = (displayContent) => {
       setSelection(null);
       return;
     }
-
+  
     const range = selectionObj.getRangeAt(0);
     const selectedText = range.toString().trim();
-
+  
     if (selectedText) {
       const startNode = range.startContainer.parentElement;
       const endNode = range.endContainer.parentElement;
       
+      console.log('Start node:', startNode);
+      console.log('End node:', endNode);
+  
       setSelection({
         text: selectedText,
         start: {
@@ -38,7 +41,6 @@ export const useTranscriptSelection = (displayContent) => {
       setSelection(null);
     }
   }, []);
-
   useEffect(() => {
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => {
@@ -50,51 +52,52 @@ export const useTranscriptSelection = (displayContent) => {
     window.getSelection().removeAllRanges();
     setSelection(null);
   }, []);
-
   const getSelectedContent = useCallback(() => {
     if (!selection) {
       console.log('No selection available');
       return [];
     }
-
+  
     console.log('Raw selection:', selection);
-
+  
     const selectedContent = [];
-
+  
     for (const file of displayContent) {
-      if (file.fileId === selection.start.fileId) {
-        for (const group of file.groupedSegments) {
-          for (const segment of group) {
-            // Filter words by both selection range and strikethrough status
-            const selectedWords = segment.words.filter(word => {
-              const isInRange = 
-                word.globalIndex >= selection.start.globalIndex &&
-                word.globalIndex <= selection.end.globalIndex;
-              
-              // Check if word has strikethrough style
-              const style = getWordStyle(word.id);
-              const isNotStrikethrough = style !== 'strikethrough';
-
-              return isInRange && isNotStrikethrough;
+      console.log('Processing file:', file.fileId);
+  
+      if (file.fileId !== selection.start.fileId && file.fileId !== selection.end.fileId) {
+        continue; // Skip files that are not part of the selection
+      }
+  
+      for (const group of file.groupedSegments) {
+        for (const segment of group) {
+          const selectedWords = segment.words.filter(word => {
+            const isInRange = 
+              (file.fileId === selection.start.fileId ? word.globalIndex >= selection.start.globalIndex : true) &&
+              (file.fileId === selection.end.fileId ? word.globalIndex <= selection.end.globalIndex : true);
+  
+            const style = getWordStyle(word.id);
+            const isNotStrikethrough = style !== 'strikethrough';
+  
+            return isInRange && isNotStrikethrough;
+          });
+  
+          if (selectedWords.length > 0) {
+            console.log('Adding selected words:', selectedWords);
+            selectedContent.push({
+              fileId: file.fileId,
+              fileName: file.fileName,
+              speaker: segment.speaker,
+              words: selectedWords,
+              startTime: selectedWords[0].start,
+              endTime: selectedWords[selectedWords.length - 1].end,
+              globalIndex: segment.globalIndex,
             });
-
-            if (selectedWords.length > 0) {
-              selectedContent.push({
-                fileId: file.fileId,
-                fileName: file.fileName,
-                speaker: segment.speaker,
-                words: selectedWords,
-                startTime: selectedWords[0].start,
-                endTime: selectedWords[selectedWords.length - 1].end,
-                globalIndex: segment.globalIndex,
-              });
-            }
           }
         }
-        break; // We've processed the file containing the selection
       }
     }
-
+  
     console.log('Final selected content:', selectedContent);
     return selectedContent;
   }, [selection, displayContent, getWordStyle]);

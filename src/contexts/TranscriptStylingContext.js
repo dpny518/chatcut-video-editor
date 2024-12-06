@@ -18,22 +18,17 @@ export const TranscriptStylingProvider = ({ children }) => {
   };
 
   const removeStyle = (selectedContent) => {
-    console.log('RemoveStyle received:', selectedContent);
     setStyledWords(prev => {
-      console.log('Previous styles:', prev);
       const newStyles = { ...prev };
       selectedContent.forEach(content => {
-        console.log('Processing content:', content);
         content.words.forEach(word => {
-          console.log('Removing style for word:', word.id);
-          delete newStyles[word.id];
+          delete newStyles[word.id]; // Remove any style associated with the word
         });
       });
-      console.log('New styles after removal:', newStyles);
       return newStyles;
     });
   };
-
+  
 
   const getWordStyle = (wordId) => {
     return styledWords[wordId];
@@ -43,7 +38,8 @@ export const TranscriptStylingProvider = ({ children }) => {
     <TranscriptStylingContext.Provider value={{
       addStyle,
       removeStyle,
-      getWordStyle
+      getWordStyle,
+      styledWords // Exposing styledWords state for debugging if needed
     }}>
       {children}
     </TranscriptStylingContext.Provider>

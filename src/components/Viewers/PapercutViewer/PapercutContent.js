@@ -29,7 +29,7 @@ const PapercutContent = ({ papercutId }) => {
   } = usePapercutActions();
 
   const { currentState, pushState, undo, redo, canUndo, canRedo } = usePapercutHistory();
-
+  
   // Drag state
   const [draggedSegment, setDraggedSegment] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
