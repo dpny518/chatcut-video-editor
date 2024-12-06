@@ -6,71 +6,83 @@ export const useTranscriptSelection = (displayContent) => {
   const { getWordStyle } = useTranscriptStyling();
 
   const isValidTranscriptNode = (node) => {
-    // Check if the node is within the transcript viewer and has required data attributes
-    if (!node) return false;
-    
-    // Walk up the DOM tree to find the closest element with data attributes
-    let currentNode = node;
-    while (currentNode && !currentNode.dataset?.fileId) {
-      // If we reach the document body or exit the transcript viewer, the selection is invalid
-      if (currentNode.tagName === 'BODY' || currentNode.id === 'root') {
-        return false;
-      }
-      currentNode = currentNode.parentElement;
-    }
-    
-    // Verify all required data attributes are present and valid
+    if (!node || !node.dataset) return false;
+
+    const { fileId, segmentIndex, wordIndex, globalIndex } = node.dataset;
+
     return !!(
-      currentNode?.dataset?.fileId &&
-      currentNode?.dataset?.segmentIndex &&
-      currentNode?.dataset?.wordIndex &&
-      currentNode?.dataset?.globalIndex &&
-      !isNaN(parseInt(currentNode.dataset.segmentIndex)) &&
-      !isNaN(parseInt(currentNode.dataset.wordIndex)) &&
-      !isNaN(parseInt(currentNode.dataset.globalIndex))
+      fileId &&
+      !isNaN(parseInt(segmentIndex)) &&
+      !isNaN(parseInt(wordIndex)) &&
+      !isNaN(parseInt(globalIndex))
     );
+  };
+
+  const findValidNodesInRange = (range) => {
+    if (!range || !range.commonAncestorContainer) {
+      console.warn('Invalid range provided to findValidNodesInRange');
+      return [];
+    }
+
+    const nodes = [];
+    const walker = document.createTreeWalker(
+      range.commonAncestorContainer,
+      NodeFilter.SHOW_ELEMENT,
+      {
+        acceptNode: (node) => (isValidTranscriptNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+      }
+    );
+
+    let currentNode = walker.currentNode;
+    while (currentNode) {
+      if (range.intersectsNode(currentNode) && isValidTranscriptNode(currentNode)) {
+        nodes.push(currentNode);
+      }
+      currentNode = walker.nextNode();
+    }
+
+    return nodes;
   };
 
   const handleSelectionChange = useCallback(() => {
     const selectionObj = window.getSelection();
-    if (selectionObj.rangeCount === 0) {
+    if (!selectionObj || selectionObj.rangeCount === 0) {
       setSelection(null);
       return;
     }
 
     const range = selectionObj.getRangeAt(0);
+    if (!range) {
+      setSelection(null);
+      return;
+    }
+
     const selectedText = range.toString().trim();
+    if (!selectedText) {
+      setSelection(null);
+      return;
+    }
 
-    if (selectedText) {
-      const startNode = range.startContainer.nodeType === Node.TEXT_NODE 
-        ? range.startContainer.parentElement 
-        : range.startContainer;
-      const endNode = range.endContainer.nodeType === Node.TEXT_NODE 
-        ? range.endContainer.parentElement 
-        : range.endContainer;
+    const validNodes = findValidNodesInRange(range);
+    if (validNodes.length > 0) {
+      const startElement = validNodes[0];
+      const endElement = validNodes[validNodes.length - 1];
 
-      // Only process selection if both start and end nodes are valid transcript nodes
-      if (isValidTranscriptNode(startNode) && isValidTranscriptNode(endNode)) {
-        // Find the actual elements with the data attributes
-        const startElement = startNode.dataset?.fileId ? startNode : 
-          startNode.closest('[data-file-id]');
-        const endElement = endNode.dataset?.fileId ? endNode : 
-          endNode.closest('[data-file-id]');
-
+      if (isValidTranscriptNode(startElement) && isValidTranscriptNode(endElement)) {
         setSelection({
           text: selectedText,
           start: {
             fileId: startElement.dataset.fileId,
             segmentIndex: parseInt(startElement.dataset.segmentIndex),
             wordIndex: parseInt(startElement.dataset.wordIndex),
-            globalIndex: parseInt(startElement.dataset.globalIndex)
+            globalIndex: parseInt(startElement.dataset.globalIndex),
           },
           end: {
             fileId: endElement.dataset.fileId,
             segmentIndex: parseInt(endElement.dataset.segmentIndex),
             wordIndex: parseInt(endElement.dataset.wordIndex),
-            globalIndex: parseInt(endElement.dataset.globalIndex)
-          }
+            globalIndex: parseInt(endElement.dataset.globalIndex),
+          },
         });
       } else {
         setSelection(null);
@@ -93,23 +105,25 @@ export const useTranscriptSelection = (displayContent) => {
   }, []);
 
   const getSelectedContent = useCallback(() => {
-    if (!selection) {
+    if (!selection) return [];
+
+    const { start, end } = selection;
+
+    if (!start || !end || !start.fileId || !end.fileId) {
+      console.warn('Invalid selection boundaries:', selection);
       return [];
     }
 
     const selectedContent = [];
-
     for (const file of displayContent) {
-      if (file.fileId !== selection.start.fileId && file.fileId !== selection.end.fileId) {
-        continue;
-      }
+      if (file.fileId !== start.fileId && file.fileId !== end.fileId) continue;
 
       for (const group of file.groupedSegments) {
         for (const segment of group) {
-          const selectedWords = segment.words.filter(word => {
-            const isInRange = 
-              (file.fileId === selection.start.fileId ? word.globalIndex >= selection.start.globalIndex : true) &&
-              (file.fileId === selection.end.fileId ? word.globalIndex <= selection.end.globalIndex : true);
+          const selectedWords = segment.words.filter((word) => {
+            const isInRange =
+              (file.fileId === start.fileId ? word.globalIndex >= start.globalIndex : true) &&
+              (file.fileId === end.fileId ? word.globalIndex <= end.globalIndex : true);
 
             const style = getWordStyle(word.id);
             const isNotStrikethrough = style !== 'strikethrough';
@@ -134,6 +148,10 @@ export const useTranscriptSelection = (displayContent) => {
 
     return selectedContent;
   }, [selection, displayContent, getWordStyle]);
+
+  useEffect(() => {
+    console.log('Current selection:', selection);
+  }, [selection]);
 
   return {
     selection,
