@@ -110,10 +110,46 @@ export function usePapercutActions() {
     }).filter(Boolean);
   }, []);
 
+  const mergeSegmentsWithSameSpeaker = useCallback((segments) => {
+    return segments.reduce((acc, current) => {
+      if (acc.length === 0) {
+        return [current];
+      }
+
+      const lastSegment = acc[acc.length - 1];
+      
+      if (lastSegment.speaker === current.speaker) {
+        // Merge the current segment with the last one
+        const mergedSegment = {
+          ...lastSegment,
+          endTime: current.endTime,
+          words: [
+            ...lastSegment.words,
+            ...current.words.map((word, idx) => ({
+              ...word,
+              index: lastSegment.words.length + idx
+            }))
+          ],
+          sourceReference: {
+            ...lastSegment.sourceReference,
+            wordRange: [
+              lastSegment.sourceReference?.wordRange?.[0] || 0,
+              (lastSegment.words.length + current.words.length)
+            ]
+          }
+        };
+        return [...acc.slice(0, -1), mergedSegment];
+      }
+
+      return [...acc, current];
+    }, []);
+  }, []);
+
   const addToPapercut = useCallback((papercutId, selectedContent) => {
     const transformedContent = selectedContent.map(transformSegment);
-    addContentToPapercut(papercutId, transformedContent);
-  }, [addContentToPapercut, transformSegment]);
+    const mergedContent = mergeSegmentsWithSameSpeaker(transformedContent);
+    addContentToPapercut(papercutId, mergedContent);
+  }, [addContentToPapercut, transformSegment, mergeSegmentsWithSameSpeaker]);
 
   const insertToPapercut = useCallback((papercutId, selectedContent) => {
     console.log('Insert called with:', { papercutId, selectedContent, cursorPosition });
@@ -123,7 +159,8 @@ export function usePapercutActions() {
       const transformedContent = selectedContent.map((segment, index) => 
         transformSegment(segment, index)
       );
-      addContentToPapercut(papercutId, transformedContent);
+      const mergedContent = mergeSegmentsWithSameSpeaker(transformedContent);
+      addContentToPapercut(papercutId, mergedContent);
       return;
     }
   
@@ -144,8 +181,6 @@ export function usePapercutActions() {
     console.log('Split content:', splitContent);
   
     // After splitting, we want to insert after the first half of the split
-    // The split creates two segments where the original was, so our insert 
-    // position should be originalIndex + 1
     const insertIndex = originalIndex + 1;
     console.log('Insert index:', insertIndex);
   
@@ -153,12 +188,13 @@ export function usePapercutActions() {
     const transformedContent = selectedContent.map((segment, index) => 
       transformSegment(segment, insertIndex + index)
     );
-    console.log('Transformed content:', transformedContent);
+    const mergedContent = mergeSegmentsWithSameSpeaker(transformedContent);
+    console.log('Transformed and merged content:', mergedContent);
   
     // Create final content
     const newContent = [
       ...splitContent.slice(0, insertIndex),
-      ...transformedContent,
+      ...mergedContent,
       ...splitContent.slice(insertIndex)
     ];
     console.log('Final content:', newContent);
@@ -166,7 +202,7 @@ export function usePapercutActions() {
     // Update the papercut
     updatePapercutContent(papercutId, newContent);
   }, [cursorPosition, papercuts, transformSegment, splitSegmentAtCursor, 
-      updatePapercutContent, addContentToPapercut]);
+      updatePapercutContent, addContentToPapercut, mergeSegmentsWithSameSpeaker]);
 
   return {
     splitSegmentAtCursor,

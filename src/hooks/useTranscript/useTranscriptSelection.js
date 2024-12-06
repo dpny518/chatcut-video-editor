@@ -31,6 +31,34 @@ export const useTranscriptSelection = (displayContent) => {
     );
   };
 
+  const findValidNodesInRange = (range) => {
+    // Get all nodes within the range
+    const nodes = [];
+    const walker = document.createTreeWalker(
+      range.commonAncestorContainer,
+      NodeFilter.SHOW_ELEMENT,
+      {
+        acceptNode: (node) => {
+          // Use isValidTranscriptNode for validation
+          if (isValidTranscriptNode(node)) {
+            return NodeFilter.FILTER_ACCEPT;
+          }
+          return NodeFilter.FILTER_SKIP;
+        }
+      }
+    );
+
+    let currentNode = walker.currentNode;
+    while (currentNode) {
+      if (range.intersectsNode(currentNode) && isValidTranscriptNode(currentNode)) {
+        nodes.push(currentNode);
+      }
+      currentNode = walker.nextNode();
+    }
+
+    return nodes;
+  };
+
   const handleSelectionChange = useCallback(() => {
     const selectionObj = window.getSelection();
     if (selectionObj.rangeCount === 0) {
@@ -42,36 +70,35 @@ export const useTranscriptSelection = (displayContent) => {
     const selectedText = range.toString().trim();
 
     if (selectedText) {
-      const startNode = range.startContainer.nodeType === Node.TEXT_NODE 
-        ? range.startContainer.parentElement 
-        : range.startContainer;
-      const endNode = range.endContainer.nodeType === Node.TEXT_NODE 
-        ? range.endContainer.parentElement 
-        : range.endContainer;
+      // Find all valid nodes in the selection range
+      const validNodes = findValidNodesInRange(range);
+      
+      // Only process if we found valid transcript nodes
+      if (validNodes.length > 0) {
+        // Use the first and last valid nodes as our selection boundaries
+        const startElement = validNodes[0];
+        const endElement = validNodes[validNodes.length - 1];
 
-      // Only process selection if both start and end nodes are valid transcript nodes
-      if (isValidTranscriptNode(startNode) && isValidTranscriptNode(endNode)) {
-        // Find the actual elements with the data attributes
-        const startElement = startNode.dataset?.fileId ? startNode : 
-          startNode.closest('[data-file-id]');
-        const endElement = endNode.dataset?.fileId ? endNode : 
-          endNode.closest('[data-file-id]');
-
-        setSelection({
-          text: selectedText,
-          start: {
-            fileId: startElement.dataset.fileId,
-            segmentIndex: parseInt(startElement.dataset.segmentIndex),
-            wordIndex: parseInt(startElement.dataset.wordIndex),
-            globalIndex: parseInt(startElement.dataset.globalIndex)
-          },
-          end: {
-            fileId: endElement.dataset.fileId,
-            segmentIndex: parseInt(endElement.dataset.segmentIndex),
-            wordIndex: parseInt(endElement.dataset.wordIndex),
-            globalIndex: parseInt(endElement.dataset.globalIndex)
-          }
-        });
+        // Double-check that we have valid nodes before setting selection
+        if (isValidTranscriptNode(startElement) && isValidTranscriptNode(endElement)) {
+          setSelection({
+            text: selectedText,
+            start: {
+              fileId: startElement.dataset.fileId,
+              segmentIndex: parseInt(startElement.dataset.segmentIndex),
+              wordIndex: parseInt(startElement.dataset.wordIndex),
+              globalIndex: parseInt(startElement.dataset.globalIndex)
+            },
+            end: {
+              fileId: endElement.dataset.fileId,
+              segmentIndex: parseInt(endElement.dataset.segmentIndex),
+              wordIndex: parseInt(endElement.dataset.wordIndex),
+              globalIndex: parseInt(endElement.dataset.globalIndex)
+            }
+          });
+        } else {
+          setSelection(null);
+        }
       } else {
         setSelection(null);
       }
