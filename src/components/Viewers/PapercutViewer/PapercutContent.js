@@ -12,6 +12,7 @@ import { usePapercuts } from '../../../contexts/PapercutContext';
 import { usePapercutActions } from '../../../hooks/usePapercut/usePapercutActions';
 import { usePapercutHistory } from '../../../hooks/usePapercutHistory';
 import WordMetadata from './WordMetadata';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const PapercutContent = ({ papercutId }) => {
   const theme = useTheme();
@@ -30,6 +31,8 @@ const PapercutContent = ({ papercutId }) => {
 
   const { currentState, pushState, undo, redo, canUndo, canRedo } = usePapercutHistory();
   
+  const [hoveredSegment, setHoveredSegment] = useState(null);
+
   // Drag state
   const [draggedSegment, setDraggedSegment] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
@@ -40,6 +43,24 @@ const PapercutContent = ({ papercutId }) => {
     papercuts.find(p => p.id === papercutId)?.content || [],
     [papercuts, papercutId]
   );
+
+  const handleContentUpdate = useCallback((newContent, operation) => {
+    const newState = {
+      id: papercutId,
+      content: newContent,
+      metadata: {
+        lastModified: Date.now(),
+        operation
+      }
+    };
+    pushState(newState);
+    updatePapercutContent(papercutId, newContent);
+  }, [papercutId, pushState, updatePapercutContent]);
+  
+  const handleDeleteSegment = useCallback((segmentId) => {
+    const newContent = content.filter(segment => segment.id !== segmentId);
+    handleContentUpdate(newContent, 'delete');
+  }, [content, handleContentUpdate]);
 
   const handleDragStart = (e, segmentId) => {
     e.dataTransfer.setData('text/plain', segmentId);
@@ -86,18 +107,7 @@ const PapercutContent = ({ papercutId }) => {
     setDropPosition(null);
   };
 
-  const handleContentUpdate = useCallback((newContent, operation) => {
-    const newState = {
-      id: papercutId,
-      content: newContent,
-      metadata: {
-        lastModified: Date.now(),
-        operation
-      }
-    };
-    pushState(newState);
-    updatePapercutContent(papercutId, newContent);
-  }, [papercutId, pushState, updatePapercutContent]);
+
 
   const handleKeyDown = useCallback((event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
@@ -159,6 +169,174 @@ const PapercutContent = ({ papercutId }) => {
     updateCursorPosition({ segmentId, wordId });
   }, [updateCursorPosition, content]);
 
+  const renderWord = useCallback((word, segment) => (
+    <Typography
+      key={word.id}
+      component="span"
+      variant="body2"
+      onClick={() => handleWordClick(segment.id, word.id)}
+      sx={{
+        display: 'inline-block',
+        cursor: 'pointer',
+        px: 0.5,
+        py: 0.25,
+        borderRadius: 1,
+        position: 'relative',
+        backgroundColor: 
+          cursorPosition?.segmentId === segment.id && 
+          cursorPosition?.wordId === word.id 
+            ? 'action.selected' 
+            : 'transparent',
+        '&:hover': {
+          backgroundColor: 'action.hover'
+        }
+      }}
+    >
+      {word.text}
+      {cursorPosition?.segmentId === segment.id && 
+       cursorPosition?.wordId === word.id && (
+        <Box
+          sx={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            width: 2,
+            height: '100%',
+            backgroundColor: 'primary.main',
+            animation: 'blink 1s step-end infinite',
+            '@keyframes blink': {
+              '50%': {
+                opacity: 0
+              }
+            }
+          }}
+        />
+      )}
+    </Typography>
+  ), [cursorPosition, handleWordClick]);
+
+  const renderSegment = useCallback((segment) => (
+    <Fade in key={segment.id}>
+      <Paper
+        elevation={draggedSegment === segment.id ? 0 : dropTarget === segment.id ? 4 : 1}
+        draggable
+        onDragStart={(e) => handleDragStart(e, segment.id)}
+        onDragOver={(e) => handleDragOver(e, segment.id)}
+        onDragLeave={handleDragLeave}
+        onDragEnd={handleDragEnd}
+        onDrop={(e) => handleDrop(e, segment.id)}
+        onMouseEnter={() => setHoveredSegment(segment.id)}
+        onMouseLeave={() => setHoveredSegment(null)}
+        sx={{ 
+          mb: 2,
+          position: 'relative',
+          transition: theme.transitions.create(['box-shadow', 'transform', 'opacity']),
+          opacity: draggedSegment === segment.id ? 0.4 : 1,
+          transform: dropTarget === segment.id 
+            ? `translateY(${dropPosition === 'top' ? -8 : 8}px)`
+            : 'none',
+          '&:hover .drag-handle': {
+            opacity: 1
+          }
+        }}
+      >
+        {/* Drop zone indicators */}
+        <Fade in={dropTarget === segment.id && dropPosition === 'top'}>
+          <Box sx={{
+            position: 'absolute',
+            top: -2,
+            left: 0,
+            right: 0,
+            height: 4,
+            bgcolor: 'primary.main',
+            borderRadius: 2,
+            zIndex: 1
+          }} />
+        </Fade>
+        <Fade in={dropTarget === segment.id && dropPosition === 'bottom'}>
+          <Box sx={{
+            position: 'absolute',
+            bottom: -2,
+            left: 0,
+            right: 0,
+            height: 4,
+            bgcolor: 'primary.main',
+            borderRadius: 2,
+            zIndex: 1
+          }} />
+        </Fade>
+
+        {/* Segment content */}
+        <Box sx={{ 
+          display: 'flex',
+          alignItems: 'flex-start',
+          p: 2
+        }}>
+          <Box 
+            className="drag-handle"
+            sx={{ 
+              opacity: 0,
+              transition: theme.transitions.create('opacity'),
+              cursor: 'grab',
+              '&:active': {
+                cursor: 'grabbing'
+              },
+              mr: 1,
+              mt: 0.5
+            }}
+          >
+            <DragIndicatorIcon color="action" />
+          </Box>
+
+          <Box sx={{ flexGrow: 1 }}>
+            <Box 
+              sx={{ 
+                borderLeft: 3,
+                borderColor: getSpeakerColor(segment.speaker).colors.edgeLine,
+                pl: 2
+              }}
+            >
+              <Typography 
+                variant="subtitle2" 
+                sx={{ 
+                  color: 'primary.main',
+                  mb: 0.5,
+                  fontWeight: 500,
+                  fontSize: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em'
+                }}
+              >
+                {segment.speaker}
+              </Typography>
+              <Box>
+                {segment.words.map((word) => renderWord(word, segment))}
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+
+        {hoveredSegment === segment.id && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              cursor: 'pointer',
+              opacity: 0.7,
+              '&:hover': {
+                opacity: 1,
+              },
+            }}
+            onClick={() => handleDeleteSegment(segment.id)}
+          >
+            <DeleteIcon color="error" />
+          </Box>
+        )}
+      </Paper>
+    </Fade>
+  ), [draggedSegment, dropTarget, dropPosition, getSpeakerColor, handleDragStart, handleDragOver, handleDragLeave, handleDragEnd, handleDrop, renderWord, handleDeleteSegment, hoveredSegment, theme]);
+
   return (
     <Box 
       sx={{ 
@@ -176,151 +354,7 @@ const PapercutContent = ({ papercutId }) => {
         overflowY: 'auto',
         p: 2
       }}>
-        {content.map(segment => (
-          <Fade in key={segment.id}>
-            <Paper
-              elevation={draggedSegment === segment.id ? 0 : dropTarget === segment.id ? 4 : 1}
-              draggable
-            onDragStart={(e) => handleDragStart(e, segment.id)}
-            onDragOver={(e) => handleDragOver(e, segment.id)}
-            onDragLeave={handleDragLeave}
-            onDragEnd={handleDragEnd}
-            onDrop={(e) => handleDrop(e, segment.id)}
-            sx={{ 
-              mb: 2,
-              position: 'relative',
-              transition: theme.transitions.create(['box-shadow', 'transform', 'opacity']),
-              opacity: draggedSegment === segment.id ? 0.4 : 1,
-              transform: dropTarget === segment.id 
-                ? `translateY(${dropPosition === 'top' ? -8 : 8}px)`
-                : 'none',
-              '&:hover .drag-handle': {
-                opacity: 1
-              }
-            }}
-          >
-            {/* Drop zone indicators */}
-            <Fade in={dropTarget === segment.id && dropPosition === 'top'}>
-              <Box sx={{
-                position: 'absolute',
-                top: -2,
-                left: 0,
-                right: 0,
-                height: 4,
-                bgcolor: 'primary.main',
-                borderRadius: 2,
-                zIndex: 1
-              }} />
-            </Fade>
-            <Fade in={dropTarget === segment.id && dropPosition === 'bottom'}>
-              <Box sx={{
-                position: 'absolute',
-                bottom: -2,
-                left: 0,
-                right: 0,
-                height: 4,
-                bgcolor: 'primary.main',
-                borderRadius: 2,
-                zIndex: 1
-              }} />
-            </Fade>
-
-            {/* Segment content */}
-            <Box sx={{ 
-              display: 'flex',
-              alignItems: 'flex-start',
-              p: 2
-            }}>
-              <Box 
-                className="drag-handle"
-                sx={{ 
-                  opacity: 0,
-                  transition: theme.transitions.create('opacity'),
-                  cursor: 'grab',
-                  '&:active': {
-                    cursor: 'grabbing'
-                  },
-                  mr: 1,
-                  mt: 0.5
-                }}
-              >
-                <DragIndicatorIcon color="action" />
-              </Box>
-
-              <Box sx={{ flexGrow: 1 }}>
-                <Box 
-                  sx={{ 
-                    borderLeft: 3,
-                    borderColor: getSpeakerColor(segment.speaker).colors.edgeLine,
-                    pl: 2
-                  }}
-                >
-                  <Typography 
-                    variant="subtitle2" 
-                    sx={{ 
-                      color: 'primary.main',
-                      mb: 0.5,
-                      fontWeight: 500,
-                      fontSize: '0.75rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.1em'
-                    }}
-                  >
-                    {segment.speaker}
-                  </Typography>
-                  <Box>
-                    {segment.words.map((word) => (
-                      <Typography
-                        key={word.id}
-                        component="span"
-                        variant="body2"
-                        onClick={() => handleWordClick(segment.id, word.id)}
-                        sx={{
-                          display: 'inline-block',
-                          cursor: 'pointer',
-                          px: 0.5,
-                          py: 0.25,
-                          borderRadius: 1,
-                          position: 'relative',
-                          backgroundColor: 
-                            cursorPosition?.segmentId === segment.id && 
-                            cursorPosition?.wordId === word.id 
-                              ? 'action.selected' 
-                              : 'transparent',
-                          '&:hover': {
-                            backgroundColor: 'action.hover'
-                          }
-                        }}
-                      >
-                                   {word.text}
-                          {cursorPosition?.segmentId === segment.id && 
-                           cursorPosition?.wordId === word.id && (
-                            <Box
-                              sx={{
-                                position: 'absolute',
-                                right: 0,
-                                top: 0,
-                                width: 2,
-                                height: '100%',
-                                backgroundColor: 'primary.main',
-                                animation: 'blink 1s step-end infinite',
-                                '@keyframes blink': {
-                                  '50%': {
-                                    opacity: 0
-                                  }
-                                }
-                              }}
-                            />
-                          )}
-                        </Typography>
-                      ))}
-                    </Box>
-                  </Box>
-                </Box>
-              </Box>
-            </Paper>
-          </Fade>
-        ))}
+        {content.map(renderSegment)}
       </Box>
 
       {/* Fixed footer */}

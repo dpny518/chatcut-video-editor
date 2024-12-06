@@ -91,7 +91,7 @@ const PapercutViewerSection = ({ transcriptData }) => {
           </Typography>
           <IconButton
             sx={{
-              color: 'text.secondary',
+              color: 'primary.main',
               mr: 1
             }}
           >
@@ -99,7 +99,7 @@ const PapercutViewerSection = ({ transcriptData }) => {
           </IconButton>
           <Typography 
             sx={{ 
-              color: 'text.secondary',
+              color: 'primary.main',
               fontSize: '0.875rem',
               fontWeight: 500,
               flexGrow: 1
@@ -111,7 +111,7 @@ const PapercutViewerSection = ({ transcriptData }) => {
             <Typography 
               variant="subtitle2" 
               sx={{ 
-                color: 'text.primary',
+                color: 'primary.main',
                 fontSize: '0.75rem',
                 fontWeight: 700
               }}
