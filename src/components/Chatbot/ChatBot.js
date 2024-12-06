@@ -1,8 +1,25 @@
 import React, { useState } from 'react';
-import { Box, TextField, Button, Select, MenuItem, FormControl, CircularProgress } from '@mui/material';
+import { 
+  Box,
+  TextField,
+  Button,
+  Select,
+  MenuItem,
+  FormControl,
+  CircularProgress,
+  Paper,
+  IconButton,
+  Slide,
+  Typography
+} from '@mui/material';
+import { 
+  KeyboardArrowDown, 
+  KeyboardArrowUp,
+  Close as CloseIcon
+} from '@mui/icons-material';
+import { useTheme } from '@mui/material/styles';
 import { promptTemplates } from './promptTemplates';
 import { sendToLLM, sendToLlama } from './Api';
-import { useTheme } from '@mui/material/styles';
 
 const ChatBot = ({ 
   onSendMessage, 
@@ -18,6 +35,7 @@ const ChatBot = ({
   const [input, setInput] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const theme = useTheme();
 
   const clearExistingClips = () => {
@@ -180,7 +198,6 @@ const ChatBot = ({
     }
   };
 
-  // Rest of the component remains the same...
   const handleSubmit = async (e, useGPT = true) => {
     e.preventDefault();
     if (input.trim() && selectedTemplate) {
@@ -233,152 +250,159 @@ const ChatBot = ({
   };
 
   return (
-    <Box sx={{
-      position: 'fixed',
-      bottom: 0,
-      left: 0,
-      width: '240px',
-      height: '300px',
-      borderTop: 1,
-      borderRight: 1,
-      borderColor: 'divider',
-      backgroundColor: theme.palette.background.paper,
-      display: 'flex',
-      flexDirection: 'column',
-      zIndex: 1000,
-    }}>
-      {/* Header */}
-      <Box sx={{ 
-        p: 1, 
-        borderBottom: 1, 
-        borderColor: 'divider',
-        backgroundColor: 'background.default',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <Box sx={{ fontSize: '16px', fontWeight: 'bold' }}>
-          Chatbot
-        </Box>
-        {isLoading && <CircularProgress size={20} />}
-      </Box>
-
-      {/* Messages Area */}
-      <Box 
-        sx={{ 
-          flex: 1,
-          overflow: 'auto',
-          p: 1,
-          backgroundColor: theme.palette.background.default
-        }}
-      >
-        {messages.map((msg, index) => (
-          <Box
-            key={index}
-            sx={{
-              p: 1,
-              mb: 1,
-              borderRadius: 1,
-              maxWidth: '85%',
-              wordBreak: 'break-word',
-              ...(msg.sender === 'user' ? {
-                ml: 'auto',
-                backgroundColor: theme.palette.primary.main,
-                color: theme.palette.primary.contrastText,
-              } : {
-                mr: 'auto',
-                backgroundColor: msg.isError ? theme.palette.error.main : 
-                               msg.isSuccess ? theme.palette.success.main : theme.palette.secondary.main,
-                color: theme.palette.secondary.contrastText,
-              })
-            }}
-          >
-            {msg.text}
-          </Box>
-        ))}
-      </Box>
-
-      {/* Input Area */}
-      <Box 
-        component="form" 
-        onSubmit={(e) => handleSubmit(e, true)}
+    <Slide direction="up" in={true} mountOnEnter unmountOnExit>
+      <Paper
+        elevation={3}
         sx={{
-          p: 1,
+          position: 'fixed',
+          bottom: isExpanded ? 0 : 'auto',
+          left: 0,
+          width: '300px',
+          height: isExpanded ? '400px' : '48px',
+          backgroundColor: theme.palette.background.paper,
           display: 'flex',
           flexDirection: 'column',
-          gap: 1,
-          borderTop: 1,
-          borderColor: 'divider',
-          backgroundColor: theme.palette.background.paper
+          zIndex: 1000,
+          transition: 'height 0.3s ease',
+          borderRadius: '8px 8px 0 0',
+          cursor: !isExpanded ? 'pointer' : 'default' // Make entire header clickable when collapsed
         }}
+        onClick={() => !isExpanded && setIsExpanded(true)} // Allow expanding when collapsed
       >
-        <FormControl size="small" fullWidth>
-          <Select
-            value={selectedTemplate}
-            onChange={(e) => setSelectedTemplate(e.target.value)}
-            displayEmpty
-            disabled={isLoading}
-            sx={{
-              backgroundColor: theme.palette.background.paper,
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: theme.palette.divider,
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: theme.palette.action.hover,
-              },
-            }}
-          >
-            <MenuItem value="">Select a template</MenuItem>
-            {promptTemplates.map(template => (
-              <MenuItem key={template.name} value={template.name}>
-                {template.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        
-        <TextField
-          size="small"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your message..."
-          disabled={isLoading}
-          fullWidth
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              backgroundColor: theme.palette.background.paper,
-              '& fieldset': {
-                borderColor: theme.palette.divider,
-              },
-              '&:hover fieldset': {
-                borderColor: theme.palette.action.hover,
-              },
-            },
-          }}
-        />
-        
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button 
-            onClick={(e) => handleSubmit(e, true)}
-            variant="contained" 
-            color="primary"
-            disabled={!input.trim() || !selectedTemplate || isLoading}
-            sx={{ flex: 1 }}
-          >
-            Send to GPT
-          </Button>
-          <Button 
-            onClick={(e) => handleSubmit(e, false)}
-            variant="contained" 
-            color="secondary"
-            disabled={!input.trim() || !selectedTemplate || isLoading}
-            sx={{ flex: 1 }}
-          >
-            Send to Llama
-          </Button>
+        {/* Header */}
+        <Box sx={{ 
+          p: 1.5,
+          borderBottom: isExpanded ? 1 : 0,
+          borderColor: 'divider',
+          backgroundColor: theme.palette.primary.main,
+          color: theme.palette.primary.contrastText,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderRadius: '8px 8px 0 0'
+        }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+            Papercut Co-Pilot
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {isLoading && <CircularProgress size={20} color="inherit" />}
+            <IconButton 
+              size="small"
+              onClick={() => setIsExpanded(!isExpanded)}
+              sx={{ color: 'inherit' }}
+            >
+              {isExpanded ? <KeyboardArrowDown /> : <KeyboardArrowUp />}
+            </IconButton>
+          </Box>
         </Box>
-      </Box>
-    </Box>
+
+        {isExpanded && (
+          <>
+            {/* Messages Area */}
+            <Box 
+              sx={{ 
+                flex: 1,
+                overflow: 'auto',
+                p: 2,
+                backgroundColor: theme.palette.background.default,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1
+              }}
+            >
+              {messages.map((msg, index) => (
+                <Paper
+                  key={index}
+                  elevation={1}
+                  sx={{
+                    p: 1.5,
+                    maxWidth: '85%',
+                    alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
+                    backgroundColor: msg.sender === 'user' 
+                      ? theme.palette.primary.main
+                      : msg.isError 
+                        ? theme.palette.error.light
+                        : msg.isSuccess 
+                          ? theme.palette.success.light
+                          : theme.palette.grey[100],
+                    color: msg.sender === 'user' 
+                      ? theme.palette.primary.contrastText
+                      : theme.palette.text.primary
+                  }}
+                >
+                  <Typography variant="body2">
+                    {msg.text}
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+
+            {/* Input Area */}
+            <Box 
+              component="form" 
+              onSubmit={(e) => handleSubmit(e, true)}
+              sx={{
+                p: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.5,
+                borderTop: 1,
+                borderColor: 'divider',
+                backgroundColor: theme.palette.background.paper
+              }}
+            >
+              <FormControl size="small" fullWidth>
+                <Select
+                  value={selectedTemplate}
+                  onChange={(e) => setSelectedTemplate(e.target.value)}
+                  displayEmpty
+                  disabled={isLoading}
+                >
+                  <MenuItem value="">Select a template</MenuItem>
+                  {promptTemplates.map(template => (
+                    <MenuItem key={template.name} value={template.name}>
+                      {template.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <TextField
+                size="small"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type your message..."
+                disabled={isLoading}
+                multiline
+                maxRows={3}
+                fullWidth
+              />
+
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button 
+                  onClick={(e) => handleSubmit(e, true)}
+                  variant="contained" 
+                  disabled={!input.trim() || !selectedTemplate || isLoading}
+                  fullWidth
+                  size="small"
+                >
+                  GPT
+                </Button>
+                <Button 
+                  onClick={(e) => handleSubmit(e, false)}
+                  variant="outlined"
+                  disabled={!input.trim() || !selectedTemplate || isLoading}
+                  fullWidth
+                  size="small"
+                >
+                  Llama
+                </Button>
+              </Box>
+            </Box>
+          </>
+        )}
+      </Paper>
+    </Slide>
   );
 };
 
