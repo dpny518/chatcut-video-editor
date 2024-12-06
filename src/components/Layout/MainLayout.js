@@ -1,7 +1,9 @@
-// src/components/Layout/MainLayout.js
 import React from 'react';
-import { Box } from '@mui/material';
+import { Box, IconButton } from '@mui/material';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 import MediaSidebar from '../Media/MediaSidebar';
+import Sidebar from './Sidebar';
 
 const MainLayout = ({ 
   mediaFiles = [], 
@@ -9,34 +11,32 @@ const MainLayout = ({
   onFileUpload, 
   onFileSelect,
   timelineProjects,
-  children 
+  children,
+  themeMode,
+  onThemeChange,
+  currentView,
+  onViewChange
 }) => {
   return (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        height: '100vh',
-        bgcolor: 'background.default',
-        color: 'text.primary',
-        overflow: 'hidden'
-      }}
-    >
-      <MediaSidebar 
-        files={mediaFiles}
-        onFileUpload={onFileUpload}
-        onFileSelect={onFileSelect}
-        selectedFile={selectedBinClip}
-        timelineProjects={timelineProjects}
-      />
-      <Box 
-        sx={{ 
-          flexGrow: 1, 
-          height: '100%',
-          overflow: 'auto',
-          p: 2
-        }}
-      >
-        {children}
+    <Box sx={{ display: 'flex', height: '100vh' }}>
+      <Sidebar onPageChange={onViewChange} currentPage={currentView} />
+      <Box sx={{ display: 'flex', flexGrow: 1 }}>
+        <MediaSidebar 
+          files={mediaFiles}
+          onFileUpload={onFileUpload}
+          onFileSelect={onFileSelect}
+          selectedFile={selectedBinClip}
+          timelineProjects={timelineProjects}
+        />
+        <Box sx={{ flexGrow: 1, p: 2, position: 'relative' }}>
+          <IconButton
+            onClick={onThemeChange}
+            sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1 }}
+          >
+            {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+          </IconButton>
+          {children}
+        </Box>
       </Box>
     </Box>
   );

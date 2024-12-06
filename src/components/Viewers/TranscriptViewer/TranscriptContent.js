@@ -35,12 +35,12 @@ const TranscriptContent = ({ displayContent, onSelectionChange, highlightedWord 
       switch (style) {
         case 'highlight-green':
           return {
-            bgcolor: 'success.light',
+            bgcolor: 'rgba(144, 238, 144, 0.5)',
             opacity: 0.9
           };
         case 'highlight-red':
           return {
-            bgcolor: 'error.light',
+            bgcolor: 'rgba(255, 99, 132, 0.5)',
             opacity: 0.9
           };
         case 'strikethrough':

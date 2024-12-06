@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import { Box, Snackbar, Alert, IconButton } from '@mui/material';
+import { CssBaseline, Box, Snackbar, Alert, IconButton } from '@mui/material';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 
@@ -15,13 +14,22 @@ import { FileSystemProvider } from './contexts/FileSystemContext';
 import { SpeakerColorProvider } from './contexts/SpeakerColorContext';
 import { PapercutProvider } from './contexts/PapercutContext';
 import { PapercutHistoryProvider } from './contexts/PapercutHistoryContext';
-import { TranscriptStylingProvider } from './contexts/TranscriptStylingContext'; 
+import { TranscriptStylingProvider } from './contexts/TranscriptStylingContext';
+
+import SearchPage from './components/Pages/SearchPage';
+import NotificationsPage from './components/Pages/NotificationsPage';
+import ProfilePage from './components/Pages/ProfilePage';
+import SettingsPage from './components/Pages/SettingsPage';
+import BillingPage from './components/Pages/BillingPage';
+import SupportPage from './components/Pages/SupportPage';
+
 const App = () => {
   const [themeMode, setThemeMode] = useState('dark');
   const [notification, setNotification] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [selectedBinClip, setSelectedBinClip] = useState(null);
   const [transcripts, setTranscripts] = useState(new Map());
+  const [currentView, setCurrentView] = useState('editor');
 
   const theme = createTheme({
     palette: {
@@ -34,22 +42,15 @@ const App = () => {
     },
   });
 
+  const handleThemeChange = () => {
+    setThemeMode(mode => mode === 'dark' ? 'light' : 'dark');
+  };
+  
+
   const timelineState = {
     clips: [],
     totalDuration: 0,
     settings: {}
-  };
-
-  const toggleThemeMode = () => {
-    setThemeMode((prevMode) => (prevMode === 'dark' ? 'light' : 'dark'));
-  };
-
-  const showNotification = (message, severity = 'info') => {
-    setNotification({ message, severity });
-  };
-
-  const handleChatMessage = (message) => {
-    setChatMessages(prev => [...prev, message]);
   };
 
   const handleFileUpload = async (file) => {
@@ -60,62 +61,82 @@ const App = () => {
         setTranscripts(prev => new Map(prev).set(file.name, transcriptData));
       }
     } catch (error) {
-      showNotification(`Error uploading file: ${error.message}`, 'error');
+      setNotification({ message: `Error uploading file: ${error.message}`, severity: 'error' });
     }
   };
+
+// Update renderContent in App.js
+const renderContent = () => {
+  switch(currentView) {
+    case 'home':
+    case 'editor':
+      return (
+        <EditorLayout>
+          <Box sx={{ 
+            display: 'flex', 
+            height: 'calc(100vh - 48px)', 
+            overflow: 'hidden',
+            gap: 2,
+            p: 2
+          }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <BinViewerSection />
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <PapercutViewerSection transcriptData={transcripts} />
+            </Box>
+          </Box>
+        </EditorLayout>
+      );
+    case 'search':
+      return <SearchPage />;
+    case 'notifications':
+      return <NotificationsPage />;
+    case 'profile':
+      return <ProfilePage />;
+    case 'settings':
+      return <SettingsPage themeMode={themeMode} onThemeChange={handleThemeChange} />;
+    case 'billing':
+      return <BillingPage />;
+    case 'support':
+      return <SupportPage />;
+    default:
+      return null;
+  }
+};
 
   return (
     <StyledEngineProvider injectFirst>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <FileSystemProvider 
-          onFileUpload={handleFileUpload}
-          onError={(message) => showNotification(message, 'error')}
-        >
+        <FileSystemProvider onFileUpload={handleFileUpload}>
           <SpeakerColorProvider>
             <PapercutHistoryProvider>
               <PapercutProvider>
-              <TranscriptStylingProvider> 
-                <MainLayout>
-                  <EditorLayout>
-                    <IconButton
-                      sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1 }}
-                      onClick={toggleThemeMode}
-                      color="inherit"
-                    >
-                      {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-                    </IconButton>
-
-                    <Box sx={{ 
-                      display: 'flex', 
-                      height: 'calc(100vh - 48px)', 
-                      overflow: 'hidden',
-                      gap: 2,
-                      p: 2
-                    }}>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <BinViewerSection />
-                      </Box>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <PapercutViewerSection 
-                          transcriptData={transcripts}
-                        />
-                      </Box>
-                    </Box>
-                  </EditorLayout>
-                  <ChatBot 
-                    clips={[]}
-                    messages={chatMessages}
-                    onSendMessage={handleChatMessage}
+                <TranscriptStylingProvider>
+                  <MainLayout
+                    themeMode={themeMode}
+                    onThemeChange={() => setThemeMode(mode => mode === 'dark' ? 'light' : 'dark')}
+                    currentView={currentView}
+                    onViewChange={setCurrentView}
+                    mediaFiles={[]}
                     selectedBinClip={selectedBinClip}
-                    transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name) : null}
-                    onAddToTimeline={() => {}}
-                    timelineState={timelineState}
-                    timelineRows={[]}
-                    setTimelineRows={() => {}}
-                    onClipsChange={() => {}}
-                  />
-                </MainLayout>
+                    onFileSelect={setSelectedBinClip}
+                    onFileUpload={handleFileUpload}
+                  >
+                    {renderContent()}
+                    <ChatBot 
+                      clips={[]}
+                      messages={chatMessages}
+                      onSendMessage={(msg) => setChatMessages(prev => [...prev, msg])}
+                      selectedBinClip={selectedBinClip}
+                      transcriptData={selectedBinClip ? transcripts.get(selectedBinClip.name) : null}
+                      timelineState={timelineState}
+                      timelineRows={[]}
+                      setTimelineRows={() => {}}
+                      onClipsChange={() => {}}
+                    />
+                  </MainLayout>
                 </TranscriptStylingProvider>
               </PapercutProvider>
             </PapercutHistoryProvider>
@@ -141,6 +162,3 @@ const App = () => {
 };
 
 export default App;
-
-
-
