@@ -30,8 +30,6 @@ const PapercutViewer = ({ transcriptData }) => {
         borderColor: 'divider',
         bgcolor: 'background.paper' 
       }}>
-
-  
       </Box>
 
       <Box sx={{ 
@@ -41,13 +39,21 @@ const PapercutViewer = ({ transcriptData }) => {
         display: 'flex',
         flexDirection: 'column'
       }}>
-        <Box sx={{ p: 2 }}>
+        <Box sx={{ 
+          py: 1.5,
+          px: 2,
+          borderBottom: 1,
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          bgcolor: 'background.default',
+        }}>
           <Typography 
-            variant="subtitle2" 
+            variant="body2"
+            color="text.secondary"
             sx={{ 
-              color: 'text.secondary',
+              fontWeight: 500,
               fontSize: '0.75rem',
-              fontWeight: 500
             }}
           >
             {activePapercut ? activePapercut.name : 'No Papercuts'}
