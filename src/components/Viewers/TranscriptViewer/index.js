@@ -11,6 +11,7 @@ import { usePapercutActions } from
   '../../../hooks/usePapercut/usePapercutActions';
 import { useTranscriptSelection } from 
   '../../../hooks/useTranscript/useTranscriptSelection';
+import { useTranscriptStyling } from '../../../contexts/TranscriptStylingContext';
 import TranscriptToolbar from './TranscriptToolbar';
 import TranscriptContent from './TranscriptContent';
 import FileCount from './FileCount';
@@ -24,6 +25,7 @@ const TranscriptViewer = () => {
   const { activeTab } = usePapercuts();
   const { addToPapercut, insertToPapercut } = usePapercutActions();
   const { highlightedWord } = useTranscript();
+  const { addStyle } = useTranscriptStyling();
   
   const transcripts = useMemo(() => {
     const selectedFileIds = selectedItems.filter(id => 
@@ -41,6 +43,15 @@ const TranscriptViewer = () => {
     getSelectedContent, 
     handleSelectionChange 
   } = useTranscriptSelection(displayContent);
+
+  const handleStyleClick = (style) => {
+    if (selection) {
+      const selectedContent = getSelectedContent();
+      // Pass the entire selectedContent to addStyle
+      addStyle(selectedContent, style);
+      clearSelection();
+    }
+  };
 
   const handleTimelineAdd = () => {
     if (selection) {
@@ -111,6 +122,7 @@ const TranscriptViewer = () => {
           onAddToTimeline={handleTimelineAdd}
           onAddToPapercut={handleAddToPapercut}
           onInsertToPapercut={handleInsertToPapercut}
+          onStyleClick={handleStyleClick}
         />
       </Box>
     </Card>

@@ -15,7 +15,7 @@ import { FileSystemProvider } from './contexts/FileSystemContext';
 import { SpeakerColorProvider } from './contexts/SpeakerColorContext';
 import { PapercutProvider } from './contexts/PapercutContext';
 import { PapercutHistoryProvider } from './contexts/PapercutHistoryContext';
-
+import { TranscriptStylingProvider } from './contexts/TranscriptStylingContext'; 
 const App = () => {
   const [themeMode, setThemeMode] = useState('dark');
   const [notification, setNotification] = useState(null);
@@ -75,6 +75,7 @@ const App = () => {
           <SpeakerColorProvider>
             <PapercutHistoryProvider>
               <PapercutProvider>
+              <TranscriptStylingProvider> 
                 <MainLayout>
                   <EditorLayout>
                     <IconButton
@@ -115,6 +116,7 @@ const App = () => {
                     onClipsChange={() => {}}
                   />
                 </MainLayout>
+                </TranscriptStylingProvider>
               </PapercutProvider>
             </PapercutHistoryProvider>
           </SpeakerColorProvider>

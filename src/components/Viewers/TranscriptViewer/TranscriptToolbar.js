@@ -1,8 +1,19 @@
 import React from 'react';
-import { Box, Button } from '@mui/material';
-import { Add as AddIcon, InsertComment as InsertIcon } from '@mui/icons-material';
+import { Box, Button, ButtonGroup } from '@mui/material';
+import { 
+  Add as AddIcon, 
+  InsertComment as InsertIcon,
+  BorderColor as HighlightIcon,
+  StrikethroughS as StrikeIcon
+} from '@mui/icons-material';
 
-const TranscriptToolbar = ({ isSelectionActive, onAddToTimeline, onAddToPapercut, onInsertToPapercut }) => {
+const TranscriptToolbar = ({ 
+  isSelectionActive, 
+  onAddToTimeline, 
+  onAddToPapercut, 
+  onInsertToPapercut,
+  onStyleClick 
+}) => {
   return (
     <Box sx={{ 
       p: 2, 
@@ -11,33 +22,71 @@ const TranscriptToolbar = ({ isSelectionActive, onAddToTimeline, onAddToPapercut
       display: 'flex',
       gap: 2,
       justifyContent: 'center',
+      flexWrap: 'wrap'
     }}>
-      <Button
-        variant="contained"
-        onClick={onAddToTimeline}
-        startIcon={<AddIcon />}
-        disabled={!isSelectionActive}
-      >
-        Add to Timeline
-      </Button>
-      <Button
-        variant="contained"
-        onClick={onAddToPapercut}
-        startIcon={<AddIcon />}
-        color="secondary"
-        disabled={!isSelectionActive}
-      >
-        Add to Papercut
-      </Button>
-      <Button
-        variant="contained"
-        onClick={onInsertToPapercut}
-        startIcon={<InsertIcon />}
-        color="primary"
-        disabled={!isSelectionActive}
-      >
-        Insert to Papercut
-      </Button>
+      <ButtonGroup>
+        <Button
+          variant="contained"
+          onClick={onAddToTimeline}
+          startIcon={<AddIcon />}
+          disabled={!isSelectionActive}
+        >
+          Add to Timeline
+        </Button>
+        <Button
+          variant="contained"
+          onClick={onAddToPapercut}
+          startIcon={<AddIcon />}
+          color="secondary"
+          disabled={!isSelectionActive}
+        >
+          Add to Papercut
+        </Button>
+        <Button
+          variant="contained"
+          onClick={onInsertToPapercut}
+          startIcon={<InsertIcon />}
+          color="primary"
+          disabled={!isSelectionActive}
+        >
+          Insert to Papercut
+        </Button>
+      </ButtonGroup>
+
+      <ButtonGroup>
+        <Button
+          variant="contained"
+          onClick={() => onStyleClick('highlight-green')}
+          startIcon={<HighlightIcon />}
+          disabled={!isSelectionActive}
+          sx={{ 
+            bgcolor: 'success.main',
+            '&:hover': { bgcolor: 'success.dark' }
+          }}
+        >
+          Green Highlight
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => onStyleClick('highlight-red')}
+          startIcon={<HighlightIcon />}
+          disabled={!isSelectionActive}
+          sx={{ 
+            bgcolor: 'error.main',
+            '&:hover': { bgcolor: 'error.dark' }
+          }}
+        >
+          Red Highlight
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => onStyleClick('strikethrough')}
+          startIcon={<StrikeIcon />}
+          disabled={!isSelectionActive}
+        >
+          Strikethrough
+        </Button>
+      </ButtonGroup>
     </Box>
   );
 };

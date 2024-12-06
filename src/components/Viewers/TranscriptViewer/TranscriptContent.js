@@ -6,6 +6,9 @@ import {
 import { 
   useSpeakerColors 
 } from '../../../contexts/SpeakerColorContext';
+import { 
+  useTranscriptStyling 
+} from '../../../contexts/TranscriptStylingContext';
 
 const TranscriptContent = ({ 
   displayContent, 
@@ -15,6 +18,7 @@ const TranscriptContent = ({
   const contentRef = useRef(null);
 
   const { getSpeakerColor } = useSpeakerColors();
+  const { getWordStyle } = useTranscriptStyling();
 
   useEffect(() => {
     const handleMouseUp = () => {
@@ -35,51 +39,78 @@ const TranscriptContent = ({
     };
   }, [onSelectionChange]);
 
-  const renderWord = (word, fileId) => (
-    <Typography
-      key={word.id}
-      component="span"
-      variant="body2"
-      ref={
-        highlightedWord && 
-        word.id === highlightedWord.id ? 
-        (el) => {
-          if (el) {
-            el.scrollIntoView({ 
-              behavior: 'smooth', 
-              block: 'center' 
-            });
-          }
-        } : 
-        null
+  const renderWord = (word, fileId) => {
+    const style = getWordStyle(word.id);
+
+    const getStyleProps = (style) => {
+      switch (style) {
+        case 'highlight-green':
+          return {
+            bgcolor: 'success.light',
+            opacity: 0.9
+          };
+        case 'highlight-red':
+          return {
+            bgcolor: 'error.light',
+            opacity: 0.9
+          };
+        case 'strikethrough':
+          return {
+            textDecoration: 'line-through',
+            opacity: 0.7
+          };
+        default:
+          return {};
       }
-      data-word-id={word.id}
-      data-global-index={
-        word.globalIndex
-      }
-      data-file-id={fileId}
-      data-segment-index={
-        word.position.segment
-      }
-      data-word-index={
-        word.position.word
-      }
-      sx={{
-        px: 0.5,
-        py: 0.25,
-        borderRadius: 1,
-        bgcolor: highlightedWord && 
-                word.id === highlightedWord.id ? 
-                'action.selected' : 
-                'transparent',
-        '&:hover': {
-          bgcolor: 'action.hover'
-        },
-      }}
-    >
-      {word.word}
-    </Typography>
-  );
+    };
+
+    return (
+      <Typography
+        key={word.id}
+        component="span"
+        variant="body2"
+        ref={
+          highlightedWord && 
+          word.id === highlightedWord.id ? 
+          (el) => {
+            if (el) {
+              el.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
+              });
+            }
+          } : 
+          null
+        }
+        data-word-id={word.id}
+        data-global-index={
+          word.globalIndex
+        }
+        data-file-id={fileId}
+        data-segment-index={
+          word.position.segment
+        }
+        data-word-index={
+          word.position.word
+        }
+        sx={{
+          px: 0.5,
+          py: 0.25,
+          borderRadius: 1,
+          bgcolor: highlightedWord && 
+                  word.id === highlightedWord.id ? 
+                  'action.selected' : 
+                  'transparent',
+          '&:hover': {
+            bgcolor: 'action.hover'
+          },
+          ...getStyleProps(style)
+        }}
+      >
+        {word.word}
+      </Typography>
+    );
+  };
 
   const renderSegment = (
     segment, 
