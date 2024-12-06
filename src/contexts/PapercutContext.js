@@ -66,6 +66,19 @@ export function PapercutProvider({ children }) {
     }));
   }, []);
 
+  const createNewPapercut = useCallback(() => {
+    const newPapercut = {
+      id: `papercut-${Date.now()}`,
+      name: `Papercut ${papercuts.length + 1}`,
+      content: [],
+      created: new Date(),
+      modified: new Date()
+    };
+  
+    setPapercuts(prev => [...prev, newPapercut]);
+    setActiveTab(newPapercut.id); // Automatically switch to new papercut
+    return newPapercut.id;
+  }, [papercuts]);
   return (
     <PapercutContext.Provider value={{
       papercuts,
@@ -75,7 +88,8 @@ export function PapercutProvider({ children }) {
       updateCursorPosition,
       updatePapercutContent,
       addContentToPapercut,
-      insertContentToPapercut
+      insertContentToPapercut,
+      createNewPapercut
     }}>
       {children}
     </PapercutContext.Provider>

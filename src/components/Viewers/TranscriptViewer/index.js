@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { 
   Box, 
   Card, 
@@ -17,6 +17,7 @@ import TranscriptContent from './TranscriptContent';
 import FileCount from './FileCount';
 import useProcessTranscripts from 
   '../../../hooks/useTranscript/useTranscriptProcessing';
+import { usePapercutHistory } from '../../../hooks/usePapercutHistory';
 
 
 const TranscriptViewer = () => {
@@ -25,7 +26,31 @@ const TranscriptViewer = () => {
   const { activeTab } = usePapercuts();
   const { addToPapercut, insertToPapercut } = usePapercutActions();
   const { highlightedWord } = useTranscript();
-  const { addStyle } = useTranscriptStyling();
+  const { addStyle, removeStyle } = useTranscriptStyling();
+  const { 
+    pushState, 
+    undo, 
+    redo, 
+    canUndo, 
+    canRedo 
+  } = usePapercutHistory();
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+        event.preventDefault();
+        if (event.shiftKey && canRedo) {
+          redo();
+        } else if (canUndo) {
+          undo();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [canUndo, canRedo, undo, redo]);
   
   const transcripts = useMemo(() => {
     const selectedFileIds = selectedItems.filter(id => 
@@ -44,19 +69,22 @@ const TranscriptViewer = () => {
     handleSelectionChange 
   } = useTranscriptSelection(displayContent);
 
+ 
+
   const handleStyleClick = (style) => {
     if (selection) {
       const selectedContent = getSelectedContent();
-      // Pass the entire selectedContent to addStyle
       addStyle(selectedContent, style);
+      pushState({ type: 'ADD_STYLE', content: selectedContent, style });
       clearSelection();
     }
   };
 
-  const handleTimelineAdd = () => {
+  const handleRemoveStyle = () => {
     if (selection) {
       const selectedContent = getSelectedContent();
-      handleAddToTimeline(selectedContent);
+      removeStyle(selectedContent);
+      pushState({ type: 'REMOVE_STYLE', content: selectedContent });
       clearSelection();
     }
   };
@@ -83,7 +111,8 @@ const TranscriptViewer = () => {
       display: 'flex', 
       flexDirection: 'column',
       bgcolor: 'background.paper' 
-    }}>
+    }}
+    tabIndex={0}>
       <FileCount count={transcripts.length} />
       
       <Box sx={{ 
@@ -119,10 +148,10 @@ const TranscriptViewer = () => {
 
         <TranscriptToolbar 
           isSelectionActive={!!selection}
-          onAddToTimeline={handleTimelineAdd}
           onAddToPapercut={handleAddToPapercut}
           onInsertToPapercut={handleInsertToPapercut}
           onStyleClick={handleStyleClick}
+          onRemoveStyle={handleRemoveStyle}
         />
       </Box>
     </Card>

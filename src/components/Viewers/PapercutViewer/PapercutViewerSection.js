@@ -69,62 +69,51 @@ const PapercutViewerSection = ({ transcriptData }) => {
           minHeight: 48,
           px: 2
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-            <IconButton
-              disabled
-              sx={{
-                opacity: 0.5,
-                color: 'text.disabled',
-                mr: 1
-              }}
-            >
-              <PlayCircleOutlineIcon />
-            </IconButton>
-            <Typography 
-              sx={{ 
-                color: 'text.disabled',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-              }}
-            >
-              VIDEO
-            </Typography>
-          </Box>
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center',
-              borderBottom: 2,
-              borderColor: 'primary.main',
-              pb: 0.5
+          <IconButton
+            disabled
+            sx={{
+              opacity: 0.5,
+              color: 'text.disabled',
+              mr: 1
             }}
           >
-            <IconButton
-              sx={{
-                color: 'primary.main',
-                mr: 1
-              }}
-            >
-              <TextSnippetIcon />
-            </IconButton>
-            <Typography 
-              sx={{ 
-                color: 'primary.main',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-              }}
-            >
-              PAPERCUT
-            </Typography>
-          </Box>
-          <Box sx={{ flexGrow: 1 }} />
+            <PlayCircleOutlineIcon />
+          </IconButton>
+          <Typography 
+            sx={{ 
+              color: 'text.disabled',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              mr: 2
+            }}
+          >
+            VIDEO
+          </Typography>
+          <IconButton
+            sx={{
+              color: 'text.secondary',
+              mr: 1
+            }}
+          >
+            <TextSnippetIcon />
+          </IconButton>
+          <Typography 
+            sx={{ 
+              color: 'text.secondary',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              flexGrow: 1
+            }}
+          >
+            PAPERCUT
+          </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography 
               variant="subtitle2" 
               sx={{ 
-                color: 'text.secondary',
+                color: 'text.primary',
                 fontSize: '0.75rem',
-                fontWeight: 500
+                fontWeight: 700
               }}
             >
               {activePapercut ? activePapercut.name : 'No Papercuts'}
@@ -159,18 +148,6 @@ const PapercutViewerSection = ({ transcriptData }) => {
         display: 'flex',
         flexDirection: 'column'
       }}>
-        <Box sx={{ p: 2 }}>
-          <Typography 
-            variant="subtitle2" 
-            sx={{ 
-              color: 'text.secondary',
-              fontSize: '0.75rem',
-              fontWeight: 700
-            }}
-          >
-            {activePapercut ? activePapercut.name : 'No Papercuts'}
-          </Typography>
-        </Box>
         <PapercutViewer transcriptData={transcriptData} />
       </Box>
     </Paper>

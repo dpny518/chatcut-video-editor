@@ -17,15 +17,23 @@ export const TranscriptStylingProvider = ({ children }) => {
     });
   };
 
-  const removeStyle = (wordIds) => {
+  const removeStyle = (selectedContent) => {
+    console.log('RemoveStyle received:', selectedContent);
     setStyledWords(prev => {
+      console.log('Previous styles:', prev);
       const newStyles = { ...prev };
-      wordIds.forEach(wordId => {
-        delete newStyles[wordId];
+      selectedContent.forEach(content => {
+        console.log('Processing content:', content);
+        content.words.forEach(word => {
+          console.log('Removing style for word:', word.id);
+          delete newStyles[word.id];
+        });
       });
+      console.log('New styles after removal:', newStyles);
       return newStyles;
     });
   };
+
 
   const getWordStyle = (wordId) => {
     return styledWords[wordId];

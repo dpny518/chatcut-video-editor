@@ -4,15 +4,16 @@ import {
   Add as AddIcon, 
   InsertComment as InsertIcon,
   BorderColor as HighlightIcon,
-  StrikethroughS as StrikeIcon
+  StrikethroughS as StrikeIcon,
+  FormatClear as ClearIcon
 } from '@mui/icons-material';
 
 const TranscriptToolbar = ({ 
   isSelectionActive, 
-  onAddToTimeline, 
   onAddToPapercut, 
   onInsertToPapercut,
-  onStyleClick 
+  onStyleClick,
+  onRemoveStyle
 }) => {
   return (
     <Box sx={{ 
@@ -25,14 +26,6 @@ const TranscriptToolbar = ({
       flexWrap: 'wrap'
     }}>
       <ButtonGroup>
-        <Button
-          variant="contained"
-          onClick={onAddToTimeline}
-          startIcon={<AddIcon />}
-          disabled={!isSelectionActive}
-        >
-          Add to Timeline
-        </Button>
         <Button
           variant="contained"
           onClick={onAddToPapercut}
@@ -85,6 +78,14 @@ const TranscriptToolbar = ({
           disabled={!isSelectionActive}
         >
           Strikethrough
+        </Button>
+        <Button
+          variant="contained"
+          onClick={onRemoveStyle}
+          startIcon={<ClearIcon />}
+          disabled={!isSelectionActive}
+        >
+          Remove Style
         </Button>
       </ButtonGroup>
     </Box>
