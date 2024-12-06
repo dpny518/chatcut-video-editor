@@ -5,10 +5,11 @@ import {
   Typography,
   IconButton,
   Menu,
-  MenuItem
+  MenuItem,
+  SvgIcon
 } from '@mui/material';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
-import TextSnippetIcon from '@mui/icons-material/TextSnippet';
+import { ReactComponent as TranscriptIcon } from '../../../images/icons/gg_transcript.svg';
+import { ReactComponent as PlayIcon } from '../../../images/icons/gg_play.svg';
 import { ChevronDown } from 'lucide-react';
 import PapercutViewer from './index';
 import { usePapercuts } from '../../../contexts/PapercutContext';
@@ -22,6 +23,22 @@ const PapercutViewerSection = ({ transcriptData }) => {
   } = usePapercuts();
 
   const [anchorEl, setAnchorEl] = React.useState(null);
+   // Custom icon component
+   const CustomIcon = ({ Icon, alt, color = 'primary.main' }) => {
+    return (
+      <SvgIcon
+        component={Icon}
+        inheritViewBox
+        sx={{
+          width: 24,
+          height: 24,
+          '& path, & rect': {
+            stroke: color,
+          },
+        }}
+      />
+    );
+  };
 
   useEffect(() => {
     if (papercuts.length > 0 && (!activeTab || !papercuts.find(p => p.id === activeTab))) {
@@ -63,7 +80,7 @@ const PapercutViewerSection = ({ transcriptData }) => {
         borderColor: 'divider',
         bgcolor: 'background.paper' 
       }}>
-        <Box sx={{ 
+    <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
           minHeight: 48,
@@ -72,37 +89,41 @@ const PapercutViewerSection = ({ transcriptData }) => {
           <IconButton
             disabled
             sx={{
-              opacity: 0.5,
+              padding: 0.5,
+              mr: 0.5,
               color: 'text.disabled',
-              mr: 1
+              '&.Mui-disabled': {
+                color: 'text.disabled',
+              },
             }}
           >
-            <PlayCircleOutlineIcon />
+            <CustomIcon Icon={PlayIcon} alt="Play" />
           </IconButton>
           <Typography 
             sx={{ 
               color: 'text.disabled',
               fontSize: '0.875rem',
               fontWeight: 500,
-              mr: 2
+              mr: 1.5,
             }}
           >
             VIDEO
           </Typography>
           <IconButton
             sx={{
+              padding: 0.5,
+              mr: 0.5,
               color: 'primary.main',
-              mr: 1
             }}
           >
-            <TextSnippetIcon />
+            <CustomIcon Icon={TranscriptIcon} alt="Transcript" />
           </IconButton>
           <Typography 
             sx={{ 
               color: 'primary.main',
               fontSize: '0.875rem',
               fontWeight: 500,
-              flexGrow: 1
+              flexGrow: 1,
             }}
           >
             PAPERCUT

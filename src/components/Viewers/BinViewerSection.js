@@ -4,17 +4,31 @@ import {
   Paper,
   Tabs,
   Tab,
-  Typography 
+  Typography,
+  SvgIcon
 } from '@mui/material';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
-import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import TranscriptViewer from './TranscriptViewer';
-
+import { ReactComponent as TranscriptIcon } from '../../images/icons/gg_transcript.svg';
+import { ReactComponent as PlayIcon } from '../../images/icons/gg_play.svg';
 const BinViewerSection = () => {
   const [viewMode, setViewMode] = useState(1);
 
   const handleViewChange = (e, newValue) => setViewMode(newValue);
-
+  const CustomIcon = ({ Icon, alt, color = 'primary.main' }) => {
+    return (
+      <SvgIcon
+        component={Icon}
+        inheritViewBox
+        sx={{
+          width: 24,
+          height: 24,
+          '& path, & rect': {
+            stroke: color,
+          },
+        }}
+      />
+    );
+  };
   return (
     <Paper sx={{ 
       flexGrow: 1,
@@ -41,7 +55,7 @@ const BinViewerSection = () => {
           }}
         >
           <Tab
-            icon={<PlayCircleOutlineIcon />}
+            icon={<CustomIcon Icon={PlayIcon} alt="Play" color="text.disabled" />}
             iconPosition="start"
             label="VIDEO"
             disabled
@@ -49,13 +63,21 @@ const BinViewerSection = () => {
               opacity: 0.5,
               '&.Mui-disabled': {
                 color: 'text.disabled'
+              },
+              '& .MuiTab-iconWrapper': {
+                marginRight: 1  // Add space between icon and text
               }
             }}
           />
           <Tab
-            icon={<TextSnippetIcon />}
+            icon={<CustomIcon Icon={TranscriptIcon} alt="Transcript" />}
             iconPosition="start"
             label="TRANSCRIPT"
+            sx={{
+              '& .MuiTab-iconWrapper': {
+                marginRight: 1  // Add space between icon and text
+              }
+            }}
           />
         </Tabs>
       </Box>
