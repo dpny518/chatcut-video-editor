@@ -1,20 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { 
-  Box, 
-  Typography 
-} from '@mui/material';
-import { 
-  useSpeakerColors 
-} from '../../../contexts/SpeakerColorContext';
-import { 
-  useTranscriptStyling 
-} from '../../../contexts/TranscriptStylingContext';
+import { Box, Typography } from '@mui/material';
+import { useSpeakerColors } from '../../../contexts/SpeakerColorContext';
+import { useTranscriptStyling } from '../../../contexts/TranscriptStylingContext';
 
-const TranscriptContent = ({ 
-  displayContent, 
-  onSelectionChange,
-  highlightedWord = null 
-}) => {
+const TranscriptContent = ({ displayContent, onSelectionChange, highlightedWord = null }) => {
   const contentRef = useRef(null);
 
   const { getSpeakerColor } = useSpeakerColors();
@@ -83,24 +72,15 @@ const TranscriptContent = ({
           null
         }
         data-word-id={word.id}
-        data-global-index={
-          word.globalIndex
-        }
+        data-global-index={word.globalIndex}
         data-file-id={fileId}
-        data-segment-index={
-          word.position.segment
-        }
-        data-word-index={
-          word.position.word
-        }
+        data-segment-index={word.position.segment}
+        data-word-index={word.position.word}
         sx={{
           px: 0.5,
           py: 0.25,
           borderRadius: 1,
-          bgcolor: highlightedWord && 
-                  word.id === highlightedWord.id ? 
-                  'action.selected' : 
-                  'transparent',
+          bgcolor: highlightedWord && word.id === highlightedWord.id ? 'action.selected' : 'transparent',
           '&:hover': {
             bgcolor: 'action.hover'
           },
@@ -112,46 +92,26 @@ const TranscriptContent = ({
     );
   };
 
-  const renderSegment = (
-    segment, 
-    fileId
-  ) => (
+  const renderSegment = (segment, fileId) => (
     <Box
       key={segment.globalIndex}
-      data-segment-id={
-        segment.globalIndex
-      }
+      data-segment-id={segment.globalIndex}
       sx={{ wordBreak: 'break-word' }}
     >
-      {segment.words.map(word => 
-        renderWord(
-          word, 
-          fileId
-        )
-      )}
+      {segment.words.map(word => renderWord(word, fileId))}
     </Box>
   );
 
-  const renderGroup = (
-    group, 
-    groupIndex, 
-    fileId
-  ) => {
-    const speakerColor = 
-      getSpeakerColor(
-        group[0].speaker
-      );
+  const renderGroup = (group, groupIndex, fileId) => {
+    const speakerColor = getSpeakerColor(group[0].speaker);
     
     return (
       <Box 
-        key={
-          `${fileId}-group-${groupIndex}`
-        } 
+        key={`${fileId}-group-${groupIndex}`} 
         sx={{ 
           mb: 2,
           borderLeft: 3,
-          borderColor: 
-            speakerColor.colors.edgeLine,
+          borderColor: speakerColor.colors.edgeLine,
           pl: 2
         }}
       >
@@ -164,36 +124,27 @@ const TranscriptContent = ({
         >
           {group[0].speaker}
         </Typography>
-        {group.map(segment => 
-          renderSegment(
-            segment, 
-            fileId
-          )
-        )}
+        {group.map(segment => renderSegment(segment, fileId))}
       </Box>
     );
   };
 
   const renderFile = file => (
     <Box key={file.fileId}>
-      {file.groupedSegments.map(
-        (group, groupIndex) => 
-          renderGroup(
-            group, 
-            groupIndex, 
-            file.fileId
-          )
-      )}
+      {file.groupedSegments.map((group, groupIndex) => renderGroup(group, groupIndex, file.fileId))}
     </Box>
   );
 
   return (
-    <Box 
+    <Box
       ref={contentRef}
-      sx={{ 
-        width: '100%',
-        overflow: 'hidden'
+      sx={{
+        padding: 2,
+        wordBreak: 'break-word',
+        overflowWrap: 'break-word',
+        marginBottom: 2,
       }}
+      onMouseUp={onSelectionChange}
     >
       {displayContent.map(renderFile)}
     </Box>

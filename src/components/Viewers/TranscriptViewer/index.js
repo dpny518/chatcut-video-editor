@@ -139,7 +139,8 @@ const TranscriptViewer = () => {
       height: '100%', 
       display: 'flex', 
       flexDirection: 'column',
-      bgcolor: 'background.paper' 
+      bgcolor: 'background.paper',
+      padding: 2,
     }}
     tabIndex={0}>
       <FileCount count={transcripts.length} />
@@ -148,14 +149,16 @@ const TranscriptViewer = () => {
         flexGrow: 1, 
         display: 'flex', 
         flexDirection: 'column', 
-        overflow: 'hidden' 
+        overflow: 'hidden',
+        padding: 2,
       }}>
         <Box sx={{ 
           flexGrow: 1, 
           overflowY: 'auto', 
           p: 2, 
           maxWidth: '900px', 
-          margin: '0 auto' 
+          margin: '0 auto',
+          padding: 2,
         }}>
           {isProcessing ? (
             <Box sx={{ 
