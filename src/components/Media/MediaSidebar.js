@@ -1,70 +1,73 @@
 // src/components/Media/MediaSidebar.js
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  Box, 
-  Button,
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import {
+  Box,
+  Paper,
   Typography,
   IconButton,
   Menu,
   MenuItem,
-  TextField,
+  Alert
 } from '@mui/material';
 import {
-  MoreVert as MoreVertIcon,
+  Add as AddIcon,
+  Upload as UploadIcon,
   CreateNewFolder as CreateNewFolderIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Folder as FolderIcon,
-  Description as DocxIcon,
-  SubtitlesOutlined as SrtIcon,
-  Code as JsonIcon,
-  InsertDriveFile as DefaultFileIcon,
+  VideoFile as PaperCutIcon
 } from '@mui/icons-material';
 import { useFileSystem } from '../../contexts/FileSystemContext';
-
-const FileTypeIcon = ({ type }) => {
-  switch (type) {
-    case 'folder':
-      return <FolderIcon fontSize="small" />;
-    case 'docx':
-      return <DocxIcon fontSize="small" />;
-    case 'srt':
-    case 'srtx':
-      return <SrtIcon fontSize="small" />;
-    case 'json':
-      return <JsonIcon fontSize="small" />;
-    default:
-      return <DefaultFileIcon fontSize="small" />;
-  }
-};
+import FileSystemTree from './FileSystemTree';
 
 const MediaSidebar = () => {
-  const { addFile, createFolder } = useFileSystem();
+  const { addFile, createFolder, setSelectedItems } = useFileSystem();
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
   const [isDraggingExternal, setIsDraggingExternal] = useState(false);
+  const [addMenuAnchorEl, setAddMenuAnchorEl] = useState(null);
   const dragCounter = useRef(0);
+  const fileInputRef = useRef(null);
 
-  const handleFileUpload = useCallback(async (files) => {
-    setIsUploading(true);
+  const handleAddClick = (event) => {
+    setAddMenuAnchorEl(event.currentTarget);
+  };
 
-    try {
-      for (const file of files) {
-        console.log('Processing file upload:', file.name);
-        await addFile(file, null);
-      }
-    } catch (error) {
-      console.error('Upload failed:', error);
-    } finally {
-      setIsUploading(false);
-    }
-  }, [addFile]);
+  const handleAddMenuClose = () => {
+    setAddMenuAnchorEl(null);
+  };
 
   const handleCreateFolder = () => {
     const folderName = prompt("Enter folder name:");
     if (folderName) {
       createFolder(folderName, null);
     }
+    handleAddMenuClose();
   };
+
+  const handleFileUpload = useCallback(async (files) => {
+    setIsUploading(true);
+    setUploadError(null);
+    
+    try {
+      // Convert FileList to array and upload each file
+      const fileArray = Array.from(files);
+      
+      // Upload files sequentially
+      for (const file of fileArray) {
+        const fileId = await addFile(file, null);
+        if (!fileId) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+        console.log(`Successfully uploaded ${file.name} with ID: ${fileId}`);
+      }
+      
+      handleAddMenuClose();
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadError(error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [addFile, handleAddMenuClose]);
 
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
@@ -101,6 +104,13 @@ const MediaSidebar = () => {
     }
   }, [handleFileUpload]);
 
+  const handleContainerClick = (event) => {
+    // Only clear selection if clicking directly on the container
+    if (event.target === event.currentTarget) {
+      setSelectedItems([]);
+    }
+  };
+
   useEffect(() => {
     window.addEventListener('dragenter', handleDragEnter);
     window.addEventListener('dragleave', handleDragLeave);
@@ -114,324 +124,173 @@ const MediaSidebar = () => {
       window.removeEventListener('drop', handleDrop);
     };
   }, [handleDragEnter, handleDragLeave, handleDragOver, handleDrop]);
-
   return (
-    <Box sx={{ 
-      width: 250, 
-      height: '100%', 
-      borderRight: 1, 
-      borderColor: 'divider',
+    <Paper sx={{ 
+      width: 250,
+      height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      position: 'relative',
+      bgcolor: 'background.default',
+      overflow: 'hidden',
+      '& > *': {
+        margin: 0
+      }
     }}>
-      <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
-        <input
-          type="file"
-          id="file-upload"
-          multiple
-          onChange={(e) => handleFileUpload(e.target.files)}
-          accept=".json,.docx,.srt,.srtx,video/*"
-          style={{ display: 'none' }}
-        />
-        <Button
-          variant="contained"
-          size="small"
-          onClick={() => document.getElementById('file-upload').click()}
-          disabled={isUploading}
-          sx={{ mr: 1, fontSize: '0.75rem' }}
-        >
-          {isUploading ? 'Uploading...' : 'Upload'}
-        </Button>
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={handleCreateFolder}
-          startIcon={<CreateNewFolderIcon />}
-          sx={{ fontSize: '0.75rem' }}
-        >
-          New Folder
-        </Button>
-      </Box>
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-        <FileSystemTree parentId={null} />
-      </Box>
-      {isDraggingExternal && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
+      <Box sx={{ 
+        borderBottom: 1, 
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        minHeight: 48,
+        px: 2
+      }}>
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: 'text.primary',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            fontWeight: 500,
           }}
         >
-          <Typography variant="h6" sx={{ color: 'white' }}>
+          Assets
+        </Typography>
+        <IconButton 
+          size="small" 
+          onClick={handleAddClick}
+          sx={{
+            bgcolor: 'action.hover',
+            width: 24,
+            height: 24,
+            '&:hover': {
+              bgcolor: 'action.selected',
+            }
+          }}
+        >
+          <AddIcon fontSize="small" />
+        </IconButton>
+        <Menu
+          anchorEl={addMenuAnchorEl}
+          open={Boolean(addMenuAnchorEl)}
+          onClose={handleAddMenuClose}
+          PaperProps={{
+            sx: {
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              boxShadow: 2,
+            }
+          }}
+        >
+          <MenuItem 
+            onClick={() => fileInputRef.current?.click()}
+            sx={{ fontSize: '0.875rem' }}
+          >
+            <UploadIcon fontSize="small" sx={{ mr: 1 }} />
+            Upload
+          </MenuItem>
+          <MenuItem 
+            onClick={handleCreateFolder}
+            sx={{ fontSize: '0.875rem' }}
+          >
+            <CreateNewFolderIcon fontSize="small" sx={{ mr: 1 }} />
+            New Folder
+          </MenuItem>
+          <MenuItem 
+            onClick={handleAddMenuClose}
+            sx={{ fontSize: '0.875rem' }}
+          >
+            <PaperCutIcon fontSize="small" sx={{ mr: 1 }} />
+            New Papercut
+          </MenuItem>
+        </Menu>
+        <input
+          ref={fileInputRef}
+          type="file"
+          hidden
+          multiple
+          onChange={(e) => handleFileUpload(Array.from(e.target.files))}
+          accept=".json,.docx,.srt,.srtx,video/*"
+        />
+      </Box>
+      
+      <Box 
+        onClick={handleContainerClick}
+        sx={{ 
+          flexGrow: 1, 
+          overflow: 'auto',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          '&::-webkit-scrollbar': {
+            width: 6,
+          },
+          '&::-webkit-scrollbar-track': {
+            bgcolor: 'transparent',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            bgcolor: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: 3,
+          },
+        }}
+      >
+        <FileSystemTree parentId={null} />
+      </Box>
+
+      {isDraggingExternal && (
+        <Box sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          bgcolor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <Typography 
+            variant="body1"
+            sx={{ color: 'common.white' }}
+          >
             Drop files here to upload
           </Typography>
         </Box>
       )}
-    </Box>
-  );
-};
 
-const FileItem = ({ file, depth = 0, onDragOver }) => {
-  const { 
-    moveItem, 
-    deleteItem, 
-    renameItem, 
-    selectedItems, 
-    setSelectedItems, 
-    files,
-    getDirectoryItems
-  } = useFileSystem();
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [newName, setNewName] = useState(file.name);
-  const [isDragging, setIsDragging] = useState(false);
-  const ref = useRef(null);
-
-  const isSelected = selectedItems.includes(file.id);
-
-  const handleMenuOpen = (event) => {
-    event.stopPropagation();
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleRename = () => {
-    setIsRenaming(true);
-    handleMenuClose();
-  };
-
-  const handleRenameSubmit = () => {
-    renameItem(file.id, newName);
-    setIsRenaming(false);
-  };
-
-  const handleDelete = () => {
-    deleteItem(file.id);
-    handleMenuClose();
-  };
-
-  const handleDragStart = (e) => {
-    e.dataTransfer.setData('text/plain', file.id);
-    setIsDragging(true);
-  };
-
-  const handleDragEnd = () => {
-    setIsDragging(false);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      const y = e.clientY - rect.top;
-      if (y < rect.height / 2) {
-        onDragOver(file.id, 'before');
-      } else if (file.type === 'folder') {
-        onDragOver(file.id, 'inside');
-      } else {
-        onDragOver(file.id, 'after');
-      }
-    }
-  };
-
-  const getAllChildFiles = useCallback((folderId) => {
-    const result = [];
-
-    const traverse = (id) => {
-      const children = getDirectoryItems(id);
-      children.forEach(child => {
-        if (child.type !== 'folder') {
-          result.push(child.id);
-        } else {
-          result.push(child.id); // Include folder ID as well
-          traverse(child.id);
-        }
-      });
-    };
-
-    traverse(folderId);
-    return result;
-  }, [getDirectoryItems]);
-
-  const handleSelect = useCallback((event) => {
-    event.stopPropagation();
-    if (file.type === 'folder') {
-      const allChildFiles = getAllChildFiles(file.id);
-      setSelectedItems(prev => {
-        const newSelection = new Set(prev);
-        if (newSelection.has(file.id)) {
-          // Deselect folder and all its contents
-          newSelection.delete(file.id);
-          allChildFiles.forEach(childId => newSelection.delete(childId));
-        } else {
-          // Select folder and all its contents
-          newSelection.add(file.id);
-          allChildFiles.forEach(childId => newSelection.add(childId));
-        }
-        return Array.from(newSelection);
-      });
-    } else {
-      setSelectedItems(prev => {
-        const newSelection = new Set(prev);
-        if (newSelection.has(file.id)) {
-          newSelection.delete(file.id);
-        } else {
-          newSelection.add(file.id);
-        }
-        return Array.from(newSelection);
-      });
-    }
-  }, [file, getAllChildFiles, setSelectedItems]);
-
-  return (
-    <Box
-      ref={ref}
-      draggable={!isDragging}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onDragOver={handleDragOver}
-      onClick={handleSelect}
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        pl: 1 + depth * 2,
-        py: 0.5,
-        cursor: 'pointer',
-        bgcolor: isSelected ? 'action.selected' : 'transparent',
-        '&:hover': {
-          bgcolor: isSelected ? 'action.selected' : 'action.hover',
-        },
-        transition: 'background-color 0.2s',
-        borderRadius: '4px',
-        mx: 0.5,
-        opacity: isDragging ? 0.5 : 1,
-      }}
-    >
-      <FileTypeIcon type={file.type} sx={{ mr: 1, color: isSelected ? 'primary.main' : 'inherit' }} />
-      {isRenaming ? (
-        <TextField
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onBlur={handleRenameSubmit}
-          onKeyPress={(e) => e.key === 'Enter' && handleRenameSubmit()}
-          size="small"
-          autoFocus
-          sx={{ fontSize: '0.75rem' }}
-        />
-      ) : (
-        <Typography 
-          variant="body2" 
-          sx={{ 
-            flexGrow: 1, 
-            fontSize: '0.75rem', 
-            color: isSelected ? 'primary.main' : 'inherit',
-            fontWeight: isSelected ? 'bold' : 'normal',
-          }}
-        >
-          {file.name}
-        </Typography>
+      {isUploading && (
+        <Box sx={{
+          position: 'absolute',
+          bottom: 16,
+          left: 16,
+          right: 16,
+          zIndex: 1000,
+        }}>
+          <Alert severity="info">
+            Uploading files...
+          </Alert>
+        </Box>
       )}
-      <IconButton size="small" onClick={handleMenuOpen}>
-        <MoreVertIcon fontSize="small" />
-      </IconButton>
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={handleRename}>
-          <EditIcon fontSize="small" sx={{ mr: 1 }} /> Rename
-        </MenuItem>
-        <MenuItem onClick={handleDelete}>
-          <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> Delete
-        </MenuItem>
-      </Menu>
-    </Box>
-  );
-};
 
-const FileSystemTree = ({ parentId, depth = 0 }) => {
-  const { getDirectoryItems, moveItem } = useFileSystem();
-  const [dropTarget, setDropTarget] = useState(null);
-  const items = getDirectoryItems(parentId);
-
-  const handleDragOver = (id, position) => {
-    setDropTarget({ id, position });
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const draggedItemId = e.dataTransfer.getData('text');
-    if (dropTarget && draggedItemId !== dropTarget.id) {
-      const targetIndex = items.findIndex(item => item.id === dropTarget.id);
-      let newIndex;
-      if (dropTarget.position === 'before') {
-        newIndex = targetIndex;
-      } else if (dropTarget.position === 'after') {
-        newIndex = targetIndex + 1;
-      } else { // 'inside'
-        moveItem(draggedItemId, dropTarget.id);
-        setDropTarget(null);
-        return;
-      }
-      
-      const draggedIndex = items.findIndex(item => item.id === draggedItemId);
-      if (draggedIndex < newIndex) {
-        newIndex--;
-      }
-      
-      const newItems = [...items];
-      const [removed] = newItems.splice(draggedIndex, 1);
-      newItems.splice(newIndex, 0, removed);
-      
-      // Update the order of items
-      newItems.forEach((item, index) => {
-        moveItem(item.id, parentId, index * 1000);
-      });
-    }
-    setDropTarget(null);
-  };
-
-  return (
-    <Box
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={handleDrop}
-    >
-      {items.map((item, index) => (
-        <React.Fragment key={item.id}>
-          {dropTarget && dropTarget.id === item.id && dropTarget.position === 'before' && (
-            <Box sx={{ height: '2px', bgcolor: 'primary.main', mx: 1 }} />
-          )}
-          <FileItem 
-            file={item} 
-            depth={depth} 
-            onDragOver={handleDragOver}
-          />
-          {item.type === 'folder' && (
-            <FileSystemTree parentId={item.id} depth={depth + 1} />
-          )}
-          {dropTarget && dropTarget.id === item.id && dropTarget.position === 'after' && (
-            <Box sx={{ height: '2px', bgcolor: 'primary.main', mx: 1 }} />
-          )}
-        </React.Fragment>
-      ))}
-      {dropTarget && dropTarget.id === parentId && (
-        <Box sx={{ height: '2px', bgcolor: 'primary.main', mx: 1 }} />
+      {uploadError && (
+        <Box sx={{
+          position: 'absolute',
+          bottom: 16,
+          left: 16,
+          right: 16,
+          zIndex: 1000,
+        }}>
+          <Alert 
+            severity="error" 
+            onClose={() => setUploadError(null)}
+          >
+            {uploadError}
+          </Alert>
+        </Box>
       )}
-    </Box>
+    </Paper>
   );
 };
 

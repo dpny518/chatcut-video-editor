@@ -21,7 +21,7 @@ import { usePapercutHistory } from '../../../hooks/usePapercutHistory';
 
 
 const TranscriptViewer = () => {
-  const { selectedItems, getTranscriptData, files } = useFileSystem();
+  const { selectedItems, getTranscriptData, files, getDirectoryItems } = useFileSystem();
   const { handleAddToTimeline } = useTranscript();
   const { activeTab } = usePapercuts();
   const { addToPapercut, insertToPapercut } = usePapercutActions();
@@ -56,7 +56,36 @@ const TranscriptViewer = () => {
     const selectedFileIds = selectedItems.filter(id => 
       files[id] && files[id].type !== 'folder'
     );
-    return getTranscriptData(selectedFileIds);
+
+    const getFilePath = (fileId) => {
+      const result = [];
+      let currentId = fileId;
+      while (currentId) {
+        const file = files[currentId];
+        if (!file) break;
+        result.unshift({
+          id: file.id,
+          name: file.name,
+          order: file.order
+        });
+        currentId = file.parentId;
+      }
+      return result;
+    };
+
+    const sortedFileIds = selectedFileIds.sort((a, b) => {
+      const pathA = getFilePath(a);
+      const pathB = getFilePath(b);
+      
+      for (let i = 0; i < Math.min(pathA.length, pathB.length); i++) {
+        if (pathA[i].id !== pathB[i].id) {
+          return pathA[i].order - pathB[i].order;
+        }
+      }
+      return pathA.length - pathB.length;
+    });
+
+    return getTranscriptData(sortedFileIds);
   }, [selectedItems, getTranscriptData, files]);
 
   const [displayContent, isProcessing] = 
