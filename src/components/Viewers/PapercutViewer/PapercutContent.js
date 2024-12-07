@@ -244,6 +244,12 @@ const PapercutContent = ({ papercutId }) => {
           backgroundColor: isSelected ? 'action.selected' : 'transparent',
           '&:hover': {
             backgroundColor: 'action.hover'
+          },
+          // Prevent text from being draggable
+          userSelect: 'none',
+          // Ensure text doesn't show grab cursor
+          '& *': {
+            cursor: 'pointer'
           }
         }}
       >
@@ -252,10 +258,7 @@ const PapercutContent = ({ papercutId }) => {
           <Box
             sx={{
               position: 'absolute',
-              ...(showLeftCursor 
-                ? { left: 0 }  // Show cursor on left if isStartOfWord
-                : { right: 0 }  // Otherwise show on right
-              ),
+              ...(showLeftCursor ? { left: 0 } : { right: 0 }),
               top: 0,
               width: 2,
               height: '100%',
@@ -293,8 +296,14 @@ const PapercutContent = ({ papercutId }) => {
           transform: dropTarget === segment.id 
             ? `translateY(${dropPosition === 'top' ? -8 : 8}px)`
             : 'none',
-          '&:hover .drag-handle': {
-            opacity: 1
+          // Make entire paper draggable with grab cursor
+          cursor: 'grab',
+          '&:active': {
+            cursor: 'grabbing'
+          },
+          // Hide drag handle since whole segment is draggable
+          '& .drag-handle': {
+            display: 'none'
           }
         }}
       >
@@ -330,28 +339,14 @@ const PapercutContent = ({ papercutId }) => {
           alignItems: 'flex-start',
           p: 2
         }}>
-          <Box 
-            className="drag-handle"
-            sx={{ 
-              opacity: 0,
-              transition: theme.transitions.create('opacity'),
-              cursor: 'grab',
-              '&:active': {
-                cursor: 'grabbing'
-              },
-              mr: 1,
-              mt: 0.5
-            }}
-          >
-            <DragIndicatorIcon color="action" />
-          </Box>
-
           <Box sx={{ flexGrow: 1 }}>
             <Box 
               sx={{ 
                 borderLeft: 3,
                 borderColor: getSpeakerColor(segment.speaker).colors.edgeLine,
-                pl: 2
+                pl: 2,
+                // Prevent text selection while dragging
+                userSelect: 'none'
               }}
             >
               <Typography 
@@ -380,11 +375,13 @@ const PapercutContent = ({ papercutId }) => {
               position: 'absolute',
               top: 8,
               right: 8,
-              cursor: 'pointer',
               opacity: 0.7,
               '&:hover': {
                 opacity: 1,
               },
+              // Override grab cursor for delete icon
+              cursor: 'pointer',
+              zIndex: 2
             }}
             onClick={() => handleDeleteSegment(segment.id)}
           >
@@ -393,7 +390,9 @@ const PapercutContent = ({ papercutId }) => {
         )}
       </Paper>
     </Fade>
-  ), [draggedSegment, dropTarget, dropPosition, getSpeakerColor, handleDragStart, handleDragOver, handleDragLeave, handleDragEnd, handleDrop, renderWord, handleDeleteSegment, hoveredSegment, theme]);
+  ), [draggedSegment, dropTarget, dropPosition, getSpeakerColor, handleDragStart, 
+      handleDragOver, handleDragLeave, handleDragEnd, handleDrop, renderWord, 
+      handleDeleteSegment, hoveredSegment, theme]);
 
   return (
     <Box 
@@ -406,7 +405,6 @@ const PapercutContent = ({ papercutId }) => {
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
-      {/* Scrollable content area */}
       <Box sx={{ 
         flex: 1,
         overflowY: 'auto',
@@ -415,7 +413,6 @@ const PapercutContent = ({ papercutId }) => {
         {content.map(renderSegment)}
       </Box>
 
-      {/* Fixed footer */}
       <Box
         sx={{
           position: 'sticky',
@@ -450,3 +447,4 @@ const PapercutContent = ({ papercutId }) => {
 };
 
 export default PapercutContent;
+
