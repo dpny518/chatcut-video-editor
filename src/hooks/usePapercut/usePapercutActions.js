@@ -89,15 +89,46 @@ export function usePapercutActions() {
     const currentSegment = content[segmentIndex];
     const wordIndex = currentSegment.words.findIndex(w => w.id === cursorPosition.wordId);
   
-    // Move cursor to previous word first
+    // Check if we're at the start of a word in a segment with a same-speaker previous segment
+    if (cursorPosition.isStartOfWord && segmentIndex > 0) {
+      const previousSegment = content[segmentIndex - 1];
+      if (previousSegment.speaker === currentSegment.speaker) {
+        // Merge the segments
+        const mergedSegment = {
+          ...previousSegment,
+          endTime: currentSegment.endTime,
+          words: [
+            ...previousSegment.words,
+            ...currentSegment.words
+          ].map((word, idx) => ({
+            ...word,
+            index: idx
+          })),
+          sourceReference: {
+            ...previousSegment.sourceReference,
+            wordRange: [
+              previousSegment.sourceReference?.wordRange?.[0] || 0,
+              previousSegment.words.length + currentSegment.words.length
+            ]
+          }
+        };
+  
+        // Create new content array with merged segments
+        return [
+          ...content.slice(0, segmentIndex - 1),
+          mergedSegment,
+          ...content.slice(segmentIndex + 1)
+        ];
+      }
+    }
+  
+    // Handle regular word deletion
     if (wordIndex > 0) {
-      // If not the first word in segment, use previous word in same segment
       updateCursorPosition({
         segmentId: cursorPosition.segmentId,
         wordId: currentSegment.words[wordIndex - 1].id
       });
     } else if (segmentIndex > 0) {
-      // If first word in segment but not first segment, use last word of previous segment
       const previousSegment = content[segmentIndex - 1];
       const lastWord = previousSegment.words[previousSegment.words.length - 1];
       updateCursorPosition({
@@ -106,7 +137,6 @@ export function usePapercutActions() {
       });
     }
   
-    // Then delete the word
     return content.map(segment => {
       if (segment.id !== cursorPosition.segmentId) return segment;
   

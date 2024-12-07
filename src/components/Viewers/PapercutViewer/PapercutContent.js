@@ -119,22 +119,76 @@ const PapercutContent = ({ papercutId }) => {
       }
       return;
     }
-
+  
     if (!cursorPosition) return;
-
+  
     if (event.key === 'Enter') {
       event.preventDefault();
       const newContent = splitSegmentAtCursor(content, cursorPosition);
       handleContentUpdate(newContent, 'split');
     }
-
+  
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       const updatedContent = deleteWordAtCursor(content, cursorPosition);
       handleContentUpdate(updatedContent, 'delete');
     }
+  
+    // Arrow key navigation
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      
+      const currentSegmentIndex = content.findIndex(s => s.id === cursorPosition.segmentId);
+      const currentSegment = content[currentSegmentIndex];
+      const currentWordIndex = currentSegment.words.findIndex(w => w.id === cursorPosition.wordId);
+  
+      if (event.key === 'ArrowLeft') {
+        if (currentWordIndex > 0) {
+          // Move to previous word in same segment
+          updateCursorPosition({
+            segmentId: cursorPosition.segmentId,
+            wordId: currentSegment.words[currentWordIndex - 1].id
+          });
+        } else if (currentSegmentIndex > 0) {
+          // Special case: if on first word and previous segment has same speaker
+          const previousSegment = content[currentSegmentIndex - 1];
+          if (previousSegment.speaker === currentSegment.speaker) {
+            // Place cursor at start of current word to enable delete-to-join
+            updateCursorPosition({
+              segmentId: cursorPosition.segmentId,
+              wordId: currentSegment.words[0].id,
+              isStartOfWord: true // Optional: if you want to track cursor position within word
+            });
+          } else {
+            // Different speaker, move to end of last word in previous segment
+            const lastWord = previousSegment.words[previousSegment.words.length - 1];
+            updateCursorPosition({
+              segmentId: previousSegment.id,
+              wordId: lastWord.id
+            });
+          }
+        }
+      } else if (event.key === 'ArrowRight') {
+        if (currentWordIndex < currentSegment.words.length - 1) {
+          // Move to next word in same segment
+          updateCursorPosition({
+            segmentId: cursorPosition.segmentId,
+            wordId: currentSegment.words[currentWordIndex + 1].id
+          });
+        } else if (currentSegmentIndex < content.length - 1) {
+          // Move to first word of next segment
+          const nextSegment = content[currentSegmentIndex + 1];
+          const firstWord = nextSegment.words[0];
+          updateCursorPosition({
+            segmentId: nextSegment.id,
+            wordId: firstWord.id
+          });
+        }
+      }
+    }
   }, [content, cursorPosition, canUndo, canRedo, undo, redo, 
-      splitSegmentAtCursor, deleteWordAtCursor, handleContentUpdate]);
+      splitSegmentAtCursor, deleteWordAtCursor, handleContentUpdate, 
+      updateCursorPosition]);
 
   const handleDrop = useCallback((e, targetSegmentId) => {
     e.preventDefault();
@@ -172,6 +226,7 @@ const PapercutContent = ({ papercutId }) => {
   const renderWord = useCallback((word, segment) => {
     const isSelected = cursorPosition?.segmentId === segment.id && 
                        cursorPosition?.wordId === word.id;
+    const showLeftCursor = isSelected && cursorPosition?.isStartOfWord;
     
     return (
       <Typography
@@ -197,7 +252,10 @@ const PapercutContent = ({ papercutId }) => {
           <Box
             sx={{
               position: 'absolute',
-              right: 0,
+              ...(showLeftCursor 
+                ? { left: 0 }  // Show cursor on left if isStartOfWord
+                : { right: 0 }  // Otherwise show on right
+              ),
               top: 0,
               width: 2,
               height: '100%',
