@@ -74,24 +74,44 @@ const Segment = forwardRef(({
   const { 
     draggedSegment, 
     dropIndicator,
-    segmentRefs,
-    bindDrag
+    handleDragStart,
+    handleDragEnd,
+    handleDragOver,
+    handleDrop
   } = dragState;
 
   const showDropIndicator = dropIndicator?.targetId === segment.id;
+  const isBeingDragged = draggedSegment?.includes(segment.id);
 
   return (
     <Box
       ref={ref}
       id={`segment-${segment.id}`}
+      className="relative"
       sx={{
         scrollMarginTop: '100px',
         marginBottom: '16px',
       }}
     >
+      {/* Top drop indicator */}
+      {showDropIndicator && dropIndicator.position === 'top' && (
+        <Box 
+          className="absolute -top-1 left-0 right-0 h-2 pointer-events-none"
+          sx={{ zIndex: 2 }}
+        >
+          <Box className="absolute left-0 right-0 top-1/2 h-0.5 bg-blue-500" />
+          <Box className="absolute left-0 top-0 w-1 h-2 bg-blue-500" />
+          <Box className="absolute right-0 top-0 w-1 h-2 bg-blue-500" />
+        </Box>
+      )}
+
       <AnimatedPaper
-        elevation={draggedSegment?.includes(segment.id) ? 4 : 1}
-        {...bindDrag(segment.id)}
+        elevation={isBeingDragged ? 4 : 1}
+        draggable={true}
+        onDragStart={(e) => handleDragStart(e, segment.id)}
+        onDragEnd={handleDragEnd}
+        onDragOver={(e) => handleDragOver(e, segment)}
+        onDrop={(e) => handleDrop(e, segment)}
         onClick={onClick}
         onMouseEnter={() => onMouseEnter(segment.id)}
         onMouseLeave={onMouseLeave}
@@ -100,8 +120,8 @@ const Segment = forwardRef(({
           position: 'relative',
           userSelect: 'none',
           backgroundColor: isSelected ? theme.palette.action.selected : theme.palette.background.paper,
-          zIndex: style.zIndex,
-          transform: `translateY(${style.y}px) scale(${style.scale})`,
+          zIndex: style.zIndex || 'auto',
+          transform: style?.transform || `translateY(0px) scale(1)`,
         }}
         sx={{ 
           transition: theme.transitions.create([
@@ -111,7 +131,7 @@ const Segment = forwardRef(({
           ], {
             duration: theme.transitions.duration.shortest
           }),
-          opacity: draggedSegment?.includes(segment.id) ? 0.8 : 1,
+          opacity: isBeingDragged ? 0.5 : 1,
           '&:hover .drag-handle': {
             opacity: 1
           },
@@ -122,19 +142,7 @@ const Segment = forwardRef(({
           })
         }}
       >
-        {showDropIndicator && (
-          <Box
-            sx={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              height: 4,
-              bgcolor: 'primary.main',
-              ...(dropIndicator.position === 'top' ? { top: -2 } : { bottom: -2 }),
-              zIndex: 2,
-            }}
-          />
-        )}
+        {/* Rest of the component remains the same */}
         <Box 
           className="segment-content"
           sx={{ 
@@ -232,6 +240,18 @@ const Segment = forwardRef(({
           </Box>
         )}
       </AnimatedPaper>
+
+      {/* Bottom drop indicator */}
+      {showDropIndicator && dropIndicator.position === 'bottom' && (
+        <Box 
+          className="absolute -bottom-1 left-0 right-0 h-2 pointer-events-none"
+          sx={{ zIndex: 2 }}
+        >
+          <Box className="absolute left-0 right-0 top-1/2 h-0.5 bg-blue-500" />
+          <Box className="absolute left-0 bottom-0 w-1 h-2 bg-blue-500" />
+          <Box className="absolute right-0 bottom-0 w-1 h-2 bg-blue-500" />
+        </Box>
+      )}
     </Box>
   );
 });
