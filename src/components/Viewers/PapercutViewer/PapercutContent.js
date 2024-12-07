@@ -169,51 +169,51 @@ const PapercutContent = ({ papercutId }) => {
     updateCursorPosition({ segmentId, wordId });
   }, [updateCursorPosition, content]);
 
-  const renderWord = useCallback((word, segment) => (
-    <Typography
-      key={word.id}
-      component="span"
-      variant="body2"
-      onClick={() => handleWordClick(segment.id, word.id)}
-      sx={{
-        display: 'inline-block',
-        cursor: 'pointer',
-        px: 0.5,
-        py: 0.25,
-        borderRadius: 1,
-        position: 'relative',
-        backgroundColor: 
-          cursorPosition?.segmentId === segment.id && 
-          cursorPosition?.wordId === word.id 
-            ? 'action.selected' 
-            : 'transparent',
-        '&:hover': {
-          backgroundColor: 'action.hover'
-        }
-      }}
-    >
-      {word.text}
-      {cursorPosition?.segmentId === segment.id && 
-       cursorPosition?.wordId === word.id && (
-        <Box
-          sx={{
-            position: 'absolute',
-            right: 0,
-            top: 0,
-            width: 2,
-            height: '100%',
-            backgroundColor: 'primary.main',
-            animation: 'blink 1s step-end infinite',
-            '@keyframes blink': {
-              '50%': {
-                opacity: 0
+  const renderWord = useCallback((word, segment) => {
+    const isSelected = cursorPosition?.segmentId === segment.id && 
+                       cursorPosition?.wordId === word.id;
+    
+    return (
+      <Typography
+        key={word.id}
+        component="span"
+        variant="body2"
+        onClick={() => handleWordClick(segment.id, word.id)}
+        sx={{
+          display: 'inline-block',
+          cursor: 'pointer',
+          px: 0.5,
+          py: 0.25,
+          borderRadius: 1,
+          position: 'relative',
+          backgroundColor: isSelected ? 'action.selected' : 'transparent',
+          '&:hover': {
+            backgroundColor: 'action.hover'
+          }
+        }}
+      >
+        {word.text}
+        {isSelected && (
+          <Box
+            sx={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              width: 2,
+              height: '100%',
+              backgroundColor: 'primary.main',
+              animation: 'blink 1s step-end infinite',
+              '@keyframes blink': {
+                '50%': {
+                  opacity: 0
+                }
               }
-            }
-          }}
-        />
-      )}
-    </Typography>
-  ), [cursorPosition, handleWordClick]);
+            }}
+          />
+        )}
+      </Typography>
+    );
+  }, [cursorPosition, handleWordClick]);
 
   const renderSegment = useCallback((segment) => (
     <Fade in key={segment.id}>

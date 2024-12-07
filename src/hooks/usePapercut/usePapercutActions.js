@@ -7,6 +7,7 @@ export function usePapercutActions() {
   const { 
     addContentToPapercut, 
     cursorPosition,
+    updateCursorPosition,
     updatePapercutContent,
     papercuts
   } = usePapercuts();
@@ -83,10 +84,32 @@ export function usePapercutActions() {
     if (!cursorPosition?.segmentId || !cursorPosition?.wordId) {
       return content;
     }
-
+  
+    const segmentIndex = content.findIndex(s => s.id === cursorPosition.segmentId);
+    const currentSegment = content[segmentIndex];
+    const wordIndex = currentSegment.words.findIndex(w => w.id === cursorPosition.wordId);
+  
+    // Move cursor to previous word first
+    if (wordIndex > 0) {
+      // If not the first word in segment, use previous word in same segment
+      updateCursorPosition({
+        segmentId: cursorPosition.segmentId,
+        wordId: currentSegment.words[wordIndex - 1].id
+      });
+    } else if (segmentIndex > 0) {
+      // If first word in segment but not first segment, use last word of previous segment
+      const previousSegment = content[segmentIndex - 1];
+      const lastWord = previousSegment.words[previousSegment.words.length - 1];
+      updateCursorPosition({
+        segmentId: previousSegment.id,
+        wordId: lastWord.id
+      });
+    }
+  
+    // Then delete the word
     return content.map(segment => {
       if (segment.id !== cursorPosition.segmentId) return segment;
-
+  
       const updatedWords = segment.words.filter(word => word.id !== cursorPosition.wordId)
         .map((word, idx) => ({
           ...word,
@@ -96,7 +119,7 @@ export function usePapercutActions() {
       if (updatedWords.length === 0) {
         return null;
       }
-
+  
       return {
         ...segment,
         words: updatedWords,
@@ -108,7 +131,7 @@ export function usePapercutActions() {
         }
       };
     }).filter(Boolean);
-  }, []);
+  }, [updateCursorPosition]);
 
   const mergeSegmentsWithSameSpeaker = useCallback((segments) => {
     return segments.reduce((acc, current) => {
