@@ -49,7 +49,7 @@ const PapercutContent = ({ papercutId }) => {
     handleContentUpdate(newContent, 'delete');
   }, [content, handleContentUpdate]);
 
-  const dragState = useDragAndDrop(content, handleContentUpdate);
+  const dragState = useDragAndDrop(content, handleContentUpdate, selectedSegments);
 
   const handleWordClick = useCallback((segmentId, wordId) => {
     updateCursorPosition({ segmentId, wordId });
@@ -185,7 +185,6 @@ const handleKeyDown = useCallback((event) => {
 }, [content, cursorPosition, canUndo, canRedo, undo, redo, 
     splitSegmentAtCursor, deleteWordAtCursor, handleContentUpdate, 
     updateCursorPosition]);
-
     return (
       <Box 
         sx={{ 
@@ -204,25 +203,29 @@ const handleKeyDown = useCallback((event) => {
           }}
           onClick={handleContainerClick}
         >
-          {content.map(segment => (
-            <Segment
-              key={segment.id}
-              segment={segment}
-              dragState={dragState}
-              isSelected={selectedSegments.has(segment.id)}
-              isHovered={hoveredSegment === segment.id}
-              theme={theme}
-              getSpeakerColor={getSpeakerColor}
-              onDeleteSegment={handleDeleteSegment}
-              cursorPosition={cursorPosition}
-              onWordClick={handleWordClick}
-              onMouseEnter={setHoveredSegment}
-              onMouseLeave={() => setHoveredSegment(null)}
-              onClick={(e) => handleSegmentClick(e, segment.id)}
-            />
-          ))}
+          {dragState.springs.map((style, index) => {
+            const segment = content[index];
+            return (
+              <Segment
+                key={segment.id}
+                segment={segment}
+                dragState={dragState}
+                isSelected={selectedSegments.has(segment.id)}
+                isHovered={hoveredSegment === segment.id}
+                theme={theme}
+                getSpeakerColor={getSpeakerColor}
+                onDeleteSegment={handleDeleteSegment}
+                cursorPosition={cursorPosition}
+                onWordClick={handleWordClick}
+                onMouseEnter={() => setHoveredSegment(segment.id)}
+                onMouseLeave={() => setHoveredSegment(null)}
+                onClick={(e) => handleSegmentClick(e, segment.id)}
+                style={style} // Pass the spring style
+              />
+            );
+          })}
         </Box>
-    
+      
         <Box
           sx={{
             position: 'sticky',
@@ -254,6 +257,6 @@ const handleKeyDown = useCallback((event) => {
         </Box>
       </Box>
     );
-};
-
-export default PapercutContent;
+  };
+  
+  export default PapercutContent;
