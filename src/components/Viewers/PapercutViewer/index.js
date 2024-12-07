@@ -60,7 +60,7 @@ const PapercutViewer = ({ transcriptData }) => {
           <Box sx={{ 
             flexGrow: 1, 
             overflowY: 'auto', 
-            p: 2
+            p: 2  // Keep padding here in parent
           }}>
             {activePapercut && (
               <PapercutContent papercutId={activePapercut.id} />
@@ -86,5 +86,6 @@ const PapercutViewer = ({ transcriptData }) => {
     </Card>
   );
 };
+
 
 export default PapercutViewer;
