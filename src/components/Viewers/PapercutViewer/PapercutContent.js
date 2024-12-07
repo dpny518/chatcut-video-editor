@@ -1,8 +1,8 @@
 // PapercutContent.js
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Box, useTheme } from '@mui/material';
 import { useDragAndDrop } from '../../../hooks/usePapercut/useDragAndDrop';
-import { Segment } from './Segment';
+import Segment from './Segment'; 
 import WordMetadata from './WordMetadata';
 import { usePapercuts } from '../../../contexts/PapercutContext';
 import { usePapercutActions } from '../../../hooks/usePapercut/usePapercutActions';
@@ -13,6 +13,9 @@ const PapercutContent = ({ papercutId }) => {
   const [hoveredSegment, setHoveredSegment] = useState(null);
   const [selectedSegments, setSelectedSegments] = useState(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const contentRef = useRef(null);
+  const segmentRefs = useRef({});
   const theme = useTheme();
   const { getSpeakerColor } = useSpeakerColors();
   
@@ -20,7 +23,8 @@ const PapercutContent = ({ papercutId }) => {
     papercuts,
     cursorPosition,
     updateCursorPosition,
-    updatePapercutContent
+    updatePapercutContent,
+    lastInsertedSegmentId
   } = usePapercuts();
 
   const { currentState, pushState, undo, redo, canUndo, canRedo } = usePapercutHistory();
@@ -185,78 +189,155 @@ const handleKeyDown = useCallback((event) => {
 }, [content, cursorPosition, canUndo, canRedo, undo, redo, 
     splitSegmentAtCursor, deleteWordAtCursor, handleContentUpdate, 
     updateCursorPosition]);
-    return (
-      <Box 
-        sx={{ 
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}
-        tabIndex={0}
-        onKeyDown={handleKeyDown}
-      >
-        <Box 
-          sx={{ 
-            flex: 1,
-            overflowY: 'auto'
-          }}
-          onClick={handleContainerClick}
-        >
-          {dragState.springs.map((style, index) => {
-            const segment = content[index];
-            return (
-              <Segment
-                key={segment.id}
-                segment={segment}
-                dragState={dragState}
-                isSelected={selectedSegments.has(segment.id)}
-                isHovered={hoveredSegment === segment.id}
-                theme={theme}
-                getSpeakerColor={getSpeakerColor}
-                onDeleteSegment={handleDeleteSegment}
-                cursorPosition={cursorPosition}
-                onWordClick={handleWordClick}
-                onMouseEnter={() => setHoveredSegment(segment.id)}
-                onMouseLeave={() => setHoveredSegment(null)}
-                onClick={(e) => handleSegmentClick(e, segment.id)}
-                style={style} // Pass the spring style
-              />
-            );
-          })}
-        </Box>
+
+  // Simplified scroll effect
+  useEffect(() => {
+    if (lastInsertedSegmentId) {
+      const elementId = `segment-${lastInsertedSegmentId}`;
+      const element = document.getElementById(elementId);
       
-        <Box
-          sx={{
-            position: 'sticky',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            width: '100%',
-            borderTop: 1,
-            borderColor: 'divider',
-            bgcolor: 'background.paper',
-            zIndex: 1000,
-          }}
-        >
-          {cursorPosition && (
-            <WordMetadata
-              word={content
-                .find(s => s.id === cursorPosition.segmentId)
-                ?.words.find(w => w.id === cursorPosition.wordId)}
-              segment={content.find(s => s.id === cursorPosition.segmentId)}
-              segmentIndex={content.findIndex(s => s.id === cursorPosition.segmentId)}
-              wordIndex={content
-                .find(s => s.id === cursorPosition.segmentId)
-                ?.words.findIndex(w => w.id === cursorPosition.wordId)}
-              fileId={content
-                .find(s => s.id === cursorPosition.segmentId)
-                ?.sourceReference?.fileId}
+      if (element) {
+        requestAnimationFrame(() => {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          });
+        });
+      }
+    }
+  }, [lastInsertedSegmentId]);
+
+  // Add effect to handle hash changes and scrolling
+  useEffect(() => {
+    if (lastInsertedSegmentId) {
+      // Set the URL hash to the segment ID
+      window.location.hash = `segment-${lastInsertedSegmentId}`;
+      
+      // Clear the hash after scrolling (optional)
+      const timeoutId = setTimeout(() => {
+        window.history.replaceState(null, null, ' ');
+      }, 1000);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [lastInsertedSegmentId]);
+
+  // Reset scroll flag when new content is inserted
+  useEffect(() => {
+    if (lastInsertedSegmentId) {
+      setHasScrolled(false);
+    }
+  }, [lastInsertedSegmentId]);
+
+  // Callback ref function to handle scrolling only on insert
+  const setSegmentRef = useCallback((element, segmentId) => {
+    if (element) {
+      segmentRefs.current[segmentId] = element;
+      
+      // Only scroll if this is the newly inserted segment and we haven't scrolled yet
+      if (segmentId === lastInsertedSegmentId && !hasScrolled) {
+        setTimeout(() => {
+          const container = contentRef.current;
+          const elementRect = element.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          
+          const elementTop = elementRect.top;
+          const containerMiddle = containerRect.top + (containerRect.height / 2);
+          
+          const offset = elementTop - containerMiddle + (elementRect.height / 2);
+          container.scrollBy({
+            top: offset,
+            behavior: 'smooth'
+          });
+          
+          setHasScrolled(true);
+        }, 100);
+      }
+    }
+  }, [lastInsertedSegmentId, hasScrolled]);
+
+  // Handle manual scroll
+  const handleScroll = useCallback(() => {
+    if (!hasScrolled && lastInsertedSegmentId) {
+      setHasScrolled(true);
+    }
+  }, [hasScrolled, lastInsertedSegmentId]);
+
+  return (
+    <Box 
+      sx={{ 
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
+      <Box 
+        ref={contentRef}
+        sx={{ 
+          flex: 1,
+          overflowY: 'auto'
+        }}
+        onClick={handleContainerClick}
+        onScroll={handleScroll}
+      >
+        {dragState.springs.map((style, index) => {
+          const segment = content[index];
+          return (
+            <Segment
+              key={segment.id}
+              ref={(el) => setSegmentRef(el, segment.id)}
+              segment={segment}
+              dragState={dragState}
+              isSelected={selectedSegments.has(segment.id)}
+              isHovered={hoveredSegment === segment.id}
+              theme={theme}
+              getSpeakerColor={getSpeakerColor}
+              onDeleteSegment={handleDeleteSegment}
+              cursorPosition={cursorPosition}
+              onWordClick={handleWordClick}
+              onMouseEnter={() => setHoveredSegment(segment.id)}
+              onMouseLeave={() => setHoveredSegment(null)}
+              onClick={(e) => handleSegmentClick(e, segment.id)}
+              style={style}
             />
-          )}
-        </Box>
+          );
+        })}
       </Box>
-    );
-  };
-  
-  export default PapercutContent;
+      
+      <Box
+        sx={{
+          position: 'sticky',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
+          borderTop: 1,
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          zIndex: 1000,
+        }}
+      >
+        {cursorPosition && (
+          <WordMetadata
+            word={content
+              .find(s => s.id === cursorPosition.segmentId)
+              ?.words.find(w => w.id === cursorPosition.wordId)}
+            segment={content.find(s => s.id === cursorPosition.segmentId)}
+            segmentIndex={content.findIndex(s => s.id === cursorPosition.segmentId)}
+            wordIndex={content
+              .find(s => s.id === cursorPosition.segmentId)
+              ?.words.findIndex(w => w.id === cursorPosition.wordId)}
+            fileId={content
+              .find(s => s.id === cursorPosition.segmentId)
+              ?.sourceReference?.fileId}
+          />
+        )}
+      </Box>
+    </Box>
+  );
+};
+
+export default PapercutContent;

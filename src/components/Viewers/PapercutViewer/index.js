@@ -39,34 +39,30 @@ const PapercutViewer = ({ transcriptData }) => {
   };
 
   return (
-    <Card sx={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      bgcolor: 'background.paper' 
-    }}
-    tabIndex={0}>
+    <Card 
+      sx={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        bgcolor: 'background.paper',
+        overflow: 'hidden'
+      }}
+      tabIndex={0}
+    >
       <ActivePapercut 
         name={activePapercut ? activePapercut.name : null}
         onMenuClick={handleMenuClick}
       />
       
       <Box sx={{ 
-          flexGrow: 1, 
-          display: 'flex', 
-          flexDirection: 'column', 
-          overflow: 'hidden' 
-        }}>
-          <Box sx={{ 
-            flexGrow: 1, 
-            overflowY: 'auto', 
-            p: 2  // Keep padding here in parent
-          }}>
-            {activePapercut && (
-              <PapercutContent papercutId={activePapercut.id} />
-            )}
-          </Box>
-        </Box>
+        flexGrow: 1,
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {activePapercut && (
+          <PapercutContent papercutId={activePapercut.id} />
+        )}
+      </Box>
 
       <Menu
         anchorEl={anchorEl}

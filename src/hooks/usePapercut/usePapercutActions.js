@@ -253,6 +253,18 @@ export function usePapercutActions() {
       ];
       
       updatePapercutContent(papercutId, newContent);
+      
+      // Get the last inserted segment
+      const lastInsertedSegment = mergedContent[mergedContent.length - 1];
+      
+      // Set cursor to last word of inserted content
+      if (lastInsertedSegment && lastInsertedSegment.words.length > 0) {
+        const lastWord = lastInsertedSegment.words[lastInsertedSegment.words.length - 1];
+        updateCursorPosition({
+          segmentId: lastInsertedSegment.id,
+          wordId: lastWord.id
+        });
+      }
       return;
     }
     
@@ -271,9 +283,22 @@ export function usePapercutActions() {
       ...splitContent.slice(insertIndex)
     ];
     
+    // Get the last inserted segment
+    const lastInsertedSegment = mergedContent[mergedContent.length - 1];
+    
+    // Update the content
     updatePapercutContent(papercutId, newContent);
+    
+    // Set cursor to last word of inserted content
+    if (lastInsertedSegment && lastInsertedSegment.words.length > 0) {
+      const lastWord = lastInsertedSegment.words[lastInsertedSegment.words.length - 1];
+      updateCursorPosition({
+        segmentId: lastInsertedSegment.id,
+        wordId: lastWord.id
+      });
+    }
   }, [cursorPosition, papercuts, transformSegment, splitSegmentAtCursor, 
-      updatePapercutContent, addContentToPapercut, mergeSegmentsWithSameSpeaker]);
+      updatePapercutContent, addContentToPapercut, mergeSegmentsWithSameSpeaker, updateCursorPosition]);
 
   return {
     splitSegmentAtCursor,

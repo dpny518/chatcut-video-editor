@@ -1,5 +1,4 @@
-// Segment.js
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
@@ -7,7 +6,6 @@ import { animated } from '@react-spring/web';
 import Paper from '@mui/material/Paper';
 
 const AnimatedPaper = animated(Paper);
-
 
 const SegmentWord = React.memo(({ 
   word, 
@@ -58,21 +56,21 @@ const SegmentWord = React.memo(({
   );
 });
 
-export const Segment = React.memo(({ 
+const Segment = forwardRef(({ 
   segment,
   dragState,
+  isSelected,
   isHovered,
   theme,
   getSpeakerColor,
   onDeleteSegment,
   cursorPosition,
   onWordClick,
+  onClick,
   onMouseEnter,
   onMouseLeave,
-  isSelected,
-  onClick,
   style
-}) => {
+}, ref) => {
   const { 
     draggedSegment, 
     dropIndicator,
@@ -83,54 +81,60 @@ export const Segment = React.memo(({
   const showDropIndicator = dropIndicator?.targetId === segment.id;
 
   return (
-    <AnimatedPaper
-      ref={el => segmentRefs.current[segment.id] = el}
-      elevation={draggedSegment?.includes(segment.id) ? 4 : 1}
-      {...bindDrag(segment.id)}
-      onClick={onClick}
-      onMouseEnter={() => onMouseEnter(segment.id)}
-      onMouseLeave={onMouseLeave}
-      style={{
-        ...style,
+    <Box
+      ref={ref}
+      id={`segment-${segment.id}`}
+      sx={{
+        scrollMarginTop: '100px',
         marginBottom: '16px',
-        position: 'relative',
-        userSelect: 'none',
-        backgroundColor: isSelected ? theme.palette.action.selected : theme.palette.background.paper,
-        zIndex: style.zIndex,
-        transform: `translateY(${style.y}px) scale(${style.scale})`,
-      }}
-      sx={{ 
-        transition: theme.transitions.create([
-          'box-shadow', 
-          'opacity',
-          'background-color'
-        ], {
-          duration: theme.transitions.duration.shortest
-        }),
-        opacity: draggedSegment?.includes(segment.id) ? 0.8 : 1,
-        '&:hover .drag-handle': {
-          opacity: 1
-        },
-        ...(isSelected && {
-          '&:hover': {
-            bgcolor: 'action.selected',
-          }
-        })
       }}
     >
-      {showDropIndicator && (
-        <Box
-          sx={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            height: 4,
-            bgcolor: 'primary.main',
-            ...(dropIndicator.position === 'top' ? { top: -2 } : { bottom: -2 }),
-            zIndex: 2,
-          }}
-        />
-      )}
+      <AnimatedPaper
+        elevation={draggedSegment?.includes(segment.id) ? 4 : 1}
+        {...bindDrag(segment.id)}
+        onClick={onClick}
+        onMouseEnter={() => onMouseEnter(segment.id)}
+        onMouseLeave={onMouseLeave}
+        style={{
+          ...style,
+          position: 'relative',
+          userSelect: 'none',
+          backgroundColor: isSelected ? theme.palette.action.selected : theme.palette.background.paper,
+          zIndex: style.zIndex,
+          transform: `translateY(${style.y}px) scale(${style.scale})`,
+        }}
+        sx={{ 
+          transition: theme.transitions.create([
+            'box-shadow', 
+            'opacity',
+            'background-color'
+          ], {
+            duration: theme.transitions.duration.shortest
+          }),
+          opacity: draggedSegment?.includes(segment.id) ? 0.8 : 1,
+          '&:hover .drag-handle': {
+            opacity: 1
+          },
+          ...(isSelected && {
+            '&:hover': {
+              bgcolor: 'action.selected',
+            }
+          })
+        }}
+      >
+        {showDropIndicator && (
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              height: 4,
+              bgcolor: 'primary.main',
+              ...(dropIndicator.position === 'top' ? { top: -2 } : { bottom: -2 }),
+              zIndex: 2,
+            }}
+          />
+        )}
         <Box 
           className="segment-content"
           sx={{ 
@@ -227,8 +231,10 @@ export const Segment = React.memo(({
             <DeleteIcon color="error" />
           </Box>
         )}
-    </AnimatedPaper>
+      </AnimatedPaper>
+    </Box>
   );
 });
 
+Segment.displayName = 'Segment';
 export default Segment;

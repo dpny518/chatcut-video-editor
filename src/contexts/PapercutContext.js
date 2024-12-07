@@ -15,6 +15,7 @@ export function PapercutProvider({ children }) {
   const [papercuts, setPapercuts] = useState([createInitialPapercut()]);
   const [activeTab, setActiveTab] = useState('papercut-default');
   const [cursorPosition, setCursorPosition] = useState(null);
+  const [lastInsertedSegmentId, setLastInsertedSegmentId] = useState(null);
 
   const updateCursorPosition = useCallback((newPosition) => {
     setCursorPosition(newPosition);
@@ -33,17 +34,30 @@ export function PapercutProvider({ children }) {
     }));
   }, []);
 
-  const addContentToPapercut = useCallback((papercutId, newContent) => {
-    setPapercuts(prevPapercuts => {
-      return prevPapercuts.map(papercut => {
-        if (papercut.id === papercutId) {
+  const addContentToPapercut = useCallback((papercutId, content) => {
+    setPapercuts(prev => {
+      const papercut = prev.find(p => p.id === papercutId);
+      if (!papercut) return prev;
+
+      const lastAddedSegment = content[content.length - 1];
+      if (lastAddedSegment) {
+        setLastInsertedSegmentId(lastAddedSegment.id);
+        // Set cursor to last word of last added segment
+        const lastWord = lastAddedSegment.words[lastAddedSegment.words.length - 1];
+        setCursorPosition({
+          segmentId: lastAddedSegment.id,
+          wordId: lastWord.id
+        });
+      }
+
+      return prev.map(p => {
+        if (p.id === papercutId) {
           return {
-            ...papercut,
-            content: [...papercut.content, ...newContent],
-            modified: new Date()
+            ...p,
+            content: [...p.content, ...content]
           };
         }
-        return papercut;
+        return p;
       });
     });
   }, []);
@@ -79,12 +93,14 @@ export function PapercutProvider({ children }) {
     setActiveTab(newPapercut.id); // Automatically switch to new papercut
     return newPapercut.id;
   }, [papercuts]);
+
   return (
     <PapercutContext.Provider value={{
       papercuts,
       activeTab,
       setActiveTab,
       cursorPosition,
+      lastInsertedSegmentId,
       updateCursorPosition,
       updatePapercutContent,
       addContentToPapercut,
