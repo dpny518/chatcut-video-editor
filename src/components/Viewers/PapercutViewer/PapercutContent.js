@@ -11,6 +11,8 @@ import { useSpeakerColors } from '../../../contexts/SpeakerColorContext';
 
 const PapercutContent = ({ papercutId }) => {
   const [hoveredSegment, setHoveredSegment] = useState(null);
+  const [selectedSegments, setSelectedSegments] = useState(new Set());
+  const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
   const theme = useTheme();
   const { getSpeakerColor } = useSpeakerColors();
   
@@ -53,7 +55,56 @@ const PapercutContent = ({ papercutId }) => {
     updateCursorPosition({ segmentId, wordId });
   }, [updateCursorPosition]);
 
- // PapercutContent.js
+  const handleSegmentClick = useCallback((e, segmentId) => {
+    // Don't trigger selection when clicking text or trash
+    if (e.target.closest('.segment-text') || e.target.closest('.delete-button')) {
+      return;
+    }
+
+    const currentIndex = content.findIndex(s => s.id === segmentId);
+
+    if (e.metaKey || e.ctrlKey) {
+      // Command/Ctrl click: Toggle selection without affecting others
+      const newSelection = new Set(selectedSegments);
+      if (newSelection.has(segmentId)) {
+        newSelection.delete(segmentId);
+      } else {
+        newSelection.add(segmentId);
+      }
+      setSelectedSegments(newSelection);
+      setLastSelectedIndex(currentIndex);
+    } else if (e.shiftKey && lastSelectedIndex !== null) {
+      // Shift click: Select range from last selected to current
+      const start = Math.min(lastSelectedIndex, currentIndex);
+      const end = Math.max(lastSelectedIndex, currentIndex);
+      const rangeSelection = content
+        .slice(start, end + 1)
+        .map(s => s.id);
+      setSelectedSegments(new Set(rangeSelection));
+    } else {
+      // Regular click: Select only this item
+      if (selectedSegments.size === 1 && selectedSegments.has(segmentId)) {
+        // Clicking the only selected item deselects it
+        setSelectedSegments(new Set());
+        setLastSelectedIndex(null);
+      } else {
+        // Select only this item
+        setSelectedSegments(new Set([segmentId]));
+        setLastSelectedIndex(currentIndex);
+      }
+    }
+  }, [content, selectedSegments, lastSelectedIndex]);
+
+  // Click on container to clear selection
+  const handleContainerClick = useCallback((e) => {
+    // Only clear if clicking directly on the container (not on segments)
+    if (e.target === e.currentTarget) {
+      setSelectedSegments(new Set());
+      setLastSelectedIndex(null);
+    }
+  }, []);
+
+  // PapercutContent.js
 const handleKeyDown = useCallback((event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
     event.preventDefault();
@@ -146,16 +197,19 @@ const handleKeyDown = useCallback((event) => {
         tabIndex={0}
         onKeyDown={handleKeyDown}
       >
-        <Box sx={{ 
-          flex: 1,
-          overflowY: 'auto',
-          // Remove padding here since parent handles it
-        }}>
+        <Box 
+          sx={{ 
+            flex: 1,
+            overflowY: 'auto'
+          }}
+          onClick={handleContainerClick}
+        >
           {content.map(segment => (
             <Segment
               key={segment.id}
               segment={segment}
               dragState={dragState}
+              isSelected={selectedSegments.has(segment.id)}
               isHovered={hoveredSegment === segment.id}
               theme={theme}
               getSpeakerColor={getSpeakerColor}
@@ -164,6 +218,7 @@ const handleKeyDown = useCallback((event) => {
               onWordClick={handleWordClick}
               onMouseEnter={setHoveredSegment}
               onMouseLeave={() => setHoveredSegment(null)}
+              onClick={(e) => handleSegmentClick(e, segment.id)}
             />
           ))}
         </Box>
