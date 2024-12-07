@@ -3,19 +3,21 @@ import { useTranscriptStyling } from '../../contexts/TranscriptStylingContext';
 
 export const useTranscriptSelection = (displayContent) => {
   const [selection, setSelection] = useState(null);
+  const [isActive, setIsActive] = useState(false);
   const { getWordStyle } = useTranscriptStyling();
 
   const isValidTranscriptNode = (node) => {
     if (!node || !node.dataset) return false;
 
     const { fileId, segmentIndex, wordIndex, globalIndex } = node.dataset;
-
-    return !!(
+    const isValid = !!(
       fileId &&
       !isNaN(parseInt(segmentIndex)) &&
       !isNaN(parseInt(wordIndex)) &&
       !isNaN(parseInt(globalIndex))
     );
+    
+    return isValid;
   };
 
   const findValidNodesInRange = (range) => {
@@ -24,19 +26,33 @@ export const useTranscriptSelection = (displayContent) => {
       return [];
     }
 
+    // First try to get the direct container if it's a text node
+    const container = range.commonAncestorContainer.nodeType === Node.TEXT_NODE 
+      ? range.commonAncestorContainer.parentElement
+      : range.commonAncestorContainer;
+
+    if (isValidTranscriptNode(container)) {
+      return [container];
+    }
+
+    // If direct container isn't valid, walk the tree
     const nodes = [];
     const walker = document.createTreeWalker(
       range.commonAncestorContainer,
-      NodeFilter.SHOW_ELEMENT,
+      NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
       {
-        acceptNode: (node) => (isValidTranscriptNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+        acceptNode: (node) => {
+          const elementToCheck = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+          return isValidTranscriptNode(elementToCheck) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        }
       }
     );
 
     let currentNode = walker.currentNode;
     while (currentNode) {
-      if (range.intersectsNode(currentNode) && isValidTranscriptNode(currentNode)) {
-        nodes.push(currentNode);
+      const elementNode = currentNode.nodeType === Node.TEXT_NODE ? currentNode.parentElement : currentNode;
+      if (range.intersectsNode(currentNode) && isValidTranscriptNode(elementNode)) {
+        nodes.push(elementNode);
       }
       currentNode = walker.nextNode();
     }
@@ -48,18 +64,21 @@ export const useTranscriptSelection = (displayContent) => {
     const selectionObj = window.getSelection();
     if (!selectionObj || selectionObj.rangeCount === 0) {
       setSelection(null);
+      setIsActive(false);
       return;
     }
 
     const range = selectionObj.getRangeAt(0);
     if (!range) {
       setSelection(null);
+      setIsActive(false);
       return;
     }
 
     const selectedText = range.toString().trim();
     if (!selectedText) {
       setSelection(null);
+      setIsActive(false);
       return;
     }
 
@@ -68,40 +87,36 @@ export const useTranscriptSelection = (displayContent) => {
       const startElement = validNodes[0];
       const endElement = validNodes[validNodes.length - 1];
 
-      if (isValidTranscriptNode(startElement) && isValidTranscriptNode(endElement)) {
-        setSelection({
+      if (isValidTranscriptNode(startElement)) {
+        // Create a single selection point for both start and end if it's a single node
+        const selectionPoint = {
+          fileId: startElement.dataset.fileId,
+          segmentIndex: parseInt(startElement.dataset.segmentIndex),
+          wordIndex: parseInt(startElement.dataset.wordIndex),
+          globalIndex: parseInt(startElement.dataset.globalIndex),
+        };
+
+        const newSelection = {
           text: selectedText,
-          start: {
-            fileId: startElement.dataset.fileId,
-            segmentIndex: parseInt(startElement.dataset.segmentIndex),
-            wordIndex: parseInt(startElement.dataset.wordIndex),
-            globalIndex: parseInt(startElement.dataset.globalIndex),
-          },
-          end: {
+          start: selectionPoint,
+          end: validNodes.length === 1 ? selectionPoint : {
             fileId: endElement.dataset.fileId,
             segmentIndex: parseInt(endElement.dataset.segmentIndex),
             wordIndex: parseInt(endElement.dataset.wordIndex),
             globalIndex: parseInt(endElement.dataset.globalIndex),
           },
-        });
+        };
+        
+        setSelection(newSelection);
+        setIsActive(true);
       } else {
         setSelection(null);
+        setIsActive(false);
       }
     } else {
       setSelection(null);
+      setIsActive(false);
     }
-  }, []);
-
-  useEffect(() => {
-    document.addEventListener('selectionchange', handleSelectionChange);
-    return () => {
-      document.removeEventListener('selectionchange', handleSelectionChange);
-    };
-  }, [handleSelectionChange]);
-
-  const clearSelection = useCallback(() => {
-    window.getSelection().removeAllRanges();
-    setSelection(null);
   }, []);
 
   const getSelectedContent = useCallback(() => {
@@ -150,11 +165,21 @@ export const useTranscriptSelection = (displayContent) => {
   }, [selection, displayContent, getWordStyle]);
 
   useEffect(() => {
-    console.log('Current selection:', selection);
-  }, [selection]);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [handleSelectionChange]);
+
+  const clearSelection = useCallback(() => {
+    window.getSelection().removeAllRanges();
+    setSelection(null);
+    setIsActive(false);
+  }, []);
 
   return {
     selection,
+    isActive,
     clearSelection,
     getSelectedContent,
     handleSelectionChange,
