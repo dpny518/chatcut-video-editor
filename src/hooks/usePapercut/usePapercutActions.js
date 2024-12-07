@@ -224,35 +224,53 @@ export function usePapercutActions() {
       return;
     }
   
-    // Find the original segment index before splitting
-    const originalIndex = papercut.content.findIndex(segment => 
-      segment.id === cursorPosition.segmentId
+    // Find the segment containing the cursor
+    const currentSegmentIndex = papercut.content.findIndex(
+      segment => segment.id === cursorPosition.segmentId
     );
-  
-    // Split the segment at cursor
+    
+    // Find the word index within the segment
+    const currentSegment = papercut.content[currentSegmentIndex];
+    const wordIndex = currentSegment.words.findIndex(
+      word => word.id === cursorPosition.wordId
+    );
+    
+    // Check if cursor is at the end of the segment
+    const isLastWord = wordIndex === currentSegment.words.length - 1;
+    
+    // If we're at the end of a segment, don't split it
+    if (isLastWord) {
+      const transformedContent = selectedContent.map((segment, index) => 
+        transformSegment(segment, currentSegmentIndex + 1 + index)
+      );
+      const mergedContent = mergeSegmentsWithSameSpeaker(transformedContent);
+      
+      // Insert after the current segment without splitting
+      const newContent = [
+        ...papercut.content.slice(0, currentSegmentIndex + 1),
+        ...mergedContent,
+        ...papercut.content.slice(currentSegmentIndex + 1)
+      ];
+      
+      updatePapercutContent(papercutId, newContent);
+      return;
+    }
+    
+    // If not at the end, proceed with normal split and insert
     const splitContent = splitSegmentAtCursor(papercut.content, cursorPosition);
-    console.log('Split content:', splitContent);
-  
-    // After splitting, we want to insert after the first half of the split
-    const insertIndex = originalIndex + 1;
-    console.log('Insert index:', insertIndex);
-  
-    // Transform the new content
+    const insertIndex = currentSegmentIndex + 1;
+    
     const transformedContent = selectedContent.map((segment, index) => 
       transformSegment(segment, insertIndex + index)
     );
     const mergedContent = mergeSegmentsWithSameSpeaker(transformedContent);
-    console.log('Transformed and merged content:', mergedContent);
-  
-    // Create final content
+    
     const newContent = [
       ...splitContent.slice(0, insertIndex),
       ...mergedContent,
       ...splitContent.slice(insertIndex)
     ];
-    console.log('Final content:', newContent);
-  
-    // Update the papercut
+    
     updatePapercutContent(papercutId, newContent);
   }, [cursorPosition, papercuts, transformSegment, splitSegmentAtCursor, 
       updatePapercutContent, addContentToPapercut, mergeSegmentsWithSameSpeaker]);
