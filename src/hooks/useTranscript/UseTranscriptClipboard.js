@@ -27,10 +27,18 @@ export const useTranscriptClipboard = (getSelectedContent) => {
   const copyToClipboard = useCallback(async () => {
     const selectedContent = getSelectedContent();
     if (!selectedContent || selectedContent.length === 0) return false;
-
+  
     try {
-      // Store the exact content that getSelectedContent returns
+      // Store in our context
       setClipboardContent(selectedContent);
+      
+      // Create plain text version for system clipboard
+      const plainText = selectedContent
+        .map(segment => segment.words.map(w => w.word || w.text).join(' '))
+        .join(' ');
+  
+      // Store in system clipboard
+      await navigator.clipboard.writeText(plainText);
       return true;
     } catch (error) {
       console.error('Failed to copy:', error);
