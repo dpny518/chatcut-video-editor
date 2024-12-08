@@ -12,6 +12,7 @@ import { usePapercutActions } from
 import { useTranscriptSelection } from 
   '../../../hooks/useTranscript/useTranscriptSelection';
 import { useTranscriptStyling } from '../../../contexts/TranscriptStylingContext';
+import { useTranscriptClipboard } from '../../../hooks/useTranscript/UseTranscriptClipboard';
 import TranscriptToolbar from './TranscriptToolbar';
 import TranscriptContent from './TranscriptContent';
 import FileCount from './FileCount';
@@ -34,6 +35,7 @@ const TranscriptViewer = () => {
     canUndo, 
     canRedo 
   } = usePapercutHistory();
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
@@ -98,7 +100,41 @@ const TranscriptViewer = () => {
     handleSelectionChange 
   } = useTranscriptSelection(displayContent);
 
- 
+  const { copyToClipboard, pasteFromClipboard } = useTranscriptClipboard(getSelectedContent);
+  
+  useEffect(() => {
+    const handleKeyboardCopy = async (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'c' && selection) {
+        event.preventDefault();
+        const success = await copyToClipboard();
+        if (success) {
+          clearSelection();
+        }
+      }
+    };
+  
+    document.addEventListener('keydown', handleKeyboardCopy);
+    return () => {
+      document.removeEventListener('keydown', handleKeyboardCopy);
+    };
+  }, [copyToClipboard, selection, clearSelection]);
+  useEffect(() => {
+    const handleKeyboardPaste = async (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+        const success = await pasteFromClipboard((content) => {
+          insertToPapercut(activeTab, content);
+        });
+        if (success) {
+          event.preventDefault();
+        }
+      }
+    };
+  
+    document.addEventListener('keydown', handleKeyboardPaste);
+    return () => {
+      document.removeEventListener('keydown', handleKeyboardPaste);
+    };
+  }, [pasteFromClipboard, activeTab, insertToPapercut]);
 
   const handleStyleClick = (style) => {
     if (selection) {

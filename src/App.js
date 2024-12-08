@@ -14,7 +14,7 @@ import { SpeakerColorProvider } from './contexts/SpeakerColorContext';
 import { PapercutProvider } from './contexts/PapercutContext';
 import { PapercutHistoryProvider } from './contexts/PapercutHistoryContext';
 import { TranscriptStylingProvider } from './contexts/TranscriptStylingContext';
-
+import { TranscriptClipboardProvider } from './contexts/TranscriptClipboardContext';
 import SearchPage from './components/Pages/SearchPage';
 import NotificationsPage from './components/Pages/NotificationsPage';
 import ProfilePage from './components/Pages/ProfilePage';
@@ -104,18 +104,19 @@ const renderContent = () => {
   }
 };
 
-  return (
-    <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <FileSystemProvider onFileUpload={handleFileUpload}>
-          <SpeakerColorProvider>
-            <PapercutHistoryProvider>
-              <PapercutProvider>
-                <TranscriptStylingProvider>
+return (
+  <StyledEngineProvider injectFirst>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <FileSystemProvider onFileUpload={handleFileUpload}>
+        <SpeakerColorProvider>
+          <PapercutHistoryProvider>
+            <PapercutProvider>
+              <TranscriptStylingProvider>
+                <TranscriptClipboardProvider>
                   <MainLayout
                     themeMode={themeMode}
-                    onThemeChange={() => setThemeMode(mode => mode === 'dark' ? 'light' : 'dark')}
+                    onThemeChange={handleThemeChange}
                     currentView={currentView}
                     onViewChange={setCurrentView}
                     mediaFiles={[]}
@@ -136,28 +137,16 @@ const renderContent = () => {
                       onClipsChange={() => {}}
                     />
                   </MainLayout>
-                </TranscriptStylingProvider>
-              </PapercutProvider>
-            </PapercutHistoryProvider>
-          </SpeakerColorProvider>
-        </FileSystemProvider>
-
-        <Snackbar
-          open={!!notification}
-          autoHideDuration={3000}
-          onClose={() => setNotification(null)}
-        >
-          <Alert
-            onClose={() => setNotification(null)}
-            severity={notification?.severity}
-            sx={{ width: '100%' }}
-          >
-            {notification?.message}
-          </Alert>
-        </Snackbar>
-      </ThemeProvider>
-    </StyledEngineProvider>
-  );
+                </TranscriptClipboardProvider>
+              </TranscriptStylingProvider>
+            </PapercutProvider>
+          </PapercutHistoryProvider>
+        </SpeakerColorProvider>
+      </FileSystemProvider>
+      <Snackbar /* ... */ />
+    </ThemeProvider>
+  </StyledEngineProvider>
+);
 };
 
 export default App;

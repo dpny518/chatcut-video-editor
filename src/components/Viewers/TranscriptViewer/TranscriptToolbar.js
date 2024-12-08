@@ -5,7 +5,9 @@ import {
   InsertComment as InsertIcon,
   BorderColor as HighlightIcon,
   StrikethroughS as StrikeIcon,
-  FormatClear as ClearIcon
+  FormatClear as ClearIcon,
+  ContentCopy as CopyIcon,
+  ContentPaste as PasteIcon
 } from '@mui/icons-material';
 
 const TranscriptToolbar = ({ 
@@ -13,7 +15,7 @@ const TranscriptToolbar = ({
   onAddToPapercut, 
   onInsertToPapercut,
   onStyleClick,
-  onRemoveStyle
+  onRemoveStyle,
 }) => {
   return (
     <Box sx={{ 

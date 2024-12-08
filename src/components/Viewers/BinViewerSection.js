@@ -10,6 +10,7 @@ import {
 import TranscriptViewer from './TranscriptViewer';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import DescriptionIcon from '@mui/icons-material/Description';
+import { TranscriptClipboardProvider } from '../../hooks/useTranscript/UseTranscriptClipboard';
 const BinViewerSection = () => {
   const [viewMode, setViewMode] = useState(1);
 
@@ -99,7 +100,9 @@ const BinViewerSection = () => {
             </Typography>
           </Box>
         ) : (
+          <TranscriptClipboardProvider>
           <TranscriptViewer />
+        </TranscriptClipboardProvider>
         )}
       </Box>
     </Paper>
