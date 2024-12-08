@@ -39,6 +39,12 @@ const PapercutViewer = ({ transcriptData }) => {
     handleMenuClose();
   };
 
+  const handleInsertToPapercut = (selectedContent) => {
+    // Logic to handle the insertion of selected content into the papercut
+    console.log('Inserting content:', selectedContent);
+    // You can add your logic here to update the state or perform any other actions
+  };
+
   return (
     <Card 
       sx={{ 
@@ -62,7 +68,9 @@ const PapercutViewer = ({ transcriptData }) => {
       }}>
         {activePapercut && (
           <TranscriptClipboardProvider>
-            <PapercutContent papercutId={activePapercut.id} />
+            <PapercutContent onHandleInsert={handleInsertToPapercut}>
+              <PapercutContent papercutId={activePapercut.id} />
+            </PapercutContent>
           </TranscriptClipboardProvider>
         )}
       </Box>

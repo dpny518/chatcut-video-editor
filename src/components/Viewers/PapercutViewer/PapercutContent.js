@@ -9,7 +9,7 @@ import { usePapercutActions } from '../../../hooks/usePapercut/usePapercutAction
 import { usePapercutHistory } from '../../../hooks/usePapercutHistory';
 import { useSpeakerColors } from '../../../contexts/SpeakerColorContext';
 
-const PapercutContent = ({ papercutId }) => {
+const PapercutContent = ({ papercutId, onHandleInsert }) => {
   const [hoveredSegment, setHoveredSegment] = useState(null);
   const [hoveredWord, setHoveredWord] = useState(null);
   const [nativeCursorPosition, setNativeCursorPosition] = useState(null);
@@ -314,6 +314,32 @@ const handleKeyDown = useCallback((event) => {
     }
   }, [nativeCursorPosition]);
 
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    try {
+      const data = e.dataTransfer.getData('application/transcript-selection');
+      if (data) {
+        const selectedContent = JSON.parse(data);
+        onHandleInsert(selectedContent);
+      }
+    } catch (error) {
+      console.error('Error handling drop:', error);
+    }
+  };
+
   return (
     <Box 
       sx={{ 
@@ -326,6 +352,9 @@ const handleKeyDown = useCallback((event) => {
       onKeyDown={handleKeyDown}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => setNativeCursorPosition(null)}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <Box 
         ref={contentRef}

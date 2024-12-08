@@ -1,15 +1,29 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useSpeakerColors } from '../../../contexts/SpeakerColorContext';
 import { useTranscriptStyling } from '../../../contexts/TranscriptStylingContext';
 import { useTheme } from '@mui/material/styles';
 
-const TranscriptContent = ({ displayContent, onSelectionChange, highlightedWord = null }) => {
+const TranscriptContent = ({ displayContent, onSelectionChange, highlightedWord = null, selection, getSelectedContent, ...otherProps }) => {
   const contentRef = useRef(null);
   const theme = useTheme();
 
   const { getSpeakerColor } = useSpeakerColors();
   const { getWordStyle } = useTranscriptStyling();
+
+  const handleDragStart = useCallback((e) => {
+    if (!selection) {
+      e.preventDefault();
+      return;
+    }
+    const selectedContent = getSelectedContent();
+    if (selectedContent && selectedContent.length > 0) {
+      e.dataTransfer.setData('application/transcript-selection', JSON.stringify(selectedContent));
+      e.dataTransfer.effectAllowed = 'copy';
+    } else {
+      e.preventDefault();
+    }
+  }, [getSelectedContent, selection]);
 
   useEffect(() => {
     const handleMouseUp = () => {
@@ -25,13 +39,18 @@ const TranscriptContent = ({ displayContent, onSelectionChange, highlightedWord 
     };
 
     document.addEventListener('mouseup', handleMouseUp);
+    if (contentRef.current) {
+      contentRef.current.addEventListener('dragstart', handleDragStart);
+    }
+
     return () => {
       document.removeEventListener('mouseup', handleMouseUp);
+      if (contentRef.current) {
+        contentRef.current.removeEventListener('dragstart', handleDragStart);
+      }
     };
-  }, [onSelectionChange]);
+  }, [onSelectionChange, handleDragStart]);
 
- 
-  
   const renderWord = (word, fileId) => {
     const style = getWordStyle(word.id);
 
@@ -157,13 +176,17 @@ const TranscriptContent = ({ displayContent, onSelectionChange, highlightedWord 
   return (
     <Box
       ref={contentRef}
+      draggable={!!selection}
+      onDragStart={handleDragStart}
       sx={{
         padding: 2,
         wordBreak: 'break-word',
         overflowWrap: 'break-word',
         marginBottom: 2,
+        userSelect: 'text', // Ensure text is selectable
       }}
       onMouseUp={onSelectionChange}
+      {...otherProps}
     >
       {displayContent.map(renderFile)}
     </Box>

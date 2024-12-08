@@ -205,6 +205,8 @@ const TranscriptViewer = () => {
               displayContent={displayContent}
               onSelectionChange={handleSelectionChange}
               highlightedWord={highlightedWord}
+              selection={selection} 
+              getSelectedContent={getSelectedContent} 
             />
           )}
         </Box>

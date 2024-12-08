@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Paper,
@@ -13,6 +13,7 @@ import {
 import { ChevronDown } from 'lucide-react';
 import PapercutViewer from './index';
 import { usePapercuts } from '../../../contexts/PapercutContext';
+import { usePapercutActions } from '../../../hooks/usePapercut/usePapercutActions';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import DescriptionIcon from '@mui/icons-material/Description';
 
@@ -23,9 +24,10 @@ const PapercutViewerSection = ({ transcriptData }) => {
     setActiveTab, 
     createNewPapercut 
   } = usePapercuts();
-
+  const { insertToPapercut } = usePapercutActions();
+  const [isDragOver, setIsDragOver] = useState(false);
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const [viewMode, setViewMode] = React.useState(1);  // 0 for Video, 1 for Papercut
+  const [viewMode, setViewMode] = React.useState(1);
 
   const CustomIcon = ({ Icon, alt, color = 'primary.main' }) => {
     return (
@@ -69,18 +71,50 @@ const PapercutViewerSection = ({ transcriptData }) => {
 
   const activePapercut = papercuts.find(p => p.id === activeTab);
 
+  const handleDragOver = (e) => {
+    if (e.dataTransfer.types.includes('application/transcript-selection')) {
+      e.preventDefault();
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    try {
+      const data = e.dataTransfer.getData('application/transcript-selection');
+      if (data && activeTab) {
+        const selectedContent = JSON.parse(data);
+        insertToPapercut(activeTab, selectedContent);
+      }
+    } catch (error) {
+      console.error('Error processing drop:', error);
+    }
+  };
+
   return (
-    <Paper sx={{ 
+    <Paper 
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      sx={{ 
         flexGrow: 1,
         display: 'flex',
         flexDirection: 'column',
         bgcolor: 'background.default',
         overflow: 'hidden',
         height: '100%',
-        '& > *': {  // This will remove any default margins between children
-          margin: 0
-        }
-      }}>
+        '& > *': { margin: 0 },
+        transition: 'all 0.2s ease',
+        border: isDragOver ? '2px dashed' : '2px solid transparent',
+        borderColor: isDragOver ? 'primary.main' : 'transparent',
+      }}
+    >
       <Box sx={{ 
         borderBottom: 1, 
         borderColor: 'divider',
@@ -124,7 +158,6 @@ const PapercutViewerSection = ({ transcriptData }) => {
           />
         </Tabs>
       </Box>
-
 
       <Box sx={{ 
         flexGrow: 1,
