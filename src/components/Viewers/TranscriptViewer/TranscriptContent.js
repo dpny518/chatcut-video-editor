@@ -2,9 +2,11 @@ import React, { useEffect, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useSpeakerColors } from '../../../contexts/SpeakerColorContext';
 import { useTranscriptStyling } from '../../../contexts/TranscriptStylingContext';
+import { useTheme } from '@mui/material/styles';
 
 const TranscriptContent = ({ displayContent, onSelectionChange, highlightedWord = null }) => {
   const contentRef = useRef(null);
+  const theme = useTheme();
 
   const { getSpeakerColor } = useSpeakerColors();
   const { getWordStyle } = useTranscriptStyling();
@@ -28,31 +30,48 @@ const TranscriptContent = ({ displayContent, onSelectionChange, highlightedWord 
     };
   }, [onSelectionChange]);
 
+ 
+  
   const renderWord = (word, fileId) => {
     const style = getWordStyle(word.id);
 
-    const getStyleProps = (style) => {
+    const redColors = {
+      light: 'hsl(0, 65%, 60%)',
+      dark: 'hsl(0, 65%, 45%)',
+      textLight: 'hsl(0, 65%, 95%)',
+      textDark: 'hsl(0, 65%, 15%)'
+    };
+    
+    const greenColors = {
+      light: 'hsl(137.508, 65%, 60%)',
+      dark: 'hsl(137.508, 65%, 45%)',
+      textLight: 'hsl(137.508, 65%, 95%)',
+      textDark: 'hsl(137.508, 65%, 15%)'
+    };
+    
+    const getStyleProps = (style, theme) => {
+      const isDarkMode = theme.palette.mode === 'dark';
+    
       switch (style) {
         case 'highlight-green':
           return {
-            bgcolor: 'rgba(144, 238, 144, 0.5)',
-            opacity: 0.9
+            bgcolor: isDarkMode ? greenColors.dark : greenColors.light,
+            color: isDarkMode ? greenColors.textDark : greenColors.textDark, // Always use textDark
           };
         case 'highlight-red':
           return {
-            bgcolor: 'rgba(255, 99, 132, 0.5)',
-            opacity: 0.9
+            bgcolor: isDarkMode ? redColors.dark : redColors.light,
+            color: isDarkMode ? redColors.textDark : redColors.textDark, // Always use textDark
           };
         case 'strikethrough':
           return {
             textDecoration: 'line-through',
-            opacity: 0.7
+            opacity: 0.7,
           };
         default:
           return {};
       }
     };
-
     return (
       <Typography
         key={word.id}
@@ -84,7 +103,7 @@ const TranscriptContent = ({ displayContent, onSelectionChange, highlightedWord 
           '&:hover': {
             bgcolor: 'action.hover'
           },
-          ...getStyleProps(style)
+          ...getStyleProps(style, theme)
         }}
       >
         {word.word}

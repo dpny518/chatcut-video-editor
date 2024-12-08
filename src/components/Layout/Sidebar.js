@@ -65,7 +65,7 @@ const Sidebar = ({ onPageChange, currentPage, themeMode, onThemeChange }) => {
       
       <Tooltip title={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} mode`} placement="right">
         <IconButton
-          onClick={onThemeChange}
+          onClick={() => onThemeChange()}
           sx={{
             p: 2,
             '&:hover': {

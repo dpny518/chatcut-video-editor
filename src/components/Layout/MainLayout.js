@@ -17,7 +17,12 @@ const MainLayout = ({
 }) => {
   return (
     <Box sx={{ display: 'flex', height: '100vh' }}>
-      <Sidebar onPageChange={onViewChange} currentPage={currentView} />
+      <Sidebar 
+        onPageChange={onViewChange}
+        currentPage={currentView}
+        themeMode={themeMode}
+        onThemeChange={onThemeChange}
+      />
       <Box sx={{ display: 'flex', flexGrow: 1 }}>
         <MediaSidebar 
           files={mediaFiles}
