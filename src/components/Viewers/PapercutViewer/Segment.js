@@ -97,23 +97,11 @@ const Segment = forwardRef(({
         marginBottom: '16px',
       }}
     >
-      {/* Top drop indicator */}
-      {showDropIndicator && dropIndicator.position === 'top' && (
-        <Box 
-          className="absolute -top-1 left-0 right-0 h-2 pointer-events-none"
-          sx={{ zIndex: 2 }}
-        >
-          <Box className="absolute left-0 right-0 top-1/2 h-0.5 bg-blue-500" />
-          <Box className="absolute left-0 top-0 w-1 h-2 bg-blue-500" />
-          <Box className="absolute right-0 top-0 w-1 h-2 bg-blue-500" />
-        </Box>
-      )}
+      {/* Drop indicators remain the same... */}
 
       <AnimatedPaper
         elevation={isBeingDragged ? 4 : 1}
-        draggable={true}
-        onDragStart={(e) => handleDragStart(e, segment.id)}
-        onDragEnd={handleDragEnd}
+        // Remove draggable from here
         onDragOver={(e) => handleDragOver(e, segment)}
         onDrop={(e) => handleDrop(e, segment)}
         onClick={onClick}
@@ -122,7 +110,7 @@ const Segment = forwardRef(({
         style={{
           ...style,
           position: 'relative',
-          userSelect: 'none',
+          // userSelect can be removed from here since it should be controlled at word level
           backgroundColor: isSelected ? theme.palette.action.selected : theme.palette.background.paper,
           zIndex: style.zIndex || 'auto',
           transform: style?.transform || `translateY(0px) scale(1)`,
@@ -146,7 +134,6 @@ const Segment = forwardRef(({
           })
         }}
       >
-        {/* Rest of the component remains the same */}
         <Box 
           className="segment-content"
           sx={{ 
@@ -158,6 +145,9 @@ const Segment = forwardRef(({
         >
           <Box 
             className="drag-handle"
+            draggable={true} // Move draggable here
+            onDragStart={(e) => handleDragStart(e, segment.id)}
+            onDragEnd={handleDragEnd}
             sx={{ 
               opacity: 0,
               transition: theme.transitions.create('opacity'),
@@ -181,45 +171,96 @@ const Segment = forwardRef(({
               <DragIndicatorIcon color="action" />
             </Box>
           </Box>
-
-          <Box className="segment-text" sx={{ flexGrow: 1 }}>
-            <Box 
-              sx={{ 
-                borderLeft: 3,
-                borderColor: getSpeakerColor(segment.speaker).colors.edgeLine,
-                pl: 2
-              }}
-            >
-              <Typography 
-                variant="subtitle2" 
-                sx={{ 
-                  color: 'primary.main',
-                  mb: 0.5,
-                  fontWeight: 500,
-                  fontSize: '0.75rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                  cursor: 'default'
-                }}
-              >
-                {segment.speaker}
-              </Typography>
-              <Box sx={{ cursor: 'text' }}>
-                {segment.words.map((word) => (
-                  <SegmentWord
-                    key={word.id}
-                    word={word}
-                    segment={segment}
-                    isSelected={cursorPosition?.segmentId === segment.id && 
-                              cursorPosition?.wordId === word.id}
-                    isStartOfWord={cursorPosition?.isStartOfWord}
-                    onWordClick={onWordClick}
-                    onWordHover={onWordHover}
-                  />
-                ))}
+          <Box className="segment-text" sx={{ 
+  flexGrow: 1,
+  userSelect: 'text' // Explicitly enable text selection
+}}>
+  <Box 
+    sx={{ 
+      borderLeft: 3,
+      borderColor: getSpeakerColor(segment.speaker).colors.edgeLine,
+      pl: 2,
+      userSelect: 'text' // Explicitly enable text selection
+    }}
+  >
+    <Typography 
+      variant="subtitle2" 
+      sx={{ 
+        color: 'primary.main',
+        mb: 0.5,
+        fontWeight: 500,
+        fontSize: '0.75rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.1em',
+        cursor: 'default',
+        userSelect: 'text' // Explicitly enable text selection
+      }}
+                >
+                  {segment.speaker}
+                </Typography>
+                <Box sx={{ cursor: 'text' }}>
+  <Typography
+    variant="body2"
+    sx={{
+      userSelect: 'text',
+      '& .word': {
+        position: 'relative', // Added for cursor positioning
+        display: 'inline-block', // Added to contain the cursor
+        px: 0.5,
+        py: 0.25,
+        borderRadius: 1,
+        '&:hover': {
+          backgroundColor: 'action.hover'
+        },
+      },
+      '& .word-selected': {
+        backgroundColor: 'action.selected'
+      }
+    }}
+  >
+    {segment.words.map((word, index) => (
+      <span
+        key={word.id}
+        className={`word ${cursorPosition?.wordId === word.id ? 'word-selected' : ''}`}
+        data-word-id={word.id}
+        onClick={(e) => {
+          // Only trigger if not selecting text
+          if (window.getSelection().toString() === '') {
+            onWordClick(segment.id, word.id);
+          }
+        }}
+        onMouseEnter={() => onWordHover(segment.id, word.id)}
+        onMouseLeave={() => onWordHover(null, null)}
+      >
+        {word.text}
+        {index < segment.words.length - 1 ? ' ' : ''}
+        {cursorPosition?.wordId === word.id && (
+  <Box
+    component="span"
+    sx={{
+      position: 'absolute',
+      // Position based on isStartOfWord
+      ...(cursorPosition?.isStartOfWord ? { left: 0 } : { right: 0 }),
+      top: 0,
+      width: 2,
+      height: '100%',
+      backgroundColor: 'primary.main',
+      animation: 'blink 1s step-end infinite',
+      '@keyframes blink': {
+        '50%': {
+          opacity: 0
+        }
+      },
+      pointerEvents: 'none'
+    }}
+  />
+)}
+      </span>
+    ))}
+  </Typography>
+</Box>
               </Box>
             </Box>
-          </Box>
         </Box>
 
         {isHovered && (

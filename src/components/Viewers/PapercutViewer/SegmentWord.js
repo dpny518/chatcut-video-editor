@@ -1,7 +1,3 @@
-// components/Viewers/PapercutViewer/SegmentWord.js
-import React from 'react';
-import { Typography, Box } from '@mui/material';
-
 export const SegmentWord = React.memo(({ 
   word, 
   segment, 
@@ -10,17 +6,52 @@ export const SegmentWord = React.memo(({
   onWordClick,
   onWordHover
 }) => {
+  const handleMouseDown = (e) => {
+    console.log('MouseDown on word:', {
+      word,
+      selection: window.getSelection().toString(),
+      preventDefault: e.defaultPrevented,
+      target: e.target,
+      currentTarget: e.currentTarget
+    });
+  };
+
+  const handleClick = (e) => {
+    console.log('Click on word:', {
+      word,
+      selection: window.getSelection().toString(),
+      preventDefault: e.defaultPrevented,
+      target: e.target,
+      currentTarget: e.currentTarget
+    });
+    
+    // Only trigger word click if no text is selected
+    if (window.getSelection().toString() === '') {
+      onWordClick(segment.id, word.id);
+    }
+  };
+
+  const handleSelect = (e) => {
+    console.log('Select on word:', {
+      word,
+      selection: window.getSelection().toString(),
+      preventDefault: e.defaultPrevented
+    });
+  };
+
   return (
     <Typography
       component="span"
       variant="body2"
-      onClick={() => onWordClick(segment.id, word.id)}
+      onClick={handleClick}
+      onMouseDown={handleMouseDown}
+      onSelect={handleSelect}
       onMouseEnter={() => onWordHover(segment.id, word.id)}
       onMouseLeave={() => onWordHover(null, null)}
       data-word-id={word.id}
       sx={{
         display: 'inline-block',
-        cursor: 'pointer',
+        cursor: 'text',
         px: 0.5,
         py: 0.25,
         borderRadius: 1,
@@ -28,11 +59,10 @@ export const SegmentWord = React.memo(({
         backgroundColor: isSelected ? 'action.selected' : 'transparent',
         '&:hover': {
           backgroundColor: 'action.hover'
-        },
-        userSelect: 'none'
+        }
       }}
     >
-      {word.text}
+      {word.text + ' '}
       {isSelected && (
         <Box
           sx={{

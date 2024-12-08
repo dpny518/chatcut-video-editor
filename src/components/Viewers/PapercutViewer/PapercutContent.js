@@ -1,6 +1,6 @@
 // PapercutContent.js
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Box, useTheme } from '@mui/material';
+import { Box, useTheme, Typography } from '@mui/material';
 import { useDragAndDrop } from '../../../hooks/usePapercut/useDragAndDrop';
 import Segment from './Segment'; 
 import WordMetadata from './WordMetadata';
@@ -167,7 +167,7 @@ const handleKeyDown = useCallback((event) => {
           updateCursorPosition({
             segmentId: cursorPosition.segmentId,
             wordId: currentSegment.words[0].id,
-            isStartOfWord: true // Optional: if you want to track cursor position within word
+            isStartOfWord: true // This flag is important for showing cursor on left
           });
         } else {
           // Different speaker, move to end of last word in previous segment
@@ -402,6 +402,11 @@ const handleKeyDown = useCallback((event) => {
               borderColor: 'divider',
               bgcolor: 'background.paper',
               zIndex: 1000,
+              height: '100px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden'
             }}
           >
             {hoveredWord ? (
@@ -419,7 +424,7 @@ const handleKeyDown = useCallback((event) => {
                   ?.sourceReference?.fileId}
               />
             ) : (
-              <div>No word hovered</div>
+              <Typography variant="body2">No word hovered</Typography>
             )}
           </Box>
     </Box>
