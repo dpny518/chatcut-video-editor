@@ -11,6 +11,8 @@ import { useSpeakerColors } from '../../../contexts/SpeakerColorContext';
 
 const PapercutContent = ({ papercutId }) => {
   const [hoveredSegment, setHoveredSegment] = useState(null);
+  const [hoveredWord, setHoveredWord] = useState(null);
+  const [nativeCursorPosition, setNativeCursorPosition] = useState(null);
   const [selectedSegments, setSelectedSegments] = useState(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -58,6 +60,14 @@ const PapercutContent = ({ papercutId }) => {
   const handleWordClick = useCallback((segmentId, wordId) => {
     updateCursorPosition({ segmentId, wordId });
   }, [updateCursorPosition]);
+
+  const handleWordHover = useCallback((segmentId, wordId) => {
+    const timerId = setTimeout(() => {
+      setHoveredWord({ segmentId, wordId });
+    }, 500);
+
+    return () => clearTimeout(timerId);
+  }, []);
 
   const handleSegmentClick = useCallback((e, segmentId) => {
     // Don't trigger selection when clicking text or trash
@@ -263,6 +273,47 @@ const handleKeyDown = useCallback((event) => {
     }
   }, [hasScrolled, lastInsertedSegmentId]);
 
+  const handleMouseMove = useCallback((e) => {
+    const wordElement = e.target.closest('[data-word-id]');
+    const segmentElement = e.target.closest('[data-segment-id]');
+    
+    if (wordElement && segmentElement) {
+      const segmentId = segmentElement.getAttribute('data-segment-id');
+      const wordId = wordElement.getAttribute('data-word-id');
+      setNativeCursorPosition({ segmentId, wordId });
+    } else {
+      setNativeCursorPosition(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('nativeCursorPosition changed:', nativeCursorPosition);
+    if (nativeCursorPosition) {
+      const timer = setTimeout(() => {
+        console.log('Setting hoveredWord:', nativeCursorPosition);
+        setHoveredWord(nativeCursorPosition);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      console.log('Clearing hoveredWord');
+      setHoveredWord(null);
+    }
+  }, [nativeCursorPosition]);
+
+  useEffect(() => {
+    if (nativeCursorPosition) {
+      console.log('Cursor over word:', nativeCursorPosition);
+      const timer = setTimeout(() => {
+        console.log('Setting hovered word:', nativeCursorPosition);
+        setHoveredWord(nativeCursorPosition);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      console.log('Cursor not over word');
+      setHoveredWord(null);
+    }
+  }, [nativeCursorPosition]);
+
   return (
     <Box 
       sx={{ 
@@ -273,6 +324,8 @@ const handleKeyDown = useCallback((event) => {
       }}
       tabIndex={0}
       onKeyDown={handleKeyDown}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setNativeCursorPosition(null)}
     >
       <Box 
         ref={contentRef}
@@ -285,57 +338,61 @@ const handleKeyDown = useCallback((event) => {
       >
         {dragState.springs.map((style, index) => {
           const segment = content[index];
+          console.log('Mapping segment:', segment);
           return (
             <Segment
-              key={segment.id}
-              ref={(el) => setSegmentRef(el, segment.id)}
-              segment={segment}
-              dragState={dragState}
-              isSelected={selectedSegments.has(segment.id)}
-              isHovered={hoveredSegment === segment.id}
-              theme={theme}
-              getSpeakerColor={getSpeakerColor}
-              onDeleteSegment={handleDeleteSegment}
-              cursorPosition={cursorPosition}
-              onWordClick={handleWordClick}
-              onMouseEnter={() => setHoveredSegment(segment.id)}
-              onMouseLeave={() => setHoveredSegment(null)}
-              onClick={(e) => handleSegmentClick(e, segment.id)}
-              style={style}
-            />
+                  key={segment.id}
+                  ref={(el) => setSegmentRef(el, segment.id)}
+                  segment={segment}
+                  dragState={dragState}
+                  isSelected={selectedSegments.has(segment.id)}
+                  isHovered={hoveredSegment === segment.id}
+                  theme={theme}
+                  getSpeakerColor={getSpeakerColor}
+                  onDeleteSegment={handleDeleteSegment}
+                  cursorPosition={cursorPosition}
+                  onWordClick={handleWordClick}
+                  onWordHover={handleWordHover}  // Add this prop
+                  onMouseEnter={() => setHoveredSegment(segment.id)}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  onClick={(e) => handleSegmentClick(e, segment.id)}
+                  style={style}
+                />
           );
         })}
       </Box>
       
       <Box
-        sx={{
-          position: 'sticky',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          borderTop: 1,
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-          zIndex: 1000,
-        }}
-      >
-        {cursorPosition && (
-          <WordMetadata
-            word={content
-              .find(s => s.id === cursorPosition.segmentId)
-              ?.words.find(w => w.id === cursorPosition.wordId)}
-            segment={content.find(s => s.id === cursorPosition.segmentId)}
-            segmentIndex={content.findIndex(s => s.id === cursorPosition.segmentId)}
-            wordIndex={content
-              .find(s => s.id === cursorPosition.segmentId)
-              ?.words.findIndex(w => w.id === cursorPosition.wordId)}
-            fileId={content
-              .find(s => s.id === cursorPosition.segmentId)
-              ?.sourceReference?.fileId}
-          />
-        )}
-      </Box>
+            sx={{
+              position: 'sticky',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              width: '100%',
+              borderTop: 1,
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              zIndex: 1000,
+            }}
+          >
+            {hoveredWord ? (
+              <WordMetadata
+                word={content
+                  .find(s => s.id === hoveredWord.segmentId)
+                  ?.words.find(w => w.id === hoveredWord.wordId)}
+                segment={content.find(s => s.id === hoveredWord.segmentId)}
+                segmentIndex={content.findIndex(s => s.id === hoveredWord.segmentId)}
+                wordIndex={content
+                  .find(s => s.id === hoveredWord.segmentId)
+                  ?.words.findIndex(w => w.id === hoveredWord.wordId)}
+                fileId={content
+                  .find(s => s.id === hoveredWord.segmentId)
+                  ?.sourceReference?.fileId}
+              />
+            ) : (
+              <div>No word hovered</div>
+            )}
+          </Box>
     </Box>
   );
 };

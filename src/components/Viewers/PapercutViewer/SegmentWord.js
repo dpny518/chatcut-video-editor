@@ -7,13 +7,17 @@ export const SegmentWord = React.memo(({
   segment, 
   isSelected, 
   isStartOfWord, 
-  onWordClick 
+  onWordClick,
+  onWordHover
 }) => {
   return (
     <Typography
       component="span"
       variant="body2"
       onClick={() => onWordClick(segment.id, word.id)}
+      onMouseEnter={() => onWordHover(segment.id, word.id)}
+      onMouseLeave={() => onWordHover(null, null)}
+      data-word-id={word.id}
       sx={{
         display: 'inline-block',
         cursor: 'pointer',

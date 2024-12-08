@@ -12,13 +12,15 @@ const SegmentWord = React.memo(({
   segment, 
   isSelected, 
   isStartOfWord, 
-  onWordClick 
+  onWordClick,
+  onWordHover
 }) => {
   return (
     <Typography
       component="span"
       variant="body2"
       onClick={() => onWordClick(segment.id, word.id)}
+      onMouseEnter={() => onWordHover(segment.id, word.id)}
       sx={{
         display: 'inline-block',
         cursor: 'pointer',
@@ -66,6 +68,7 @@ const Segment = forwardRef(({
   onDeleteSegment,
   cursorPosition,
   onWordClick,
+  onWordHover,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -88,6 +91,7 @@ const Segment = forwardRef(({
       ref={ref}
       id={`segment-${segment.id}`}
       className="relative"
+      data-segment-id={segment.id}
       sx={{
         scrollMarginTop: '100px',
         marginBottom: '16px',
@@ -210,6 +214,7 @@ const Segment = forwardRef(({
                               cursorPosition?.wordId === word.id}
                     isStartOfWord={cursorPosition?.isStartOfWord}
                     onWordClick={onWordClick}
+                    onWordHover={onWordHover}
                   />
                 ))}
               </Box>
